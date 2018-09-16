@@ -89,9 +89,11 @@ class WorkerHandler(metaclass=abc.ABCMeta):
     library from pathos, however, the class adds the following functionality:
         a) Capability of switching between multiprocessing and multi-threading seamlessly, with a consistent interface
         b) Specific Worker-Server Model, including management of resources and progress tracking.
-        c) Timing of individual tasks
-    """
+        c) Timing of individual tasks for performance tracking.
 
+    Technicalities:
+      * Communication is
+    """
     HANDLER_ID = 0
 
     # ======================================== Internal Interfaces ======================================== #
