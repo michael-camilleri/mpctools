@@ -1,2 +1,2 @@
-pathos
-numpy
+pathos  # Must be installed through PIP
+numpy   # Can be installed through Conda

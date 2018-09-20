@@ -33,6 +33,10 @@ class ProgressBar:
         self.__count = int(0)
         self.__prefix = None
 
+    @property
+    def Sink(self):
+        return self.__sink
+
     def reset(self, prefix='', suffix=''):
         """
         Convenience Function for starting the Progress bar:
@@ -89,22 +93,27 @@ class WorkerHandler(metaclass=abc.ABCMeta):
     library from pathos, however, the class adds the following functionality:
         a) Capability of switching between multiprocessing and multi-threading seamlessly, with a consistent interface
         b) Specific Worker-Server Model, including management of resources and progress tracking.
-        c) Timing of individual tasks for performance tracking.
+        c) (Crude) Timing of individual tasks for performance tracking.
 
     Technicalities:
-      * Communication is
+      * Communication is done via a queue interface.
+      * When multi-threading is enabled (as opposed to multiprocessing) the threads are run one at a time (there is no
+            inter-leaving.
     """
     HANDLER_ID = 0
 
     # ======================================== Internal Interfaces ======================================== #
     class Worker(metaclass=abc.ABCMeta):
         """
-        This is the Worker Interface
-        """
+        This is the Worker Interface. All worker-threads should implement this abstract interface, specifically
+        the parallel_compute method.
 
-        @property
-        def Statistics(self):
-            return self.__stats
+        The workers communicate with the Handler through a queue (accessed through the handler interface). Each message
+        consists of two parts:
+            a) ID: this is 0 for the Handler itself (i.e. when informing the update thread of completion) and greater
+                    than 0 otherwise.
+            b) progress: A number between 0 and 100 indicating the current (relative) progress.
+        """
 
         def __init__(self, id, handler):
             """
@@ -119,7 +128,6 @@ class WorkerHandler(metaclass=abc.ABCMeta):
             """
             self.ID = id
             self.__queue = weakref.ref(handler.Queue)   # Keep Weak-Reference to Handler Class' Queue
-            self.__stats = {}                           # Empty Dictionary of Statistics
             handler._register_worker(id)
 
         @abc.abstractmethod
@@ -130,28 +138,25 @@ class WorkerHandler(metaclass=abc.ABCMeta):
             Must be implemented by respective classes.
             :param _common: Any common data, across all workers
             :param _data:   The Data to utilise for each individual computation
-            :return:        Any results (tupled)
+            :return:        Any results **Must be a Tuple, at least of size 1**
             """
             raise NotImplementedError()
 
-        def update_progress(self, progress, stats=None):
+        def update_progress(self, progress):
             """
-            Must be called to indicate progress updates
+            Should be called to indicate progress updates by the worker-thread.
 
             Note, that due to some bug in the MultiProcessing Library, which seems to sometimes reset the connection,
              I had to wrap this in a try-catch block
 
             :param progress: A number between 0 and 100 indicating the *CURRENT* progress as a percentage
-            :param stats:    Dictionary of Key-Value pairs (statistics)
-            :return:
+            :return: None
             """
             try:
                 self.__queue().put((self.ID, progress), block=False)
             except TypeError:
                 sys.stderr.write('Warn: TypeError Encountered')
                 pass
-            if stats:
-                dictextend(self.__stats, stats)
 
 
     # ========================================= Abstract Interface ========================================= #
@@ -172,32 +177,30 @@ class WorkerHandler(metaclass=abc.ABCMeta):
     def Queue(self):
         return self._queue
 
-    def __init__(self, num_proc, sink=sys.stdout):
+    def __init__(self, num_proc):
         """
         Initialiser
 
-        :param num_proc:    Number of processes to employ (default to the number of cores less 2) If 0 or less, then
-                            defaults to Multi-Threading instead
-        :param sink:        Sink where to write progress to (may be None)
+        :param num_proc:    Number of processes to employ (default to the number of cores less 2). If 0 or less, then
+                            defaults to Multi-Threading instead of Multi-Processing: this can be especially useful for
+                            debugging.
         """
         # Parameters
-        self.Sink = sink                        # Sink where to write progress to
         self.NumProc = num_proc                 # Number of Processes to employ
 
         # Management
         self._queue = mp.Manager().Queue() if num_proc > 0 else queue.Queue()   # Queue
         self.__timers = {}                                                      # Timers
         self.__thread = None                                                    # Progress Thread Handler
-        self.__worker_set = None                                                # Dictionary of Workers and progress
-        self.__done = 0                         # How many are finished
-        self.__tasks_done = 0                   # How many (workers) are finished
-        self.__complexity = 0                   # How many Tasks (work-points) we have
+        self.__worker_set = None                                                # List of Workers and progress
+        self.__done = 0                             # How many are finished
+        self.__tasks_done = 0                       # How many (workers) are finished
+        self.__progress = None                      # Eventually will be the progress bar
 
     def _reset(self, num_workers):
         self.__thread = threading.Thread(target=self.__handler_thread)
         self.__worker_set = np.zeros(num_workers)  # Set of Workers and associated progress
         self.__tasks_done = 0                      # How many (workers) are finished
-        self.__complexity = 100*num_workers        # How many Tasks (work-points) we have
 
     def start_timer(self, name):
         """
@@ -227,16 +230,18 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         """
         return self.__timers[name][1] - self.__timers[name][0]
 
-    def RunWorkers(self, _num_work, _type, _configs, _args):
+    def run_workers(self, _num_work, _type, _configs, _args, _sink=sys.stdout):
         """
-        Starts the Pool of Workers and executes.
+        Starts the Pool of Workers and executes them.
 
-        The method blocks until all workers have completed
+        The method blocks until all workers have completed. However, it also starts a background update-thread which
+        publishes information about progress.
 
         :param _num_work:   Number of workers to initialise
         :param _type:       The worker type to run
         :param _configs:    These are common across all workers: may be None
-        :param _args:       These are arguments per-worker. Must be a list equal in length to _workers
+        :param _args:       These are arguments per-worker. Must be a list equal in length to _num_work or None
+        :param sink:        Sink where to write progress to (may be None)
         :return:            Result of the Aggregator
         """
         # Reset Everything
@@ -266,6 +271,12 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         self.Queue.put([0, -1])
         self.__thread.join()
 
+        # Prepare the Progress Bar if not None
+        if _sink is not None:
+            self.__progress = ProgressBar(100 * _num_work, sink=_sink)
+        else:
+            self.__progress = None
+
         # Return the aggregated information
         return aggregated
 
@@ -289,8 +300,9 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         _continue = True
 
         # Print First one
-        print_progress(0, self.__complexity, sink=self.Sink, prefix=('Working [{0} Proc]'.format(self.NumProc) if self.NumProc > 0 else 'Working [Multi-Thread]'),
-                       suffix='Completed {0}/{1} Tasks'.format(self.__done, len(self.__worker_set)), print_suffix=True)
+        self.__progress.reset(prefix=('Working [{0} Proc]'.format(self.NumProc) if self.NumProc > 0 else
+                                      'Working [Multi-Thread]'),
+                              suffix=('Completed {0}/{1} Tasks'.format(self.__done, len(self.__worker_set))))
 
         # This provides an infinite loop until signalled to stop
         while _continue:
@@ -301,13 +313,11 @@ class WorkerHandler(metaclass=abc.ABCMeta):
                 if _msg[1] == 100.0 and self.__worker_set[_msg[0]-1] < 100: self.__done += 1
                 self.__worker_set[_msg[0]-1] = _msg[1]
                 # Print Progress
-                print_progress(self.__worker_set.sum(), self.__complexity, prefix='Working [{0} Proc]'.format(self.NumProc),
-                               suffix='Completed {0}/{1} Tasks'.format(self.__done, len(self.__worker_set)),
-                               print_suffix=True, sink=self.Sink)
+                self.__progress.update(set=self.__worker_set.sum(),
+                                       suffix='Completed {0}/{1} Tasks'.format(self.__done, len(self.__worker_set)))
             else:
                 _continue = False
-                if self.Sink is not None:
-                    self.Sink.write('Done: Completed All Tasks\n' if self.__done == len(self.__worker_set) else
+                self.Sink.write('Done: Completed All Tasks\n' if self.__done == len(self.__worker_set) else
                                     '\nStopped after {0}/{1} Tasks\n'.format(self.__done, len(self.__worker_set)))
 
             # Indicate Task Done
