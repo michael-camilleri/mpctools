@@ -12,6 +12,8 @@ class ProgressBar:
     """
     Class for printing a progress bar. The code is adapted from:
         https://gist.github.com/aubricus/f91fb55dc6ba5557fbab06119420dd6a
+
+    This is a convenient method for displaying (and keeping track) of progress.
     """
 
     def __init__(self, total, width=100, sink=sys.stdout, prec=1):
@@ -87,6 +89,65 @@ class ProgressBar:
         return
 
 
+class IWorker(metaclass=abc.ABCMeta):
+    """
+    This is the Worker Interface. All worker-threads should implement this abstract interface, specifically
+    the parallel_compute method.
+
+    IWorker instances should be stateless, with all functionality contained within the parallel_compute method. Each
+    worker is managed by the WorkManager (below), which controls instantiation, execution and progress control. The
+    workers communicate with the Manager through a queue (to which each IWorker has access).
+    """
+
+    def __init__(self, _id, _mgr):
+        """
+        Initialiser
+
+        Note that the implementation Constructor should follow the same template and not take additional arguments:
+        these must be passed to the parallel_compute method if required.
+
+        :param _id:  A Unique Identifier: This must be greater than 0!
+        :param _mgr: An instance of a Worker Handler for getting the queue from.
+
+        """
+        self.ID = _id
+        self.__queue = weakref.ref(_mgr.Queue)   # Keep Weak-Reference to Handler Class' Queue
+        _mgr._register_worker(id)
+
+    def update_progress(self, progress):
+        """
+        This method should be called (regularly) to indicate progress updates by the worker-thread.
+
+        Internally, it uses the manager queue to update it of progress. Each message consists of two parts:
+            a) ID: this is automatically assigned (and managed) by the Manager, and is a number greater than 0 (which is
+                   reserved for the Manager itself.
+            b) Progress: A number between 0 and 100 indicating the current (relative) progress.
+
+        Note, that due to some bug in the MultiProcessing Library, which seems to sometimes reset the connection,
+         I had to wrap this in a try-catch block
+
+        :param progress: A number between 0 and 100 indicating the *CURRENT* progress as a percentage
+        :return: None
+        """
+        try:
+            self.__queue().put((self.ID, progress), block=False)
+        except TypeError:
+            sys.stderr.write('Warn: TypeError Encountered')
+            pass
+
+    @abc.abstractmethod
+    def parallel_compute(self, _common, _data):
+        """
+        Parallel Computation to be performed
+
+        Must be implemented by respective classes.
+        :param _common: Any common data, across all workers
+        :param _data:   The Data to utilise for each individual computation
+        :return:        Any results **Must be a Tuple, at least of size 1**
+        """
+        raise NotImplementedError()
+
+
 class WorkerHandler(metaclass=abc.ABCMeta):
     """
     This Class Implements an interface for controlling multiple workers. It is itself based on the multiprocessing
@@ -103,60 +164,7 @@ class WorkerHandler(metaclass=abc.ABCMeta):
     HANDLER_ID = 0
 
     # ======================================== Internal Interfaces ======================================== #
-    class Worker(metaclass=abc.ABCMeta):
-        """
-        This is the Worker Interface. All worker-threads should implement this abstract interface, specifically
-        the parallel_compute method.
 
-        The workers communicate with the Handler through a queue (accessed through the handler interface). Each message
-        consists of two parts:
-            a) ID: this is 0 for the Handler itself (i.e. when informing the update thread of completion) and greater
-                    than 0 otherwise.
-            b) progress: A number between 0 and 100 indicating the current (relative) progress.
-        """
-
-        def __init__(self, id, handler):
-            """
-            Initialiser
-
-            Note that the implementation Constructor should not take additional arguments: these may be passed to the
-            parallel_compute method
-
-            :param id:      A Unique Identifier: This must be greater than 0!
-            :param handler: An instance of a Worker Handler for getting the queue from
-            :param params:  Additional parameters (in a tuple) to be used by the child implementation
-            """
-            self.ID = id
-            self.__queue = weakref.ref(handler.Queue)   # Keep Weak-Reference to Handler Class' Queue
-            handler._register_worker(id)
-
-        @abc.abstractmethod
-        def parallel_compute(self, _common, _data):
-            """
-            Parallel Computation to be performed
-
-            Must be implemented by respective classes.
-            :param _common: Any common data, across all workers
-            :param _data:   The Data to utilise for each individual computation
-            :return:        Any results **Must be a Tuple, at least of size 1**
-            """
-            raise NotImplementedError()
-
-        def update_progress(self, progress):
-            """
-            Should be called to indicate progress updates by the worker-thread.
-
-            Note, that due to some bug in the MultiProcessing Library, which seems to sometimes reset the connection,
-             I had to wrap this in a try-catch block
-
-            :param progress: A number between 0 and 100 indicating the *CURRENT* progress as a percentage
-            :return: None
-            """
-            try:
-                self.__queue().put((self.ID, progress), block=False)
-            except TypeError:
-                sys.stderr.write('Warn: TypeError Encountered')
-                pass
 
 
     # ========================================= Abstract Interface ========================================= #
