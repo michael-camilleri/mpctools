@@ -2,12 +2,12 @@
 This is the Setup Script for installing the Library
 """
 
-from setuptools import setup, find_namespace_packages
+from setuptools import setup
 
 setup(
     # Common Setup
     name="mpctools",
-    version="0.1.1",
+    version="0.1.2",
     packages=['mpctools.extensions', 'mpctools.multiprocessing'],
 
     # Requirements

@@ -1,4 +1,5 @@
 from pathos.helpers import mp
+from extensions import utils
 import numpy as np
 import threading
 import weakref
@@ -184,13 +185,14 @@ class WorkerHandler(metaclass=abc.ABCMeta):
     def Queue(self):
         return self._queue
 
-    def __init__(self, num_proc):
+    def __init__(self, num_proc, sink=sys.stdout):
         """
         Initialiser
 
         :param num_proc:    Number of processes to employ (default to the number of cores less 2). If 0 or less, then
                             defaults to Multi-Threading instead of Multi-Processing: this can be especially useful for
                             debugging.
+        :param sink:        Sink where to write progress to (may be None)
         """
         # Parameters
         self.NumProc = num_proc                 # Number of Processes to employ
@@ -203,6 +205,7 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         self.__done = 0                             # How many are finished
         self.__tasks_done = 0                       # How many (workers) are finished
         self.__progress = None                      # Eventually will be the progress bar
+        self.__sink = utils.NullableSink(sink)      # Sink to write to
 
     def _reset(self, num_workers):
         self.__thread = threading.Thread(target=self.__handler_thread)
@@ -237,7 +240,7 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         """
         return self.__timers[name][1] - self.__timers[name][0]
 
-    def run_workers(self, _num_work, _type, _configs, _args, _sink=sys.stdout):
+    def run_workers(self, _num_work, _type, _configs, _args):
         """
         Starts the Pool of Workers and executes them.
 
@@ -248,7 +251,6 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         :param _type:       The worker type to run
         :param _configs:    These are extensions across all workers: may be None
         :param _args:       These are arguments per-worker. Must be a list equal in length to _num_work or None
-        :param _sink:       Sink where to write progress to (may be None)
         :return:            Result of the Aggregator
         """
         # Reset Everything
@@ -256,7 +258,7 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         _args = _args if _args is not None else [None for _ in range(_num_work)]
 
         # Prepare the Progress Bar: will automatically handle None
-        self.__progress = ProgressBar(100 * _num_work, sink=_sink)
+        self.__progress = ProgressBar(100 * _num_work, sink=self.__sink.Obj)
 
         # Create List of Worker Objects, and initialise thread
         _workers = [_type(_i+1, self) for _i in range(_num_work)]
@@ -300,6 +302,17 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         """
         assert wrk_id > 0, 'Worker ID must be greater than 0'
         self.__worker_set[wrk_id-1] = 0.0
+
+    def _write(self, *args):
+        self.__sink.write(*args)
+
+    def _flush(self):
+        self.__sink.flush()
+
+    def _print(self, *args):
+        self.__sink.write(*args)
+        self.__sink.write('\n')
+        self.__sink.flush()
 
     def __handler_thread(self):
         # Flag for Stopping the function
