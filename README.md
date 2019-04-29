@@ -9,15 +9,18 @@ This Library has the following dependencies:
   * scikit-multilearn
   * **opencv-python**
   * scikit-learn
-  * cudatoolkit
+  * **cudatoolkit**
   * matplotlib
-  * pytorch
+  * **pytorch**
   * pandas
-  * pathos
+  * **pathos**
   * numpy
   
 Most of the above can be automatically installed through the library itself (i.e. pip will attempt to download them).
-However, you may wish to install some explicitly: specifically, opencv is not included in the list of requirements since one may wish to build it from source and allow for proprietery codecs.
+However, you may wish to install some explicitly: specifically, the libraries listed in bold are not included:
+   1. `opencv` is not included in the list of requirements since one may wish to build it from source and allow for proprietery codecs.
+   2. `pathos` is not included as this is only required if using the multiprocessing toolbox
+   2. `pytorch` and `cudatoolkit` are not included as these are only required if using the torchext toolbox
 
 ### Installing
 

@@ -11,7 +11,7 @@ setup(
     packages=['mpctools.extensions', 'mpctools.multiprocessing'],
 
     # Requirements
-    install_requires=['numpy', 'pathos'],
+    install_requires=['numpy', 'pathos', 'scikit-multilearn', 'scikit-learn', 'matplotlib', 'pandas'],
 
     # Meta-Data
     author='Michael P. J. Camilleri',

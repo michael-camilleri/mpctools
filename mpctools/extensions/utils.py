@@ -2,12 +2,14 @@
 Other General Utilities
 """
 import numpy as np
+import shutil
 import copy
+import os
+
 
 ################################################
-##           Collections Processing           ##
+#            Collections Processing            #
 ################################################
-
 
 def to_tuple(value):
     """
@@ -74,8 +76,24 @@ def dzip(*_dcts):
         yield (i, tuple(d[i] for d in _dcts))
 
 
+def dict_invert(_dict):
+    """
+    Inverts the Key-Value pairs in a dictionary.
+    ***IMP***: They Value entries themselves must be unique
+    The function also works on lists (putting values as keys and the index in the list as values
+
+    :param _dict: The dictionary to invert or a list to extract from
+    :return:      A new dict object which the key-value entries reversed (i.e. values become keys and v.v.)
+    """
+    if type(_dict) is dict:
+        return {v: k for k, v in _dict.items()}
+    else:
+        return {v: k for k, v in enumerate(_dict)}
 
 
+################################################
+#            Printing & Formatting             #
+################################################
 
 class NullableSink:
     """
@@ -84,10 +102,105 @@ class NullableSink:
     def __init__(self, obj=None):
         self.Obj = obj
 
-    def write(self, str):
+    def write(self, *args):
         if self.Obj is not None:
-            self.Obj.write(str)
+            self.Obj.write(*args)
 
     def flush(self):
         if self.Obj is not None:
             self.Obj.flush()
+
+    def print(self, *args):
+        self.write(*args)
+        self.write('\n')
+        self.flush()
+
+
+def name(obj):
+    """
+    Static (Module) Method for outputting the name of a data type. This amounts to calling the __name__ method on
+    the passed obj (or its class type) if it exists, or calling string otherwise on it... (mainly for None Types)
+
+    :param obj: An instance or class type.
+    :return: string representation of 'obj'
+    """
+    if isinstance(obj, type):
+        if hasattr(obj, '__name__'):
+            return obj.__name__
+        else:
+            return str(obj)
+    else:
+        return obj.__class__.__name__
+
+
+def float_list(_list, prec=2):
+    """
+    Print a List of Floating point numbers with arbitrary precision
+
+    :param _list: List of floats
+    :param prec:  Precision
+    :return:
+    """
+    return ['{1:.{0}f}'.format(prec, f) for f in _list]
+
+
+def str_width(_iterable):
+    """
+    Returns the maximum width of all strings in iterable
+
+    :param _iterable:
+    :return:
+    """
+    return max([len(str(s)) for s in _iterable])
+
+
+def dict_width(_dict):
+    """
+    Returns the maximum length of all elements in a dictionary. Note that if the dict contains strings, strwidth should
+    be used, as this will always return 1.
+
+    :param _dict: Dictionary: elements may or may not implement the len function
+    :return:
+    """
+    return max([len(to_tuple(s)) for s in _dict.values()])
+
+
+def short_int(_int):
+    """
+    Returns a shorted representation of large numbers
+
+    :param _int: Integer (or float) value
+    :return:     String representation
+    """
+    if _int < 1000:
+        return str(_int)
+    elif _int < 1000000:
+        return '{0:.4g}K'.format(_int/1000)
+    elif _int < 1000000000:
+        return '{0:.4g}M'.format(_int/1000000)
+    else:
+        return '{0:.4g}G'.format(_int/1000000000)
+
+
+################################################
+#                OS Manipulation               #
+################################################
+
+def make_dir(_path, _clear=False):
+    """
+    Static (Module) Method for ensuring that the given path exists, and if not, will attempt to create it.
+
+    :param _path: The Full Directory to create
+    :param _clear: If True, will clear any contents previously in the directory if it existed.
+    :return: None
+    :raises OSError: if unable to create the directory
+    """
+    # First, if asked to clear, then remove directory
+    if _clear and os.path.isdir(_path):
+        shutil.rmtree(_path)
+
+    # Now (Re)Create
+    try:
+        os.makedirs(_path)
+    except OSError:
+        if not os.path.isdir(_path): raise
