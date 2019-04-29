@@ -106,7 +106,9 @@ class IWorker(metaclass=abc.ABCMeta):
         Note that the implementation Constructor should follow the same template and not take additional arguments:
         these must be passed to the parallel_compute method if required.
 
-        :param _id:  A Unique Identifier: This must be greater than 0!
+        :param _id:  A Unique Identifier: This will be greater than 0! This is typically used not only to identify the
+                        different workers, but could also be used to help ensure a consistent but unique seed to each of
+                        the workers.
         :param _mgr: An instance of a Worker Handler for getting the queue from.
 
         """
@@ -141,7 +143,7 @@ class IWorker(metaclass=abc.ABCMeta):
         Parallel Computation to be performed
 
         Must be implemented by respective classes.
-        :param _common: Any common data, across all workers
+        :param _common: Any extensions data, across all workers
         :param _data:   The Data to utilise for each individual computation
         :return:        Any results **Must be a Tuple, at least of size 1**
         """
@@ -159,12 +161,9 @@ class WorkerHandler(metaclass=abc.ABCMeta):
     Technicalities:
       * Communication is done via a queue interface.
       * When multi-threading is enabled (as opposed to multiprocessing) the threads are run one at a time (there is no
-            inter-leaving.
+            inter-leaving). This can provide a better level of debugging.
     """
     HANDLER_ID = 0
-
-    # ======================================== Internal Interfaces ======================================== #
-
 
 
     # ========================================= Abstract Interface ========================================= #
@@ -247,9 +246,9 @@ class WorkerHandler(metaclass=abc.ABCMeta):
 
         :param _num_work:   Number of workers to initialise
         :param _type:       The worker type to run
-        :param _configs:    These are common across all workers: may be None
+        :param _configs:    These are extensions across all workers: may be None
         :param _args:       These are arguments per-worker. Must be a list equal in length to _num_work or None
-        :param sink:        Sink where to write progress to (may be None)
+        :param _sink:       Sink where to write progress to (may be None)
         :return:            Result of the Aggregator
         """
         # Reset Everything
@@ -288,10 +287,12 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         # Return the aggregated information
         return aggregated
 
-    def __computer(self, worker, arguments):
+    @staticmethod
+    def __computer(worker, arguments):
         return worker.parallel_compute(arguments[0], arguments[1])
 
-    def __threader(self, worker, arguments, _queue):
+    @staticmethod
+    def __threader(worker, arguments, _queue):
         _queue.put(worker.parallel_compute(arguments[0], arguments[1]))
 
     def _register_worker(self, wrk_id):
@@ -325,8 +326,11 @@ class WorkerHandler(metaclass=abc.ABCMeta):
                                        suffix='Completed {0}/{1} Tasks'.format(self.__done, len(self.__worker_set)))
             else:
                 _continue = False
-                self.Sink.write('Done: Completed All Tasks\n' if self.__done == len(self.__worker_set) else
-                                    '\nStopped after {0}/{1} Tasks\n'.format(self.__done, len(self.__worker_set)))
+                if self.__progress.Sink is not None:
+                    self.__progress.Sink.write('Done: Completed All Tasks\n' if self.__done == len(self.__worker_set)
+                                               else '\nStopped after {0}/{1} Tasks\n'
+                                               .format(self.__done, len(self.__worker_set)))
 
             # Indicate Task Done
             self.Queue.task_done()
+
