@@ -1,1 +1,0 @@
-# https://setuptools.readthedocs.io/en/latest/setuptools.html

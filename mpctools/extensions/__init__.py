@@ -1,3 +1,1 @@
-
-
-__author__ = 'Michael P. Camilleri'
+__author__ = 'Michael P. J. Camilleri'

@@ -114,7 +114,7 @@ class IWorker(metaclass=abc.ABCMeta):
         """
         self.ID = _id
         self.__queue = weakref.ref(_mgr.Queue)   # Keep Weak-Reference to Handler Class' Queue
-        _mgr._register_worker(id)
+        _mgr._register_worker(_id)
 
     def update_progress(self, progress):
         """
@@ -255,6 +255,9 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         self._reset(_num_work)
         _args = _args if _args is not None else [None for _ in range(_num_work)]
 
+        # Prepare the Progress Bar: will automatically handle None
+        self.__progress = ProgressBar(100 * _num_work, sink=_sink)
+
         # Create List of Worker Objects, and initialise thread
         _workers = [_type(_i+1, self) for _i in range(_num_work)]
         self.__thread.start()
@@ -277,12 +280,6 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         # Inform and join thread
         self.Queue.put([0, -1])
         self.__thread.join()
-
-        # Prepare the Progress Bar if not None
-        if _sink is not None:
-            self.__progress = ProgressBar(100 * _num_work, sink=_sink)
-        else:
-            self.__progress = None
 
         # Return the aggregated information
         return aggregated
