@@ -4,6 +4,21 @@ Other General Utilities
 import numpy as np
 import copy
 
+################################################
+##           Collections Processing           ##
+################################################
+
+
+def to_tuple(value):
+    """
+    Static (Module) Method for converting a scalar into a tuple if not already (tuple/list/numpy array). Will also
+    ignore None. Note, that this does not handle dict types!
+
+    :param value: The Value to convert
+    :return: A Tuple containing value if a scalar, or value if already a list/tuple/numpy array/none
+    """
+    return value if (type(value) in (tuple, list, np.ndarray) or value is None) else (value,)
+
 
 def to_list(value):
     """
@@ -13,6 +28,17 @@ def to_list(value):
     :return: A List containing value if a scalar, or value if already a list/tuple/numpy array/none
     """
     return value if (type(value) in (tuple, list, np.ndarray) or value is None) else [value, ]
+
+
+def to_scalar(value):
+    """
+    Converts a single-element tuple into a scalar value if not already. To do this, it attempts to dereference the
+    first element if it is of type tuple, list or np.ndarray
+
+    :param value:
+    :return:
+    """
+    return value[0] if (type(value) in (tuple, list, np.ndarray)) else value
 
 
 def extend_dict(_d1, _d2, deep=False):
@@ -35,6 +61,20 @@ def extend_dict(_d1, _d2, deep=False):
 
     # Return _d1
     return _d1
+
+
+def dzip(*_dcts):
+    """
+    Generate an iterator over two (or more) dictionaries, parsing only the common keys.
+
+    :param _dcts:   Iterable of dictionaries
+    :return:        Enumerated iteration over common elements of dictionaries
+    """
+    for i in sorted(set(_dcts[0]).intersection(*_dcts[1:])):
+        yield (i, tuple(d[i] for d in _dcts))
+
+
+
 
 
 class NullableSink:
