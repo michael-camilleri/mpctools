@@ -1,12 +1,25 @@
+"""
+Implementation of a Progress Bar
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
+License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with this program. If not, see
+http://www.gnu.org/licenses/.
+"""
+
+
 import sys
 
 
 class ProgressBar:
     """
-    Class for printing a progress bar. The code is adapted from:
+    Class for printing a progress bar, while keeping track of progress. The code is adapted from:
         https://gist.github.com/aubricus/f91fb55dc6ba5557fbab06119420dd6a
-
-    This is a convenient method for displaying (and keeping track) of progress.
     """
 
     def __init__(self, total, width=100, sink=sys.stdout, prec=1):
@@ -18,7 +31,7 @@ class ProgressBar:
         :param sink:    The output sink: can be None to suppress output.
         :param prec:    The precision to display percentages at: Default 1 d.p.
         """
-        # Initaliseables
+        # Initialise Members
         self.__total = round(float(total))
         self.__width = round(float(width))
         self.__sink = sink
@@ -71,12 +84,11 @@ class ProgressBar:
 
         # Write Out
         _progress = self.__width * self.__count / self.__total
-        self.__sink.write('\r{0} |{1}{2}| {3:.{4}f} {5}'.format(self.__prefix,
-                                                                '\u2588'*int(_progress),
-                                                                '-'*(self.__total - int(_progress)),
-                                                                _progress, self.__prec,
-                                                                suffix))
-        if int(_progress) == self.__total: self.__sink.write('\n')
+        self.__sink.write('\r{0} |{1}{2}| {3:.{4}f}% {5}'.format(self.__prefix, '\u2588'*int(_progress),
+                                                                 '-'*(self.__width - int(_progress)), _progress,
+                                                                 self.__prec, suffix))
+        if int(_progress) == int(self.__width):
+            self.__sink.write(' [DONE]\n')
         self.__sink.flush()
 
         return self

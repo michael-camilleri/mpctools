@@ -1,3 +1,18 @@
+"""
+A Set of interfaces for multi-processing in python
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
+License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with this program. If not, see
+http://www.gnu.org/licenses/.
+"""
+
+
 from mpctools.extensions import utils
 from pathos.helpers import mp
 import numpy as np
@@ -72,15 +87,15 @@ class IWorker(metaclass=abc.ABCMeta):
 
 class WorkerHandler(metaclass=abc.ABCMeta):
     """
-    This Class Implements an interface for controlling multiple workers. It is itself based on the multiprocessing
+    This Class Implements an interface for controlling multiple workers. It is itself based on the parallel
     library from pathos, however, the class adds the following functionality:
-        a) Capability of switching between multiprocessing and multi-threading seamlessly, with a consistent interface
+        a) Capability of switching between parallel and multi-threading seamlessly, with a consistent interface
         b) Specific Worker-Server Model, including management of resources and progress tracking.
         c) (Crude) Timing of individual tasks for performance tracking.
 
     Technicalities:
       * Communication is done via a queue interface.
-      * When multi-threading is enabled (as opposed to multiprocessing) the threads are run one at a time (there is no
+      * When multi-threading is enabled (as opposed to parallel) the threads are run one at a time (there is no
             inter-leaving). This can provide a better level of debugging.
     """
     HANDLER_ID = 0

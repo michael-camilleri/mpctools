@@ -1,11 +1,224 @@
 """
-This module contains some extensions of numpy/pandas functionality (hence the name 'NumPy EXTensions').
+This module contains some extensions of numpy/scipy functionality (hence the name 'NumPy EXTensions').
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
+License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with this program. If not, see
+http://www.gnu.org/licenses/.
 """
+
 from scipy.optimize import linear_sum_assignment as hungarian
 from scipy.special import gamma
 from scipy.stats import entropy
+from functools import reduce
 import numpy as np
 
+
+################################################################
+#                       Array Operations                       #
+################################################################
+
+def masked_logsumexp(a, axis=None, b=None, keepdims=False, return_sign=False):
+    """
+    Compute the log of the sum of exponentials of input elements. This is identical to the scipy.special function,
+       but ignores Masked (NaN) values.
+
+    Parameters
+    ----------
+    a : array_like
+        Input array.
+    axis : None or int or tuple of ints, optional
+        Axis or axes over which the sum is taken. By default `axis` is None,
+        and all elements are summed.
+    b : array-like, optional
+        Scaling factor for exp(`a`) must be of the same shape as `a` or
+        broadcastable to `a`. These values may be negative in order to
+        implement subtraction.
+    keepdims : bool, optional
+        If this is set to True, the axes which are reduced are left in the
+        result as dimensions with size one. With this option, the result
+        will broadcast correctly against the original array.
+    return_sign : bool, optional
+        If this is set to True, the result will be a pair containing sign
+        information; if False, results that are negative will be returned
+        as NaN. Default is False (no sign information).
+
+    Returns
+    -------
+    res : ndarray
+        The result, ``np.log(np.sum(np.exp(a)))`` calculated in a numerically
+        more stable way. If `b` is given then ``np.log(np.sum(b*np.exp(a)))``
+        is returned.
+    sgn : ndarray
+        If return_sign is True, this will be an array of floating-point
+        numbers matching res and +1, 0, or -1 depending on the sign
+        of the result. If False, only one result is returned.
+    """
+    if b is not None:
+        a, b = np.broadcast_arrays(a, b)
+        if np.any(b == 0):
+            a = a + 0.  # promote to at least float
+            a[b == 0] = -np.inf
+
+    a_max = np.nanmax(a, axis=axis, keepdims=True)
+
+    if a_max.ndim > 0:
+        a_max[~np.isfinite(a_max)] = 0
+    elif not np.isfinite(a_max):
+        a_max = 0
+
+    if b is not None:
+        b = np.asarray(b)
+        tmp = b * np.exp(a - a_max)
+    else:
+        tmp = np.exp(a - a_max)
+
+    # suppress warnings about log of zero
+    with np.errstate(divide='ignore'):
+        s = np.nansum(tmp, axis=axis, keepdims=keepdims)
+        if return_sign:
+            sgn = np.sign(s)
+            s *= sgn  # /= makes more sense but we need zero -> zero
+        out = np.log(s)
+
+    if not keepdims:
+        a_max = np.squeeze(a_max, axis=axis)
+    out += a_max
+
+    if return_sign:
+        return out, sgn
+    else:
+        return out
+
+
+def exp10(a):
+    """
+    Raise 10 to array, elementwise
+
+    The function is a convenience similar to numpy's exp and exp2
+
+    :param a:   Arraylike or scalar to raise 10 to.
+    :return:    Numpy Array (or scalar) of same shape and type as array, with values 10 ^ array
+    """
+    return np.power(10.0, a)
+
+
+def clamp(a, cutoff, limits):
+    """
+    Clamp the values in a to limits at the cutoff: specifically, values less than or equal to the cutoff are converted
+    to limits[0] and values greather than cutoff are converted to limits[1]. This is a counterpart to the clip function.
+
+    :param a:       Array
+    :param cutoff:  Cutoff value for clamping from
+    :param limits:  Limits to clamp values to (min/max)
+    :return:        Clamped matrix
+    """
+    aa = a.copy()
+    aa_cutoff = aa <= cutoff
+    aa[aa_cutoff] = limits[0]
+    aa[~aa_cutoff] = limits[1]
+    return aa
+
+
+def mad(a, b, axis=None, keepdims=False):
+    """
+    Compute the Mean Absolute Deviation between two arrays: they must be of same size or broadcastable
+
+    :param a:           First Array
+    :param b:           Second Array
+    :param axis:        Axes along which to compute MAD
+    :param keepdims:    Whether to keep dimensions
+    :return:            MAD Array
+    """
+    return np.mean(np.abs(a - b), axis=axis, keepdims=keepdims)
+
+
+def multiply(arrays):
+    """
+    Multiply (element-wise) a series of arrays: they must all abe of the same shape!
+
+    :param arrays:  Tuple/list of arrays to multiply
+    :return:        Element-wise multiple
+    """
+    return reduce(np.multiply, arrays)
+
+
+def value_map(array, _to, _from=None, shuffle=False):
+    """
+    Map Values in a Numpy Array from a domain to another.
+
+    Currently supports only 1D arrays
+
+    :param array:  Array to map
+    :param _to:    Values to map to
+    :param _from:  Values to map from: if not present, it is assumed that the entries in to are ordered in their domain
+                    [0, len(to)-1]
+    :param shuffle: Optimisation: if True, does not need to use searchsorted (uses just array indexing). Only set this
+                     to True iff _from contains all contiguous values from 0 up to len(_to) - 1 (also no duplicates).
+    :return:       Mapped Array
+    """
+    # If just shuffling, then use just array indexing...
+    if shuffle:
+        if _from is not None:
+            sort_idx = np.argsort(_from)
+            return np.asarray(_to)[sort_idx][array]
+        else:
+            return np.asarray(_to)[array]
+
+    # Otherwise, have to use search sorted: in this case, from cannot be None!
+    else:
+        sort_idx = np.argsort(_from)
+        idx = np.searchsorted(_from, array, sorter=sort_idx)
+        return np.asarray(_to)[sort_idx][idx]
+
+
+################################################################
+#                     Matrix Manipulations                     #
+################################################################
+
+def non_diag(a: np.ndarray):
+    """
+    Remove the Diagonal Entries from a matrix
+
+    :param a:   2D Numpy Array to operate on
+    :return:    A copy of the matrix with diagonal elements zeroed out
+    """
+    return a - np.diagflat(a.diagonal())
+
+
+def make_diagonal(on_diag, off_diag, size):
+    """
+    Create a Diagonally-dominant matrix with on_diag elements on the main diagonal, and off_diag elsewhere
+
+    :param on_diag:     Scalar: Value to put on diagonal
+    :param off_diag:    Scalar: Value to put off the diagonal
+    :param size:        Scalar: Size of the matrix
+    :return:            Diagonal matrix
+    """
+    return np.eye(size)*on_diag + non_diag(np.full(shape=[size, size], fill_value=off_diag))
+
+
+def maximise_trace(x):
+    """
+    Maximise the Trace of a SQUARE Matrix X using the Hungarian Algorithm
+
+    :param x: Numpy 2D SQUARE Array
+    :return: Tuple containing (in order):
+                * optimal permutation of columns to achieve a maximal trace
+                * size of this trace
+    """
+    _rows, _cols = hungarian(np.full(len(x), np.max(x)) - x)
+    return _cols, x[_rows, _cols].sum()
+
+
+################################################################
+#                    Probabilistic Helpers                     #
+################################################################
 
 class Dirichlet:
     """
@@ -81,108 +294,6 @@ class Dirichlet:
         return self.logpdf(x).sum()
 
 
-def value_map(array, _to, _from=None, shuffle=False):
-    """
-    Map Values in a Numpy Array from a domain to another.
-
-    Currently supports only 1D arrays
-
-    :param array:  Array to map
-    :param _to:    Values to map to
-    :param _from:  Values to map from: if not present, it is assumed that the entries in to are ordered in their domain
-                    [0, len(to)-1]
-    :param shuffle: Optimisation: if True, does not need to use searchsorted (uses just array indexing). Only set this
-                     to True iff _from contains all contiguous values from 0 up to len(_to) - 1 (also no duplicates).
-    :return:       Mapped Array
-    """
-    # If just shuffling, then use just array indexing...
-    if shuffle:
-        if _from is not None:
-            sort_idx = np.argsort(_from)
-            return np.asarray(_to)[sort_idx][array]
-        else:
-            return np.asarray(_to)[array]
-
-    # Otherwise, have to use search sorted: in this case, from cannot be None!
-    else:
-        sort_idx = np.argsort(_from)
-        idx = np.searchsorted(_from, array, sorter=sort_idx)
-        return np.asarray(_to)[sort_idx][idx]
-
-
-def masked_logsumexp(a, axis=None, b=None, keepdims=False, return_sign=False):
-    """
-    Compute the log of the sum of exponentials of input elements. This is identical to the scipy.special function,
-       but ignores Masked (NaN) values.
-
-    Parameters
-    ----------
-    a : array_like
-        Input array.
-    axis : None or int or tuple of ints, optional
-        Axis or axes over which the sum is taken. By default `axis` is None,
-        and all elements are summed.
-    b : array-like, optional
-        Scaling factor for exp(`a`) must be of the same shape as `a` or
-        broadcastable to `a`. These values may be negative in order to
-        implement subtraction.
-    keepdims : bool, optional
-        If this is set to True, the axes which are reduced are left in the
-        result as dimensions with size one. With this option, the result
-        will broadcast correctly against the original array.
-    return_sign : bool, optional
-        If this is set to True, the result will be a pair containing sign
-        information; if False, results that are negative will be returned
-        as NaN. Default is False (no sign information).
-
-    Returns
-    -------
-    res : ndarray
-        The result, ``np.log(np.sum(np.exp(a)))`` calculated in a numerically
-        more stable way. If `b` is given then ``np.log(np.sum(b*np.exp(a)))``
-        is returned.
-    sgn : ndarray
-        If return_sign is True, this will be an array of floating-point
-        numbers matching res and +1, 0, or -1 depending on the sign
-        of the result. If False, only one result is returned.
-    """
-    if b is not None:
-        a, b = np.broadcast_arrays(a, b)
-        if np.any(b == 0):
-            a = a + 0.  # promote to at least float
-            a[b == 0] = -np.inf
-
-    a_max = np.nanmax(a, axis=axis, keepdims=True)
-
-    if a_max.ndim > 0:
-        a_max[~np.isfinite(a_max)] = 0
-    elif not np.isfinite(a_max):
-        a_max = 0
-
-    if b is not None:
-        b = np.asarray(b)
-        tmp = b * np.exp(a - a_max)
-    else:
-        tmp = np.exp(a - a_max)
-
-    # suppress warnings about log of zero
-    with np.errstate(divide='ignore'):
-        s = np.nansum(tmp, axis=axis, keepdims=keepdims)
-        if return_sign:
-            sgn = np.sign(s)
-            s *= sgn  # /= makes more sense but we need zero -> zero
-        out = np.log(s)
-
-    if not keepdims:
-        a_max = np.squeeze(a_max, axis=axis)
-    out += a_max
-
-    if return_sign:
-        return out, sgn
-    else:
-        return out
-
-
 def sum_to_one(x, axis=None, norm=False):
     """
     Ensure that the elements of x sum to 1 (normally for probabilities), by dividing by their sum.
@@ -198,19 +309,6 @@ def sum_to_one(x, axis=None, norm=False):
     _sum = np.sum(x, axis=axis, keepdims=True)  # Find Sum
     _sum[_sum == 0] = 1.0                       # Avoid Division by Zero
     return (np.divide(x, _sum), 1.0/_sum.squeeze()) if norm else np.divide(x, _sum)
-
-
-def maximise_trace(x):
-    """
-    Maximise the Trace of a SQUARE Matrix X using the Hungarian Algorithm
-
-    :param x: Numpy 2D SQUARE Array
-    :return: Tuple containing (in order):
-                * optimal permutation of columns to achieve a maximal trace
-                * size of this trace
-    """
-    _rows, _cols = hungarian(np.full(len(x), np.max(x)) - x)
-    return _cols, x[_rows, _cols].sum()
 
 
 def conditional_entropy(emission, prior=None, base=None):
@@ -271,3 +369,37 @@ def mutual_information(prior, emission, base=None):
 
     # Now Compute Entropies and return
     return entropy(pX, base=base) - conditional_entropy(emission, prior, base)
+
+
+def markov_stationary(transition):
+    """
+    Return the Stationary Distribution of a Markov-Chain Transition Matrix
+
+    :param transition: The MC Transition probabilities
+    :return: The Stationary Distribution
+    """
+    evals, evect = np.linalg.eig(transition.T)
+    _i = np.where(np.isclose(evals, 1.0))[0][0]
+
+    return sum_to_one(np.real_if_close(evect[:, _i]))
+
+
+def switch_rate(a, axis=-1, ratio=False):
+    """
+    Compute the number/frequency of switching at various levels in a time-series.
+    This is guaranteed to work for 1D/2D arrays but the result is unspecified for other dimensionalities
+
+    :param a:       Array_like
+    :param axis:    Optional: the axis along which to compute, default is the last axis. Note that this can only be one
+                    axis at most.
+    :param ratio:   Whether to return a ratio or absolute value.
+    :return:
+    """
+    # Get the Difference
+    a_diff = (np.diff(a, n=1, axis=axis) != 0).sum(axis=axis)
+
+    # Now get the shape if need be
+    a_len = np.shape(a)[axis]
+
+    # Return
+    return a_diff/a_len if ratio else a_diff
