@@ -7,7 +7,6 @@ A set of python tools for extending standard (and non-standard) libraries.
 
 This Library has the following dependencies:
   * scikit-multilearn
-  * **opencv-python**
   * scikit-learn
   * **cudatoolkit**
   * matplotlib
@@ -18,8 +17,7 @@ This Library has the following dependencies:
   
 Most of the above can be automatically installed through the library itself (i.e. pip will attempt to download them).
 However, you may wish to install some explicitly: specifically, the libraries listed in bold are not included:
-   1. `opencv` is not included in the list of requirements since one may wish to build it from source and allow for proprietery codecs.
-   2. `pathos` is not included as this is only required if using the `parallel` toolbox
+   1. `pathos` is not included as this is only required if using the `parallel` toolbox
    2. `pytorch` and `cudatoolkit` are not included as these are only required if using the `neural` toolbox
 
 ### Installing
