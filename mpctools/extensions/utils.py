@@ -200,11 +200,14 @@ def make_dir(_path, _clear=False):
     """
     Static (Module) Method for ensuring that the given path exists, and if not, will attempt to create it.
 
-    :param _path: The Full Directory to create
+    :param _path: The Full Directory to create. Note that this will silently ignore None Paths
     :param _clear: If True, will clear any contents previously in the directory if it existed.
     :return: None
     :raises OSError: if unable to create the directory
     """
+    if _path is None:
+        return
+
     # First, if asked to clear, then remove directory
     if _clear and os.path.isdir(_path):
         shutil.rmtree(_path)

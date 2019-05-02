@@ -22,11 +22,13 @@ However, you may wish to install some explicitly: specifically, the libraries li
 
 ### Installing
 
-Installation is as easy as running the setup script:
+Installation is as easy as running the setup script and then installing using pip:
   ```bash
-  pip setup.py install --user
+  python setup.py sdist --format=tar
+  pip install dist/mpctools-0.1.4.tar --user
   ```
- The `--user` flag is optional and only necessary when one does not have full system permissions.
+ The `--user` flag is optional and only necessary when one does not have full system permissions. Note that depending on
+ which version the library is at, you may need to change the version number of the install command.
 
 
 
