@@ -12,7 +12,7 @@ You should have received a copy of the GNU General Public License along with thi
 http://www.gnu.org/licenses/.
 """
 
-
+from mpctools.parallel.progress_bar import ProgressBar
 from mpctools.extensions import utils
 from pathos.helpers import mp
 import numpy as np
