@@ -67,28 +67,28 @@ class ProgressBar:
         :return:        Self (for chaining)
         """
         # Check that there is somewhere to write.
-        if self.__sink is None: return
+        if self.__sink is not None:
 
-        # Check Update logic
-        if update is not None:
-            self.__count += int(update)
-        else:
-            if value is None:
-                self.__count += 1
+            # Check Update logic
+            if update is not None:
+                self.__count += int(update)
             else:
-                self.__count = int(value)
+                if value is None:
+                    self.__count += 1
+                else:
+                    self.__count = int(value)
 
-        # Check Prefix
-        if prefix is not None:
-            self.__prefix = prefix
+            # Check Prefix
+            if prefix is not None:
+                self.__prefix = prefix
 
-        # Write Out
-        _progress = self.__width * self.__count / self.__total
-        self.__sink.write('\r{0} |{1}{2}| {3:.{4}f}% {5}'.format(self.__prefix, '\u2588'*int(_progress),
-                                                                 '-'*(self.__width - int(_progress)), _progress,
-                                                                 self.__prec, suffix))
-        if int(_progress) == int(self.__width):
-            self.__sink.write(' [DONE]\n')
-        self.__sink.flush()
+            # Write Out
+            _progress = self.__width * self.__count / self.__total
+            self.__sink.write('\r{0} |{1}{2}| {3:.{4}f}% {5}'.format(self.__prefix, '\u2588'*int(_progress),
+                                                                     '-'*(self.__width - int(_progress)), _progress,
+                                                                     self.__prec, suffix))
+            if int(_progress) == int(self.__width):
+                self.__sink.write(' [DONE]\n')
+            self.__sink.flush()
 
         return self
