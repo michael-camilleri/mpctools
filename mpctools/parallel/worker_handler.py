@@ -104,7 +104,7 @@ class WorkerHandler(metaclass=abc.ABCMeta):
     # ========================================= Abstract Interface ========================================= #
 
     @abc.abstractmethod
-    def aggregate_results(self, results):
+    def _aggregate_results(self, results):
         """
         Must be implemented to aggregate results from the Worker Pool
 
@@ -202,7 +202,7 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         if self.NumProc > 0:
             with mp.Pool(processes=self.NumProc) as pool:
                 processes = [pool.apply_async(self.__computer, args=(_workers[_i], (_configs, _args[_i]))) for _i in range(_num_work)]
-                aggregated = self.aggregate_results([result.get() for result in processes])
+                aggregated = self._aggregate_results([result.get() for result in processes])
         else:
             r_q = queue.Queue()
             threads = [threading.Thread(target=self.__threader, args=(_workers[_i], (_configs, _args[_i]), r_q)) for _i in range(_num_work)]
@@ -211,7 +211,7 @@ class WorkerHandler(metaclass=abc.ABCMeta):
             while not r_q.empty():
                 results.append(r_q.get())
                 r_q.task_done()
-            aggregated = self.aggregate_results(results)
+            aggregated = self._aggregate_results(results)
 
         # Inform and join thread
         self.Queue.put([0, -1])
