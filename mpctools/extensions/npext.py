@@ -293,6 +293,26 @@ class Dirichlet:
         """
         return self.logpdf(x).sum()
 
+    def sample(self):
+        """
+        Generates a single sample from the Dirichlet
+
+        :return:    A single sample
+        """
+        return self._recursive_sample(self._alpha + 1)
+
+    @staticmethod
+    def _recursive_sample(alpha):
+        # Handle Base-Case with just 1 dimension
+        if alpha.ndim == 1:
+            return np.random.dirichlet(alpha)
+        # Handle Other Cases
+        else:
+            sample = np.empty_like(alpha)
+            for i in range(alpha.shape[0]):
+                sample[i, :] = Dirichlet._recursive_sample(alpha[i, :])
+            return sample
+
 
 def sum_to_one(x, axis=None, norm=False):
     """
