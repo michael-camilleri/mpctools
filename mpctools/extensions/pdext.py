@@ -58,7 +58,8 @@ def build_dataframe(_d, _idx_names, _idx_values):
 
 def recategorise(_df, _cat_type, _cols, _map=None):
     """
-    A Convenience function to re-categorise the columns in the dataframe: the operation is performed in place.
+    A Convenience function to re-categorise the columns in the dataframe: the operation is performed in place. Note that
+    the function allows mapping of categorical type with no overlaps through the _map construct.
 
     :param _df:         Data-Frame to recategorise
     :param _cat_type:   Categorical DType to set
@@ -69,7 +70,7 @@ def recategorise(_df, _cat_type, _cols, _map=None):
     """
     if _map is not None:
         for col in _cols:
-            _df.loc[:, col] = _df[col].map(_map)
+            _df.loc[:, col] = _df[col].map(_map)  # Note that this will automatically convert to the appropriate type!
             _df.loc[:, col] = _df[col].astype(float, copy=False).astype(_cat_type)
     else:
         for col in _cols:
