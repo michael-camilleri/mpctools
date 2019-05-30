@@ -101,6 +101,18 @@ def dict_invert(_dict):
         return {v: k for k, v in enumerate(_dict)}
 
 
+def glen(generator):
+    """
+    Compute the Length of a generator expression:
+
+    This will basically execute the generator, so may have side-effects!
+
+    :param generator: Generator to run
+    :return:
+    """
+    return sum(1 for _ in generator)
+
+
 ################################################
 #            Printing & Formatting             #
 ################################################
