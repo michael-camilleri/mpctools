@@ -331,6 +331,18 @@ def sum_to_one(x, axis=None, norm=False):
     return (np.divide(x, _sum), 1.0/_sum.squeeze()) if norm else np.divide(x, _sum)
 
 
+def invert_softmax(x):
+    """
+    Return a vector which would yield x under softmax: note that uniqueness is achieved by enforcing the vector to sum
+    to 0.
+
+    :param x: Vector/Matrix of probabilities (last dimension must sum to 1)
+    :return:  Inverse Softmax
+    """
+    log_x = np.log(x)
+    return log_x - np.mean(log_x, axis=-1, keepdims=True)
+
+
 def conditional_entropy(emission, prior=None, base=None):
     """
     Compute the Conditional Entropy of a Joint Distribution over latent and conditioned variables.
