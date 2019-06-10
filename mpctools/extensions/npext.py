@@ -331,16 +331,23 @@ def sum_to_one(x, axis=None, norm=False):
     return (np.divide(x, _sum), 1.0/_sum.squeeze()) if norm else np.divide(x, _sum)
 
 
-def invert_softmax(x):
+def invert_softmax(x, enforce_unique=None):
     """
-    Return a vector which would yield x under softmax: note that uniqueness is achieved by enforcing the vector to sum
-    to 0.
+    Return a vector which would yield x under softmax: note that uniqueness is achieved in a number of ways.
 
     :param x: Vector/Matrix of probabilities (last dimension must sum to 1)
+    :param enforce_unique: If None (default) then uniqueness is achieved by enforcing that the inverted space sums to 0.
+                           Otherwise, it specifies an index which is enforced to be 0.
     :return:  Inverse Softmax
     """
+    # Compute Log(X)
     log_x = np.log(x)
-    return log_x - np.mean(log_x, axis=-1, keepdims=True)
+
+    # Branch on how we achieve uniqueness
+    if enforce_unique is None:
+        return log_x - np.mean(log_x, axis=-1, keepdims=True)           # Eq. (7), substituting Eq. (8) for C.
+    else:
+        return log_x - np.expand_dims(log_x[..., enforce_unique], -1)   # Eq. (7), substituting Eq. (9) for C.
 
 
 def conditional_entropy(emission, prior=None, base=None):

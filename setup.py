@@ -7,7 +7,7 @@ from setuptools import setup
 setup(
     # Common Setup
     name="mpctools",
-    version="0.2.5",
+    version="0.2.6",
     packages=['mpctools.extensions', 'mpctools.parallel'], # Eventually, do neural
 
     # Requirements
