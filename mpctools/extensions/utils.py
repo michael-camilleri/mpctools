@@ -114,6 +114,21 @@ def glen(generator):
     return sum(1 for _ in generator)
 
 
+def pad(a, length, value):
+    """
+    Pad a list (not tuple). Note that if length is less than the len(a) then this has no effect.
+
+    :param a:       The original List
+    :param length:  The desired length
+    :param value:   The Value to fill with
+    :return:        Padded List. A copy is always returned!
+    """
+    if length > len(a):
+        return a + [value] * (length - len(a))
+    else:
+        return copy.copy(a)
+
+
 ################################################
 #            Printing & Formatting             #
 ################################################
