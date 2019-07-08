@@ -180,7 +180,7 @@ def plot_categorical(time_series, values, labels, nan=-1, cmap=None, ax=None, y_
        https://robinsones.github.io/Better-Plotting-in-Python-with-Seaborn/
        https://matplotlib.org/gallery/images_contours_and_fields/pcolor_demo.html
 
-    :param time_series: Time-Series Data to plot. Must be a 2D array
+    :param time_series: Time-Series Data to plot. Must be a 2D array, with time along the columns.
     :param values:      The allowable values: in ascending order
     :param labels:      String description of categorical labels
     :param nan:         Value to replace NaN with
