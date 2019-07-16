@@ -352,33 +352,51 @@ def invert_softmax(x, enforce_unique=None):
 
 def conditional_entropy(emission, prior=None, base=None):
     """
-    Compute the Conditional Entropy of a Joint Distribution over latent and conditioned variables.
+    Compute the Conditional Entropy of a Joint Distribution over latent and conditioned (visible) variables.
+    This only supports 2D Emissions (ie one latent variable and one visible)
 
-    This currently only supports 2D or 3D variables
-
-    :param emission:    The L by V conditional probabilities (Latent along the first indices)
-    :param prior:       The Distribution over L (if None, use vector/matrix of ones)
-    :return:
+    :param emission:    The L by V conditional probabilities (Latent along the first index)
+    :param prior:       The Distribution over L (if None, use vector of equi-probability)
+    :param base:        The numeric base to operate with.
+    :return:            Conditional Entropy (scalar)
     """
     if emission.ndim == 2:
         if prior is None:
             prior = np.ones(len(emission))/len(emission)
+        return np.matmul(prior, entropy(emission.T, base=base))  # Sum_{l=1}^{|L|} P(L=l) H(V|L=l): see NIP slide 6
 
-        return np.dot(prior, entropy(emission.T, base=base))
+    else:
+        raise ValueError('Function does not support Tensors of dimensionality {}. If you need to compute'
+                         ' for a latent variable of dimensionality 2, then use conditional_entropy_2D()'
+                         .format(emission.ndim))
 
-    elif emission.ndim == 3:
+
+def conditional_entropy_2D(emission, prior=None, base=None):
+    """
+    Compute the Conditional Entropy of a joint distribution over latent states and conditioned variables
+    This version is designed to be used when the conditioning variables (latent) are 2D: NOT when the visible ones are 2D
+
+    :param emission: The L1 by L2 by V conditional probabilities (3D with latents along first two indices)
+    :param prior:    The distribution over L1/L2: if None, will initialise to uniform probability
+    :param base:     The numeric base to operate with.
+    :return:         Conditional Entropy (scalar)
+    """
+    if emission.ndim == 3:
+        # Get the Latent dimensionalities
         s1, s2, _ = np.shape(emission)
+        # Construct Prior if not provided
         if prior is None:
             prior = sum_to_one(np.ones([s1, s2]))
-
+        # Sum over combinations of each L1/L2
         cond_ent = 0
         for r in range(s1):
             for c in range(s2):
-                cond_ent += prior[r, c] * entropy(emission[r, c, :])
+                cond_ent += prior[r, c] * entropy(emission[r, c, :], base=base)
         return cond_ent
 
     else:
-        raise ValueError('Function does not support Tensors of dimensionality {}'.format(emission.ndim))
+        raise ValueError('Function does not support Tensors of dimensionality {}. For standard conditional entropy, use'
+                         ' conditional_entropy().'.format(emission.ndim))
 
 
 def mutual_information(prior, emission, base=None):
@@ -386,28 +404,35 @@ def mutual_information(prior, emission, base=None):
     Compute the Mutual information between an input (Z) and set of output (X) variables, under the assumption that when
       there is more than 1 X variable, they are conditionally independent of each other given Z (i.e. the Naive Bayes
       assumption). Be careful however, that as the number of X variables increases, the dimensionality of the problem
-      explodes!
+      explodes (since we need to work with the full joint marginal)!
 
-    :param prior:       Prior Distribution over Z
+    Note that this only supports a 1D latent variable (Z): i.e. there may be multiple (X) variables but only 1 (Z).
+
+    :param prior:       Prior Distribution over Z [1D array]
     :param emission:    Conditional Distribution over X given Z. This can be either:
-                            a) 2D Numpy array, with Z along the rows.
+                            a) 2D Numpy array, with Z along the rows, for one conditional
                             b) List of 2D Numpy arrays, each constituting a 2D Numpy array (Z along rows) showing the
-                               emission of a variable
+                               emission of a variable.
+    :param base:        The numeric base to operate with.
     :return:            Mutual Information
     """
-    # First Collapse all emissions into 1 by computing outer product along X-axis
+    # First Collapse all emissions into 1 by computing outer product along X-axis (i.e. finding the cross-product)
+    #  This is done by a smart use of the self-looping and the outer product function. Basically, we need to find the
+    #  cross-combination of all emissions. To do this, for each latent state (Z=z), we find the probability of each
+    #  combination of Xs by repeatedly (over each variable) finding the outer product between the current flattened
+    #  representation and the next variable in sequence.
     if type(emission) in (list, tuple):
         pXZ = [1 for _ in prior]
         for k in range(len(prior)):
             for variable in emission:
-                pXZ[k] = np.outer(pXZ[k], variable[k,:]).ravel()
-        emission = np.asarray(pXZ)
+                pXZ[k] = np.outer(pXZ[k], variable[k, :]).ravel()  # We are continuously increasing in size...
+        emission = np.asarray(pXZ)      # Will be array of size |Z| by |X_1|*|X_2|*...|X_n|
 
     # Compute Marginal X:
     pX = np.matmul(prior, emission)
 
     # Now Compute Entropies and return
-    return entropy(pX, base=base) - conditional_entropy(emission, prior, base)
+    return entropy(pX, base=base) - conditional_entropy(emission=emission, prior=prior, base=base)
 
 
 def markov_stationary(transition):
