@@ -62,3 +62,24 @@ class TestInvertSoftmax(unittest.TestCase):
                 inverse = npext.invert_softmax(sample, enforce_unique=int(index0))
                 self.assertTrue(np.allclose(sample, softmax(inverse, axis=-1)))
                 self.assertTrue(np.allclose(inverse[..., int(index0)], 0))
+
+
+class TestNaNRunLengths(unittest.TestCase):
+
+    def test_correct_values(self):
+        # Define Array
+        a = np.array([0, 5, np.NaN, 1., np.NaN, np.NaN, 4.3, -5, -np.Inf, np.NaN, 5.2])
+        self.assertTrue((npext.null_run_lengths(a) == [1, 2, 1]).all())
+
+    def test_handles_edges(self):
+        # Define Array
+        a = np.array([0, 5, np.NaN, 1., np.NaN, np.NaN, 4.3, -5, -np.Inf, np.NaN, 5.2, np.NaN])
+        b = np.array([np.NaN, np.NaN, 0, 5, np.NaN, 1., np.NaN, np.NaN, 4.3, -5, -np.Inf, np.NaN, 5.2])
+        # Test
+        self.assertTrue((npext.null_run_lengths(a) == [1, 2, 1, 1]).all())
+        self.assertTrue((npext.null_run_lengths(b) == [2, 1, 2, 1]).all())
+
+    def test_handle_reshaping(self):
+        # Define array
+        a = np.array([np.NaN, np.NaN, 0, 5, np.NaN, 1., np.NaN, np.NaN, 4.3, -5, -np.Inf, np.NaN]).reshape([4, 3])
+        self.assertTrue((npext.null_run_lengths(a) == [2, 1, 2, 1]).all())

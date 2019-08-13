@@ -16,6 +16,7 @@ from scipy.optimize import linear_sum_assignment as hungarian
 from scipy.special import gamma
 from scipy.stats import entropy
 from functools import reduce
+import itertools as iter
 import numpy as np
 
 
@@ -175,6 +176,16 @@ def value_map(array, _to, _from=None, shuffle=False):
         sort_idx = np.argsort(_from)
         idx = np.searchsorted(_from, array, sorter=sort_idx)
         return np.asarray(_to)[sort_idx][idx]
+
+
+def null_run_lengths(a):
+    """
+    Compute the lengths of runs of NaN-sequences in an array.
+
+    :param a: Array If not one-d, the input is flattened.
+    :return:  Array, with each entry being the length of each run of nulls.
+    """
+    return np.asarray([len(list(g)) for k, g in iter.groupby(np.isnan(a.flatten())) if k])
 
 
 ################################################################
