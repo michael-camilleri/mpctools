@@ -83,3 +83,8 @@ class TestNaNRunLengths(unittest.TestCase):
         # Define array
         a = np.array([np.NaN, np.NaN, 0, 5, np.NaN, 1., np.NaN, np.NaN, 4.3, -5, -np.Inf, np.NaN]).reshape([4, 3])
         self.assertTrue((npext.null_run_lengths(a) == [2, 1, 2, 1]).all())
+
+    def test_handle_none(self):
+        # Define Array
+        a = np.arange(100)
+        self.assertEqual(len(npext.null_run_lengths(a)), 0)

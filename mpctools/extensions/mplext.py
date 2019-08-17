@@ -201,7 +201,7 @@ def plot_categorical(time_series, values, labels, nan=-1, cmap=None, ax=None, y_
     # Transform Data
     _data = []
     for row in range(n_rows):
-        _data.append(time_series[row].copy())
+        _data.append(time_series[row, :].copy())
         _data[row][np.isnan(_data[row])] = nan  # Convert NaN
         _data[row] = npext.value_map(_data[row], np.arange(N), _from=values)
     _data = np.vstack(_data)

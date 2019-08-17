@@ -227,6 +227,20 @@ def maximise_trace(x):
     return _cols, x[_rows, _cols].sum()
 
 
+def swap_columns(x, cols):
+    """
+    Swap the columns of a 2D Matrix
+
+    :param x:    Numpy 2D Array
+    :param cols: A 2-tuple, of the column indices to swap
+    :return:     Matrix with cols swapped. A copy is always returned.
+    """
+    temp = x.copy()
+    temp[:, cols[0]] = x[:, cols[1]]
+    temp[:, cols[1]] = x[:, cols[0]]
+    return temp
+
+
 ################################################################
 #                    Probabilistic Helpers                     #
 ################################################################
