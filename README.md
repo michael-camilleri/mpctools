@@ -34,7 +34,7 @@ them). If this causes issues, just install them manually.
 Installation is as easy as running the setup script and then installing using pip:
   ```bash
   python setup.py sdist --format=tar
-  pip install dist/mpctools-0.2.9.tar --user
+  pip install dist/mpctools-0.2.10.tar --user
   ```
  The `--user` flag is optional and only necessary when one does not have full system permissions. Note that depending on
  which version the library is at, you may need to change the version number of the install command.

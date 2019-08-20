@@ -103,7 +103,7 @@ def plot_matrix(matrix, mode='hinton', min_max=None, show_val=False, ax=None, cb
         ax.invert_yaxis()
     else:
         sns.heatmap(matrix, vmin=min_max[0], vmax=min_max[1], annot=show_val, fmt=fmt, ax=ax, cbar=cbar is not False,
-                    cbar_ax=cbar)
+                    cbar_ax=cbar if isinstance(cbar, axes.Axes) else None)
 
     # Add Ticks/Labels
     if labels is not None:
