@@ -241,6 +241,22 @@ def swap_columns(x, cols):
     return temp
 
 
+def ensure2d(a, axis=0):
+    """
+    Returns a matrix of dimensionality 2 from a potentially linear vector
+
+    :param a: Numpy array
+    :param axis: Axis to append if missing: either 0 or 1
+    :return: 2D Matrix
+    """
+    if np.ndim(a) > 1:
+        return a
+    elif np.ndim(a) == 1:
+        return a[np.newaxis, :] if axis == 0 else a[:, np.newaxis]
+    else:
+        return a*np.ones([1, 1])
+
+
 ################################################################
 #                    Probabilistic Helpers                     #
 ################################################################
