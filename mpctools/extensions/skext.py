@@ -133,7 +133,7 @@ class HierarchicalClustering:
         """
         # If Precomputed, convert to Condensed Form first
         if self.__affinity == 'precomputed':
-            X = squareform(X, checks=True)
+            X = squareform(X, checks=False)
         # Cluster
         self.__clusters = linkage(y=X, method=self.__linkage, metric=self.__affinity, optimal_ordering=True)
         # Return self for chaining
@@ -162,14 +162,20 @@ class HierarchicalClustering:
         """
         return self.fit(X).predict()
 
-    def plot_dendrogram(self, ax=None, labels=None, x_rot=0):
+    def plot_dendrogram(self, ax=None, labels=None, x_rot=0, color=None, fs=None):
         """
         Plot a Dendogram of the Agglomeration procedure
 
         :param ax:      Axes to plot on: if not specified, then uses a new axis.
         :param labels:  Labels for the leaf nodes: if not specified, will just number 0 through N-1
         :param x_rot:   Rotation for the leaf node text
+        :param color:   Threshold to use for colouring. If None, then do not differ in colours (similar to negative):
+                        else it signifies a threshold to use as per:
+                        (https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.cluster.hierarchy.dendrogram.html)
+        :param fs:      Font-size for plotting the labels
         :return:        self, for chaining
         """
-        dendrogram(self.__clusters, ax=ax, labels=labels, leaf_rotation=x_rot)
+        if color is None:
+            color = -1
+        dendrogram(self.__clusters, ax=ax, labels=labels, leaf_rotation=x_rot, color_threshold=color, leaf_font_size=fs)
         return self
