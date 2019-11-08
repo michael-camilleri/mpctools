@@ -11,7 +11,7 @@ setup(
     packages=['mpctools.extensions', 'mpctools.parallel'], # Eventually, do neural
 
     # Requirements
-    install_requires=['numpy', 'scipy', 'pathos', 'scikit-learn', 'matplotlib', 'seaborn', 'pandas', 'scikit-multilearn'],
+    install_requires=['numpy', 'scipy', 'pathos', 'scikit-learn', 'matplotlib', 'seaborn', 'pandas', 'scikit-multilearn', 'numba'],
 
     # Meta-Data
     author='Michael P. J. Camilleri',

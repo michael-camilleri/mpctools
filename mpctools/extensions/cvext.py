@@ -1,6 +1,22 @@
-# This Module will serve as an alternative and extension to opencv - hence the name
+"""
+This Module will serve as an alternative and extension to opencv - hence the name
+
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
+License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
+version.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
+warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License along with this program. If not, see
+http://www.gnu.org/licenses/.
+
+Author: Michael P. J. Camilleri
+"""
+
 from mpctools.extensions import npext
 from queue import Queue, Empty, Full
+from numba import jit, uint8, uint16
 from threading import Thread
 import numpy as np
 import time as tm
@@ -233,3 +249,141 @@ class VideoParser:
 
         # Stop Stream
         stream.release()
+
+
+class SWAHE:
+    """
+    Class for implementing the CLAHE algorithm by way of a sliding window. Note that this is a loose adaptation, and I
+    do cut some corners in the interest of some efficiency. Note, that this requires the Image data to be in 8-bit
+    Format! The reason for this implementation is to separate the histogram computation from the equalisation step.
+    """
+
+    def __init__(self, imgSize, clipLimit=2.0, tileGridSize=(8, 8), padding='reflect'):
+        """
+        Initialiser
+
+        :param imgSize:         The Dimensions of the Image (Width[C] x Height[R])
+        :param clipLimit:       The Clip Limit to Employ. Note that this will be the clip-limit per image added to the
+                                histogram (computed retroactively). If not required, pass None
+        :param tileGridSize:    The Tile-Size to compute with. Note that in our case, this signifies the padding around
+                                the pixel, which is a deviation from the OpenCV Implementation! The padding is in terms
+                                of width and height respectivel.
+        :param padding:         Type of padding to employ when computing along the edges. See the documentation for
+                                numpy.pad
+        """
+        # Store some Values for later
+        self.__W, self.__H = imgSize
+        self.__clip = clipLimit
+        self.__tile_W, self.__tile_H = tileGridSize
+        self.__pad = padding.lower()  # Ensure Lower-Case
+        self.__seen = 0  # How many Images seen so far.
+
+        # Now prepare placeholder for Histograms
+        self.__hst = np.zeros([self.__H, self.__W, 256])                        # Maintains Raw Counts
+        self.__lut = np.zeros([self.__H, self.__W, 256], dtype=np.uint8)       # Maintains Clipped Counts
+
+    def clear_histogram(self):
+        """
+        Clears the Histogram
+
+        :return: self, for chaining.
+        """
+        # Re-Initialise Histograms
+        self.__hst = np.zeros([self.__H, self.__W, 256])                    # Maintains Raw Counts
+        self.__lut = np.zeros([self.__H, self.__W, 256], dtype=np.uint8)  # Maintains Clipped Counts
+        self.__seen = 0
+
+        # Return Self
+        return self
+
+    def update_histogram(self, img):
+        """
+        Update the Histogram
+
+        :param img: Input image to use to update the Histogram with. Must be a single channel image of type uint8
+        :return:    self, for chaining
+        """
+        # First PAD the image: this will allow computation being much easier...
+        img = np.pad(img, pad_width=[[self.__tile_H], [self.__tile_W]], mode=self.__pad)
+        self.__seen += 1
+
+        # Generate Histogram for this Image and add to the Original Histogram
+        hist = np.zeros_like(self.__lut)
+        self.__update_hist(img, self.__tile_H, self.__tile_W, hist)
+        self.__hst += hist
+
+        # Now Perform Clipping.
+
+
+    @staticmethod
+    @jit(signature_or_function=(uint8[:, :], uint8, uint8, uint16[:, :, :]), nopython=True)
+    def __update_hist(padded, row_pad, col_pad, hist):
+        """
+        A Private Method (to just Numba) to compute the Histogram for the Padded Image
+
+        :param padded:  The Padded Image
+        :param row_pad: The padding to include along the rows (integer)
+        :param col_pad: The padding to include along the columns (integer)
+        :param hist:    The output histogram. This should be initialised to all zeros!
+        :return:
+        """
+        # Compute Valid ranges for Rows and Columns
+        valid_rows = (row_pad, padded.shape[0] - row_pad - 1)
+        valid_cols = (col_pad+1, padded.shape[1] - col_pad - 1) # Note that due to scheme, we start with col_pad+1
+
+        # Now Iterate over Pixels in a Row-Column Basis
+        for r_img in range(*valid_rows):
+            # Get the Histogram Row we are working on...
+            r_hst = r_img - row_pad
+            # Compute First Pixel:
+            # Not that there is a special case when this is the top-left corner, which we must compute from scratch.
+            if r_hst == 0:
+                for nbh_r in range(row_pad*2 + 1):
+                    for nbh_c in range(col_pad*2 + 1):
+                        hist[0, 0, padded[nbh_r, nbh_c]] += 1
+            # Otherwise, we can initialise from the upper row.
+            else:
+                hist[r_hst, 0, :] = hist[r_hst-1, 0, :]
+                # Compute the Previous/Next Row (in image space)
+                r_prev = r_img - row_pad - 1
+                r_next = r_img + row_pad
+                # Iterate over the columns, subtracting the previous row and adding the next one in turn
+                for nbh_c in range(col_pad*2 + 1):
+                    hist[r_hst, 0, padded[r_prev, nbh_c]] -= 1
+                    hist[r_hst, 0, padded[r_next, nbh_c]] += 1
+            # Now iterate over columns
+            for c_img in range(*valid_cols):
+                # Get the histogram Column we are working on: also get the previous and next columns
+                c_hst = c_img - col_pad
+                c_prev = c_img - col_pad - 1
+                c_next = c_img + col_pad
+                # Initialise the Histogram with the pixel to the left and build from there.
+                hist[r_hst, c_hst, :] = hist[r_hst, c_hst - 1]
+                for nbh_r in range(r_img - row_pad, r_img + row_pad + 1):
+                    hist[r_hst, c_hst, padded[nbh_r, c_prev]] -= 1
+                    hist[r_hst, c_hst, padded[nbh_r, c_next]] += 1
+
+    @staticmethod
+    def __clip_limit(hist, limit, lut, scaler):
+        """
+        Here Ideally, hist is float!
+
+        :param hist:
+        :param limit:
+        :param scaler: should be 256* lut size
+        :return:
+        """
+
+        # Iterate over rows/columns of Histogram
+        for r in range(hist.shape[0]):
+            for c in range(hist.shape[1]):
+                # Find the ones which are higher than clip_limit
+                higher = hist[r, c, :] > limit   # TODO consider using number array instead of boolean
+                # Sum them to find how many pixels will be clipped
+                to_clip = hist[r, c, higher].sum() - higher*limit
+                # Clip Them
+                hist[r, c, higher] = limit
+                # Now Redistribute - Note, that I will ignore residual.
+                hist[r, c, :] += to_clip/256
+                # Now Transform to Lookup Table
+                lut[r, c] = np.around(hist[r, c, :].cumsum() * scaler).astype(np.uint8)
