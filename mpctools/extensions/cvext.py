@@ -16,7 +16,7 @@ Author: Michael P. J. Camilleri
 
 from mpctools.extensions import npext
 from queue import Queue, Empty, Full
-from numba import jit, uint8, uint16
+from numba import jit, uint8, uint16, double
 from threading import Thread
 import numpy as np
 import time as tm
@@ -251,11 +251,15 @@ class VideoParser:
         stream.release()
 
 
-class SWAHE:
+class SwCLAHE:
     """
     Class for implementing the CLAHE algorithm by way of a sliding window. Note that this is a loose adaptation, and I
     do cut some corners in the interest of some efficiency. Note, that this requires the Image data to be in 8-bit
     Format! The reason for this implementation is to separate the histogram computation from the equalisation step.
+
+    Note that the algorithm is modified as follows to allow a history:
+     a) Keep track of per-pixel raw-counts in a histogram.
+     b) For the true lut, perform clipping based on the number of frames used in the histogram computation.
     """
 
     def __init__(self, imgSize, clipLimit=2.0, tileGridSize=(8, 8), padding='reflect'):
@@ -279,8 +283,8 @@ class SWAHE:
         self.__seen = 0  # How many Images seen so far.
 
         # Now prepare placeholder for Histograms
-        self.__hst = np.zeros([self.__H, self.__W, 256])                        # Maintains Raw Counts
-        self.__lut = np.zeros([self.__H, self.__W, 256], dtype=np.uint8)       # Maintains Clipped Counts
+        self.__hst = np.zeros([self.__H, self.__W, 256])                             # Maintains Raw Counts
+        self.__lut = np.zeros([self.__H, self.__W, 256], dtype=np.uint8, order='C')  # Maintains Clipped Counts
 
     def clear_histogram(self):
         """
@@ -289,8 +293,8 @@ class SWAHE:
         :return: self, for chaining.
         """
         # Re-Initialise Histograms
-        self.__hst = np.zeros([self.__H, self.__W, 256])                    # Maintains Raw Counts
-        self.__lut = np.zeros([self.__H, self.__W, 256], dtype=np.uint8)  # Maintains Clipped Counts
+        self.__hst = np.zeros([self.__H, self.__W, 256])                             # Maintains Raw Counts
+        self.__lut = np.zeros([self.__H, self.__W, 256], dtype=np.uint8, order='C')  # Maintains Clipped Counts
         self.__seen = 0
 
         # Return Self
@@ -308,12 +312,24 @@ class SWAHE:
         self.__seen += 1
 
         # Generate Histogram for this Image and add to the Original Histogram
-        hist = np.zeros_like(self.__lut)
+        hist = np.zeros_like(self.__lut, dtype=np.uint16)
         self.__update_hist(img, self.__tile_H, self.__tile_W, hist)
         self.__hst += hist
 
         # Now Perform Clipping.
+        self.__clip_limit(self.__hst, float(self.__seen*self.__clip), self.__lut,
+                          256.0/((self.__tile_W+1) * (self.__tile_H+1)))
 
+    def transform(self, img):
+        """
+        Transform the Image according to the LUT.
+
+        :param img:
+        :return:
+        """
+        tr_ = np.empty_like(img)
+        self.__transform(self.__lut, img, tr_)
+        return tr_
 
     @staticmethod
     @jit(signature_or_function=(uint8[:, :], uint8, uint8, uint16[:, :, :]), nopython=True)
@@ -364,26 +380,44 @@ class SWAHE:
                     hist[r_hst, c_hst, padded[nbh_r, c_next]] += 1
 
     @staticmethod
+    @jit(signature_or_function=(double[:, :, ::1], double, uint8[:, :, ::1], double), nopython=True)
     def __clip_limit(hist, limit, lut, scaler):
         """
-        Here Ideally, hist is float!
+        Here hist should be float (to avoid truncation), but lut is integer!
 
-        :param hist:
-        :param limit:
-        :param scaler: should be 256* lut size
+        :param hist:   The Original Histogram (raw)
+        :param limit:  This should take into consideration the number of samples seen so far (i.e. a multiplicated)
+        :param lut:    The Lookup table (placeholder)
+        :param scaler: should be 256 / boxsize
         :return:
         """
-
         # Iterate over rows/columns of Histogram
         for r in range(hist.shape[0]):
             for c in range(hist.shape[1]):
-                # Find the ones which are higher than clip_limit
-                higher = hist[r, c, :] > limit   # TODO consider using number array instead of boolean
-                # Sum them to find how many pixels will be clipped
-                to_clip = hist[r, c, higher].sum() - higher*limit
-                # Clip Them
-                hist[r, c, higher] = limit
-                # Now Redistribute - Note, that I will ignore residual.
+                to_clip = 0  # Initialise to_clip
+                for h in range(256):
+                    if hist[r, c, h] > limit:
+                        to_clip += hist[r, c, h] - limit
+                        hist[r, c, h] = limit
+                # Now Redistribute - Note that I will ignore residuals (handled through rounding)
                 hist[r, c, :] += to_clip/256
-                # Now Transform to Lookup Table
-                lut[r, c] = np.around(hist[r, c, :].cumsum() * scaler).astype(np.uint8)
+                # Now Transform to Lookup Table (rounding) - Had to do this manually due to issues with Numba!
+                cumsum = 0
+                for h in range(256):
+                    cumsum += hist[r, c, h]
+                    lut[r, c, h] = round(cumsum * scaler)
+
+    @staticmethod
+    @jit(signature_or_function=(uint8[:, :, ::1], uint8[:, ::1], uint8[:, ::1]), nopython=True)
+    def __transform(lut, img, out):
+        """
+        Numba JIT to transform the image (lookup table)
+
+        :param lut: The Lookup Table
+        :param img: The Original Image
+        :param out: The transformed Image
+        :return:
+        """
+        for r in range(lut.shape[0]):
+            for c in range(lut.shape[1]):
+                out[r, c] = lut[r, c, img[r, c]]

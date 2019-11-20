@@ -178,14 +178,42 @@ def value_map(array, _to, _from=None, shuffle=False):
         return np.asarray(_to)[sort_idx][idx]
 
 
-def null_run_lengths(a):
+def run_lengths(a, null='I', return_values=False):
     """
-    Compute the lengths of runs of NaN-sequences in an array.
+    Compute the length of continuous runs of the same values in an array.
 
     :param a: Array If not one-d, the input is flattened.
-    :return:  Array, with each entry being the length of each run of nulls.
+    :param null: How to treat np.NaN:
+                    A: Add as a normal number.
+                    I: Ignore NaNs from the computation
+                    O: compute Only NaNs
+    :param return_values: If true, return also the Key (value) for each run.
+    :return: lengths, [values]
+               The first array contains the run lengths: the second, if present, is the actual key (value) of that run.
     """
-    return np.asarray([len(list(g)) for k, g in iter.groupby(np.isnan(a.flatten())) if k])
+    # Compute
+    if null.lower() == 'a':
+        if type(a) == np.ndarray:
+            # I have to do this convoluted aspect first to make sure that nan-run-lengths are treated correctly!
+            a = [i if not np.isnan(i) else np.nan for i in a.flatten()]
+        rls = np.asarray([(sum(1 for _ in l), n) for n, l in iter.groupby(a)])
+    elif null.lower() == 'i':
+        if type(a) == np.ndarray:
+            a = a.flatten().tolist()
+        rls = np.asarray([(sum(1 for _ in l), n) for n, l in iter.groupby(a) if not np.isnan(n)])
+    elif null.lower() == 'o':
+        if type(a) == np.ndarray:
+            # I have to do this convoluted aspect first to make sure that nan-run-lengths are treated correctly!
+            a = [i if not np.isnan(i) else np.nan for i in a.flatten()]
+        rls = np.asarray([(sum(1 for _ in l), n) for n, l in iter.groupby(a) if np.isnan(n)])
+    else:
+        raise ValueError('Incorrect format for NULL')
+    # Now Return
+    if len(rls) > 0:
+        return (rls[:, 0], rls[:, 1]) if return_values else rls[:, 0]
+    else:
+        return ([],  []) if return_values else []
+
 
 
 ################################################################

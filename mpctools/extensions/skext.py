@@ -55,7 +55,8 @@ def multi_way_split(y, sizes, splitter, random_state=None):
                             otherwise, it is enough to be an empty array of the same length as the data.
     :param sizes:           The relative sizes of the three sets. Note that these should sum to 1.
     :param splitter:        The splitting object: this allows stratified/unstratified type splits (basically one of
-                            ShuffleSplit or StratifiedShuffleSplit)
+                            ShuffleSplit or StratifiedShuffleSplit). Note that you should NOT initialise the object:
+                            this is just passing a reference to the class (and not an object).
     :param random_state:    Any random state to employ
     :return:                N-tuple of indices, one each for the N sets.
     """
