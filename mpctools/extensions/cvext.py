@@ -14,9 +14,9 @@ http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 
+from numba import jit, uint8, uint16, double
 from mpctools.extensions import npext
 from queue import Queue, Empty, Full
-from numba import jit, uint8, uint16, double
 from threading import Thread
 import numpy as np
 import time as tm
@@ -24,8 +24,8 @@ import cv2
 
 
 # Define Some Constants
-VP_CUR_PROP_POS_MSEC = -100
-VP_CUR_PROP_POS_FRAMES = -101
+VP_CUR_PROP_POS_MSEC = -100     # Encodes the current frame (rather than next one) in MS
+VP_CUR_PROP_POS_FRAMES = -101   # Encodes the current frame (rather than next one) in index
 
 
 class Homography:
@@ -92,6 +92,7 @@ class VideoParser:
         self.signal_stop = False            # Signal from main to thread to stop
         self.signal_started = False         # Signal from thread to main to indicate started
         self.StartAt = 0                    # Where to Start
+        self.Stride = 1                     # Whether to stride...
 
         # Now some other State-Control
         self.properties = {VP_CUR_PROP_POS_MSEC: None,
@@ -105,10 +106,12 @@ class VideoParser:
                            cv2.CAP_PROP_FRAME_COUNT: -1,
                            cv2.CAP_PROP_FOURCC: None}
 
-    def start(self, start=None):
+    def start(self, start=None, stride=1):
         """
         Start the Parsing Loop
         :param start:   If not None (default) then signifies an index of the frame at which to start
+        :param stride:  How much to stride: default is to just add 1... (this is in terms of frames). Note that when
+                        striding, the last frame is ALWAYS read even if it is not a multiple of the stride...
         :return:        True if successful, false otherwise
         """
         # Check that not already processing
@@ -119,6 +122,7 @@ class VideoParser:
         self.signal_stop = False
         self.signal_started = False
         self.StartAt = start if start is not None else 0
+        self.Stride = int(max(0, stride-1))   # guard against negative striding
 
         # Start Thread for processing
         self.thread = Thread(target=self.__read, args=())
@@ -237,8 +241,13 @@ class VideoParser:
         while not self.signal_stop and frame is not None:
             # Get the next Frame and associated Parameters
             ret, frame = stream.read()
-            _msec = stream.get(cv2.CAP_PROP_POS_MSEC)
             _fnum = stream.get(cv2.CAP_PROP_POS_FRAMES)
+            # If Striding, need to add stride: however, only do this, if we are not at the end...
+            if self.Stride > 0 and _fnum < self.properties[cv2.CAP_PROP_FRAME_COUNT]:
+                stream.set(cv2.CAP_PROP_POS_FRAMES, min(_fnum + self.Stride, self.properties[cv2.CAP_PROP_FRAME_COUNT]))
+                _fnum = stream.get(cv2.CAP_PROP_POS_FRAMES)
+            # Check Read
+            _msec = stream.get(cv2.CAP_PROP_POS_MSEC)
             # Push to queue
             while not self.signal_stop:
                 try:
@@ -319,7 +328,7 @@ class SwCLAHE:
         self.__hst += hist
 
         # Now Perform Clipping.
-        self.__clip_limit(self.__hst, float(self.__seen*self.__clip), self.__lut, float(self.__seen*self.__scale))
+        self.__clip_limit(self.__hst, float(self.__seen*self.__clip), self.__lut, float(self.__scale/self.__seen))
 
         # Return Self
         return self
