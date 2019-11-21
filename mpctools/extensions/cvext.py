@@ -277,8 +277,10 @@ class SwCLAHE:
         """
         # Store some Values for later
         self.__W, self.__H = imgSize
-        self.__clip = clipLimit
         self.__tile_W, self.__tile_H = tileGridSize
+        tgSze = (self.__tile_W * 2 + 1) * (self.__tile_H * 2 + 1)
+        self.__clip = clipLimit * tgSze / 256.0
+        self.__scale = 255.0 / tgSze
         self.__pad = padding.lower()  # Ensure Lower-Case
         self.__seen = 0  # How many Images seen so far.
 
@@ -317,8 +319,7 @@ class SwCLAHE:
         self.__hst += hist
 
         # Now Perform Clipping.
-        self.__clip_limit(self.__hst, float(self.__seen*self.__clip), self.__lut,
-                          256.0/((self.__tile_W+1) * (self.__tile_H+1)))
+        self.__clip_limit(self.__hst, float(self.__seen*self.__clip), self.__lut, float(self.__seen*self.__scale))
 
         # Return Self
         return self

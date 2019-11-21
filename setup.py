@@ -7,11 +7,12 @@ from setuptools import setup
 setup(
     # Common Setup
     name="mpctools",
-    version="0.3.21",
+    version="0.3.22",
     packages=['mpctools.extensions', 'mpctools.parallel'], # Eventually, do neural
 
     # Requirements
-    install_requires=['numpy', 'scipy', 'pathos', 'scikit-learn', 'matplotlib', 'seaborn', 'pandas', 'scikit-multilearn', 'numba'],
+    install_requires=['numpy', 'scipy', 'pathos', 'scikit-learn', 'matplotlib', 'seaborn', 'pandas',
+                      'scikit-multilearn', 'numba'],
 
     # Meta-Data
     author='Michael P. J. Camilleri',
