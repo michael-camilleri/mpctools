@@ -101,6 +101,7 @@ class TestSWAHE(unittest.TestCase):
         # Create 'Image'
         a = np.random.randint(0, 255, [H, W], dtype=np.uint8)
         a_cpy = a.copy()
+        b = np.random.randint(0, 255, [H, W], dtype=np.uint8)
 
         # ----- Test that Histogram is currently 0 ------- #
         self.assertTrue((swclahe.transform(a_cpy) == 0).all())
@@ -108,7 +109,7 @@ class TestSWAHE(unittest.TestCase):
         self.assertTrue(np.array_equal(a, a_cpy))
 
         # ------- Now Test histogram update -------- #
-        swclahe.update_histogram(a_cpy)
+        swclahe.update_model(a_cpy)
         # Check that no modification so far...
         self.assertTrue(np.array_equal(a, a_cpy))
         # Now Histogram is not 0!
@@ -118,19 +119,27 @@ class TestSWAHE(unittest.TestCase):
         self.assertTrue(np.array_equal(tr_1, swclahe.transform(a_cpy)))
 
         # ------- Do another update -------- #
-        swclahe.update_histogram(a_cpy)
+        swclahe.update_model(a_cpy)
         # However, applying same transform again, should not have changed anything...
+        self.assertTrue(np.array_equal(tr_1, swclahe.transform(a_cpy)))
+        swclahe.transform(b)
+        self.assertTrue(np.array_equal(tr_1, swclahe.transform(a_cpy)))
+        # However, applying something else does...
+        swclahe.update_model(b)
         self.assertFalse(np.array_equal(tr_1, swclahe.transform(a_cpy)))
 
         # ------- Do final update with clear histogram -------- #
         swclahe.clear_histogram()
-        swclahe.update_histogram(a_cpy)
+        swclahe.update_model(a_cpy)
         # However, applying same transform again, should not have changed anything...
         self.assertTrue(np.array_equal(tr_1, swclahe.transform(a_cpy)))
 
         # finally check that apply works as expected
         self.assertTrue(np.array_equal(tr_1, swclahe.apply(a_cpy)))
         self.assertTrue(np.array_equal(tr_1, swclahe.apply(a_cpy)))
-        self.assertFalse(np.array_equal(tr_1, swclahe.apply(a_cpy, clear=False)))
+        self.assertTrue(np.array_equal(tr_1, swclahe.apply(a_cpy, clear=False)))
+        self.assertFalse(np.array_equal(tr_1, swclahe.transform(b)))
+        swclahe.apply(b, clear=False)
+        self.assertFalse(np.array_equal(tr_1, swclahe.transform(a_cpy)))
         self.assertTrue(np.array_equal(a, a_cpy))
 

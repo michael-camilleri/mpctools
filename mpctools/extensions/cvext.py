@@ -311,9 +311,19 @@ class SwCLAHE:
         # Return Self
         return self
 
+    def update_model(self, img):
+        """
+        Update the Histogram and perform Clipping. This creates a usable LUT, and is equivalent to calling
+        update_histogram() followed by generate_lut().
+
+        :param img: Input image to use to update the Histogram with. Must be a single channel image of type uint8.
+        :return:    self, for chaining
+        """
+        return self.update_histogram(img).generate_lut()
+
     def update_histogram(self, img):
         """
-        Update the Histogram
+        Update the Histogram only, without perform any clipping
 
         :param img: Input image to use to update the Histogram with. Must be a single channel image of type uint8
         :return:    self, for chaining
@@ -327,8 +337,17 @@ class SwCLAHE:
         self.__update_hist(img, self.__tile_H, self.__tile_W, hist)
         self.__hst += hist
 
-        # Now Perform Clipping.
-        self.__clip_limit(self.__hst, float(self.__seen*self.__clip), self.__lut, float(self.__scale/self.__seen))
+        # Return Self
+        return self
+
+    def generate_lut(self):
+        """
+        Wrapper around clip function to generate LUT
+
+        :return:  self, for chaining
+        """
+        # CLip
+        self.__clip_limit(self.__hst, float(self.__seen * self.__clip), self.__lut, float(self.__scale / self.__seen))
 
         # Return Self
         return self
@@ -355,7 +374,7 @@ class SwCLAHE:
         """
         if clear:
             self.clear_histogram()
-        return self.update_histogram(img).transform(img)
+        return self.update_model(img).transform(img)
 
     @staticmethod
     @jit(signature_or_function=(uint8[:, :], uint8, uint8, uint16[:, :, :]), nopython=True)
