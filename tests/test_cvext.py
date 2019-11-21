@@ -24,8 +24,9 @@ class TestSWAHE(unittest.TestCase):
 
     @staticmethod
     def brute_force_clipping(hist, limit, scaler):
+        hist = hist.copy()
         higher = hist > limit
-        to_clip = (hist[higher] - limit).sum(axis=-1, keepdims=True)
+        to_clip = (np.ma.masked_array(hist, np.logical_not(higher)) - limit).sum(axis=-1, keepdims=True)
         hist[higher] = limit
         hist += to_clip / 256.0
         return np.around(hist.cumsum(axis=-1) * scaler)
@@ -65,14 +66,71 @@ class TestSWAHE(unittest.TestCase):
         #  channels, the total count is on average 2560. This would amount to having 2560 cells for histogram. Hence,
         #  256/2560 is 0.1. However, to be sure, use a slightly smaller value.
         h = np.random.randint(0, 20, [H, W, 256]).astype(float)
+        h_cpy = h.copy()
+
+        # Perform the SwClahe version
         lut_s = np.zeros([H, W, 256], dtype=np.uint8)
         cvext.SwCLAHE._SwCLAHE__clip_limit(h, 10.0, lut_s, 0.08)
+        # Ensure that nothing changed...
+        self.assertTrue(np.array_equal(h_cpy, h))
+        # Perform Brute-Force version
         lut_b = self.brute_force_clipping(h, 10, 0.08).astype(np.uint8)
         self.assertTrue(np.array_equal(lut_s, lut_b))
 
         # Do Second One: this time, scaler < 256/(256*15) = 0.06667
         h = np.random.randint(0, 30, [H, W, 256]).astype(float)
-        lut_s = np.zeros([H, W, 256], dtype=np.uint8)
+        h_cpy = h.copy()
+        # Perform the SwClahe version: however, do not initialise lut_s....
         cvext.SwCLAHE._SwCLAHE__clip_limit(h, 10.0, lut_s, 0.05)
+        # Ensure that nothing changed...
+        self.assertTrue(np.array_equal(h_cpy, h))
         lut_b = self.brute_force_clipping(h, 10, 0.05).astype(np.uint8)
         self.assertTrue(np.array_equal(lut_s, lut_b))
+
+    def test_side_effects(self):
+        """
+        Test for various side-effects of the methods...
+        :return:
+        """
+        # Seed and create objects
+        np.random.seed(100)
+
+        # Create SwCLAHE object
+        swclahe = cvext.SwCLAHE([W, H])
+
+        # Create 'Image'
+        a = np.random.randint(0, 255, [H, W], dtype=np.uint8)
+        a_cpy = a.copy()
+
+        # ----- Test that Histogram is currently 0 ------- #
+        self.assertTrue((swclahe.transform(a_cpy) == 0).all())
+        # Check that no modification so far...
+        self.assertTrue(np.array_equal(a, a_cpy))
+
+        # ------- Now Test histogram update -------- #
+        swclahe.update_histogram(a_cpy)
+        # Check that no modification so far...
+        self.assertTrue(np.array_equal(a, a_cpy))
+        # Now Histogram is not 0!
+        tr_1 = swclahe.transform(a_cpy)
+        self.assertFalse((tr_1 == 0).all())
+        # However, applying same transform again, should not have changed anything...
+        self.assertTrue(np.array_equal(tr_1, swclahe.transform(a_cpy)))
+
+        # ------- Do another update -------- #
+        swclahe.update_histogram(a_cpy)
+        # However, applying same transform again, should not have changed anything...
+        self.assertFalse(np.array_equal(tr_1, swclahe.transform(a_cpy)))
+
+        # ------- Do final update with clear histogram -------- #
+        swclahe.clear_histogram()
+        swclahe.update_histogram(a_cpy)
+        # However, applying same transform again, should not have changed anything...
+        self.assertTrue(np.array_equal(tr_1, swclahe.transform(a_cpy)))
+
+        # finally check that apply works as expected
+        self.assertTrue(np.array_equal(tr_1, swclahe.apply(a_cpy)))
+        self.assertTrue(np.array_equal(tr_1, swclahe.apply(a_cpy)))
+        self.assertFalse(np.array_equal(tr_1, swclahe.apply(a_cpy, clear=False)))
+        self.assertTrue(np.array_equal(a, a_cpy))
+

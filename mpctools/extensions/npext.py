@@ -178,30 +178,30 @@ def value_map(array, _to, _from=None, shuffle=False):
         return np.asarray(_to)[sort_idx][idx]
 
 
-def run_lengths(a, null='I', return_values=False):
+def run_lengths(a, how='I', return_values=False):
     """
     Compute the length of continuous runs of the same values in an array.
 
     :param a: Array If not one-d, the input is flattened.
-    :param null: How to treat np.NaN:
-                    A: Add as a normal number.
-                    I: Ignore NaNs from the computation
+    :param how: How to treat values including np.NaN
+                    A: use All values (including treating NaN as its own de-facto value)
+                    I: Ignore NaN values but treat all others as before
                     O: compute Only NaNs
     :param return_values: If true, return also the Key (value) for each run.
     :return: lengths, [values]
                The first array contains the run lengths: the second, if present, is the actual key (value) of that run.
     """
     # Compute
-    if null.lower() == 'a':
+    if how.lower() == 'a':
         if type(a) == np.ndarray:
             # I have to do this convoluted aspect first to make sure that nan-run-lengths are treated correctly!
             a = [i if not np.isnan(i) else np.nan for i in a.flatten()]
         rls = np.asarray([(sum(1 for _ in l), n) for n, l in iter.groupby(a)])
-    elif null.lower() == 'i':
+    elif how.lower() == 'i':
         if type(a) == np.ndarray:
             a = a.flatten().tolist()
         rls = np.asarray([(sum(1 for _ in l), n) for n, l in iter.groupby(a) if not np.isnan(n)])
-    elif null.lower() == 'o':
+    elif how.lower() == 'o':
         if type(a) == np.ndarray:
             # I have to do this convoluted aspect first to make sure that nan-run-lengths are treated correctly!
             a = [i if not np.isnan(i) else np.nan for i in a.flatten()]

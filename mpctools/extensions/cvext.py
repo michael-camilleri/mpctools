@@ -320,6 +320,9 @@ class SwCLAHE:
         self.__clip_limit(self.__hst, float(self.__seen*self.__clip), self.__lut,
                           256.0/((self.__tile_W+1) * (self.__tile_H+1)))
 
+        # Return Self
+        return self
+
     def transform(self, img):
         """
         Transform the Image according to the LUT.
@@ -330,6 +333,19 @@ class SwCLAHE:
         tr_ = np.empty_like(img)
         self.__transform(self.__lut, img, tr_)
         return tr_
+
+    def apply(self, img, clear=True):
+        """
+        Convenience Method for joining together updating of histogram and transform... This emulates the default
+        CLAHE implementation which clears the histogram after each iteration
+
+        :param img:     The image to operate on
+        :param clear:   If True, then re-generate the histogram.
+        :return:        Transformed Image
+        """
+        if clear:
+            self.clear_histogram()
+        return self.update_histogram(img).transform(img)
 
     @staticmethod
     @jit(signature_or_function=(uint8[:, :], uint8, uint8, uint16[:, :, :]), nopython=True)
@@ -391,6 +407,9 @@ class SwCLAHE:
         :param scaler: should be 256 / boxsize
         :return:
         """
+        # Do a Copy of Hist: This is needed to prevent unintentional modification...
+        hist = hist.copy()
+
         # Iterate over rows/columns of Histogram
         for r in range(hist.shape[0]):
             for c in range(hist.shape[1]):
