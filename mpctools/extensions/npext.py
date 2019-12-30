@@ -178,42 +178,67 @@ def value_map(array, _to, _from=None, shuffle=False):
         return np.asarray(_to)[sort_idx][idx]
 
 
-def run_lengths(a, how='I', return_values=False):
+def run_lengths(a, how='I', return_values=False, return_positions=False):
     """
     Compute the length of continuous runs of the same values in an array.
 
     :param a: Array If not one-d, the input is flattened.
     :param how: How to treat values including np.NaN
                     A: use All values (including treating NaN as its own de-facto value)
-                    I: Ignore NaN values but treat all others as before
+                    I: Ignore NaN values but treat all others as before. Note that if an NaN interrupts a stream of
+                       same values, then these will be treated as SEPARATE streams.
                     O: compute Only NaNs
     :param return_values: If true, return also the Key (value) for each run.
-    :return: lengths, [values]
-               The first array contains the run lengths: the second, if present, is the actual key (value) of that run.
+    :param return_positions: If true, return also the start position of each run.
+    :return: lengths, [values], [positions]
+               The first array contains the run lengths: optionally, the next array (if present) is the values for each
+               run, and finally (if present) the position of the start of each run.
     """
-    # Compute
+    # Prepare
+    #  We fist compute assuming that we are going to use everything! This allows us to have correct position information
+    #  We also need to convert arrays of NaN to lists so that NaN works. This will slow down but cannot be helped.
+    if type(a) == np.ndarray:
+        a = [i if not np.isnan(i) else np.nan for i in a.flatten()]
+    rls = np.asarray([(sum(1 for _ in l), n) for n, l in iter.groupby(a)])  # Now, compute run-lengths and types.
+    pos = np.asarray([0, *np.cumsum(rls[:, 0])[:-1]], dtype=int) if len(rls) > 0 else []  # Compute positions just in case.
+    # Compute: Branch on Format
     if how.lower() == 'a':
-        if type(a) == np.ndarray:
-            # I have to do this convoluted aspect first to make sure that nan-run-lengths are treated correctly!
-            a = [i if not np.isnan(i) else np.nan for i in a.flatten()]
-        rls = np.asarray([(sum(1 for _ in l), n) for n, l in iter.groupby(a)])
+        lens, vals = (rls[:, 0], rls[:, 1]) if len(rls) > 0 else ([], [])
     elif how.lower() == 'i':
-        if type(a) == np.ndarray:
-            a = a.flatten().tolist()
-        rls = np.asarray([(sum(1 for _ in l), n) for n, l in iter.groupby(a) if not np.isnan(n)])
+        n_nan = ~np.isnan(rls[:, 1])
+        lens, vals, pos = (rls[n_nan, 0], rls[n_nan, 1], pos[n_nan]) if len(n_nan) > 0 else ([], [], [])
     elif how.lower() == 'o':
-        if type(a) == np.ndarray:
-            # I have to do this convoluted aspect first to make sure that nan-run-lengths are treated correctly!
-            a = [i if not np.isnan(i) else np.nan for i in a.flatten()]
-        rls = np.asarray([(sum(1 for _ in l), n) for n, l in iter.groupby(a) if np.isnan(n)])
+        nan = np.isnan(rls[:, 1])
+        lens, vals, pos = (rls[nan, 0], rls[nan, 1], pos[nan]) if len(nan) > 0 else ([], [], [])
     else:
-        raise ValueError('Incorrect format for NULL')
+        raise ValueError('Incorrect format for "how" parameter.')
     # Now Return
-    if len(rls) > 0:
-        return (rls[:, 0], rls[:, 1]) if return_values else rls[:, 0]
-    else:
-        return ([],  []) if return_values else []
+    to_return = [lens]
+    if return_values:
+        to_return.append(vals)
+    if return_positions:
+        to_return.append(pos.astype(int))
+    return tuple(to_return) if len(to_return) > 1 else to_return[0]
 
+
+def array_nan_equal(left, right):
+    """
+    Compares two numpy arrays to test for equality, but considers np.nan values to be equal to each other
+    :param left: The Left array to consider
+    :param right: The Right array to consider
+    :return: True if left is the same shape as right, and all elements are equal (including nan's at same positions)
+    """
+    # Ensure that Arrays (potentially convert from list)
+    try:
+        left, right = np.asarray(left), np.asarray(right)
+    except ValueError:
+        return False
+
+    # Check that Shape is correct
+    if left.shape != right.shape: return False
+
+    # Return
+    return bool(np.logical_or(np.asarray(left == right), np.logical_and(np.isnan(left), np.isnan(right))).all())
 
 
 ################################################################
