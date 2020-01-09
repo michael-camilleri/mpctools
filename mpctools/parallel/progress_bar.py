@@ -53,7 +53,7 @@ class ProgressBar:
 
         :param prefix: Prefix to set (if any)
         :param suffix: Suffix to write
-        :return: None
+        :return: Self, for chaining
         """
         return self.update(value=0, prefix=prefix, suffix=suffix)
 

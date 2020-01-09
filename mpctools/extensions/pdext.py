@@ -105,3 +105,17 @@ def dfmultiindex(df, lvl, vals, indexer=False):
         return df.loc[_slicer, :]
 
 
+def time_overlap(tr1, tr2, time_only=False):
+    """
+    Method to check whether two time-ranges overlap.
+
+    :param tr1: TimeRange 1 (tuple of pandas.DateTime)
+    :param tr2: TimeRange 2 (tuple of pandas.DateTime)
+    :param time_only: If true, then only consider overlap in absolute time-of-day rather than entire date.
+    :return:    True if they overlap, false otherwise.
+    """
+    if time_only:
+        return (tr1[0].time() <= tr2[1].time()) and (tr1[1].time() >= tr2[0].time())
+    else:
+        return (tr1[0] <= tr2[1]) and (tr1[1] >= tr2[0])
+
