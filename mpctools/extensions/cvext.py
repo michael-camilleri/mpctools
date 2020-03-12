@@ -78,6 +78,33 @@ def expand_box(c, size):
     return np.asarray(((c - (x, y)), (c + (x, -y)), (c + (x, y)), (c + (-x, y))))
 
 
+def intersection_over_union(ground_truth, prediction):
+    """
+    Computes the Intersection over Union.
+    Code modifed from https://gist.github.com/meyerjo/dd3533edc97c81258898f60d8978eddc
+
+    :param ground_truth: The ground-truth rectangle. Stored as [X_tl, Y_tl, W, H]
+    :param prediction:   The predicted rectangle. Stored as [X_tl, Y_tl, W, H]
+    :return:
+    """
+    # Determine the bounds of the intersection:
+    x_tl = max(ground_truth[0], prediction[0])
+    y_tl = max(ground_truth[1], prediction[1])
+    x_br = min(ground_truth[0] + ground_truth[2], prediction[0] + prediction[2])
+    y_br = min(ground_truth[1] + ground_truth[3], prediction[1] + prediction[3])
+
+    # Compute intersection:
+    intersection = max(x_br - x_tl, 0) * max(y_br - y_tl, 0)
+    if intersection == 0:
+        return 0
+
+    # Compute the union
+    union = ground_truth[2]*ground_truth[3] + prediction[2]*prediction[3] - intersection
+
+    # Return Intersection over Union
+    return intersection/union
+
+
 class VideoParser:
     """
     The Video Parser (Wrapper) Object
