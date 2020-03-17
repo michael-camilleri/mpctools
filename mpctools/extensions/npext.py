@@ -447,7 +447,10 @@ def mutual_information(prior, emission, base=None):
       assumption). Be careful however, that as the number of X variables increases, the dimensionality of the problem
       explodes (since we need to work with the full joint marginal)!
 
-    Note that this only supports a 1D latent variable (Z): i.e. there may be multiple (X) variables but only 1 (Z).
+    Note (1) - This is NOT the Conditional Mutual Information, which is something different: this is just the MI between
+    a Z and a multi-dimensional X (taken as one variable).
+
+    Note (2) - This only supports a 1D latent variable (Z): i.e. there may be multiple (X) variables but only 1 (Z).
 
     :param prior:       Prior Distribution over Z [1D array]
     :param emission:    Conditional Distribution over X given Z. This can be either:
