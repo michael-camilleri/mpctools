@@ -1,6 +1,6 @@
 # mpctools
-A set of python tools for extending standard (and non-standard) libraries. These originated from my own needs and I 
-decided to put them here in case they may be useful to other people.
+A set of python tools for extending standard (and non-standard) libraries. These originated from my own needs and those
+of my students, and I decided to put them here in case they may be useful to other people.
 
 ## Features
 
@@ -24,6 +24,7 @@ This Library has the following dependencies:
   * seaborn
   * pandas
   * pathos
+  * scipy
   * numpy
   
 In most cases, the above can be automatically installed through the library itself (i.e. pip will attempt to download 
@@ -44,7 +45,16 @@ pip install opencv-python
 Installation is as easy as running the setup script and then installing using pip:
   ```bash
   python setup.py sdist --format=tar
-  pip install dist/mpctools-0.3.00.tar --user
+  pip install dist/mpctools-0.3.23.tar --user
   ```
  The `--user` flag is optional and only necessary when one does not have full system permissions. Note that depending on
  which version the library is at, you may need to change the version number of the install command.
+
+### Known Issues
+
+ * **Python 3.7: parallel.IWorker** - There seems to be an incompatibility in pathos with python 3.7, which is causing
+ it to  default to pickle rather than dill, and sometimes preventing abc-derived classes (namely the IWorker instance)
+ from  being pickled. If this happens to you, just make your worker a standard class and copy the initialiser and 
+ `update_progress` methods from IWorker. We are working on a solution to this.
+ * **parallel Blocking** - If the program seems to hang for no reason, it could be that one of the child processes died
+ maybe due  to a memory overlow... if this happens, try to limit the amount of memory usage by each IWorker.

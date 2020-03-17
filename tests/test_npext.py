@@ -64,27 +64,48 @@ class TestInvertSoftmax(unittest.TestCase):
                 self.assertTrue(np.allclose(inverse[..., int(index0)], 0))
 
 
-class TestNaNRunLengths(unittest.TestCase):
+class TestRunLengths(unittest.TestCase):
 
-    def test_correct_values(self):
-        # Define Array
+    def test_standard(self):
+        a = np.array([0, 0, 0, 1, 1, np.NaN, 1, 1, 1, 1, 1, -1, 1, 1, 1, 1, 2, 3, 0.56, 0.56, 0.56])
+        self.assertTrue(np.array_equal(npext.run_lengths(a, how='i'), [3, 2, 5, 1, 4, 1, 1, 3]))
+        self.assertTrue((npext.run_lengths(a, how='a') == [3, 2, 1, 5, 1, 4, 1, 1, 3]).all())
+
+    def test_NaN_handling(self):
+        # Test 1
         a = np.array([0, 5, np.NaN, 1., np.NaN, np.NaN, 4.3, -5, -np.Inf, np.NaN, 5.2])
-        self.assertTrue((npext.null_run_lengths(a) == [1, 2, 1]).all())
+        self.assertTrue((npext.run_lengths(a, how='o') == [1, 2, 1]).all())
+        self.assertTrue((npext.run_lengths(a, how='a') == [1, 1, 1, 1, 2, 1, 1, 1, 1, 1]).all())
+        self.assertTrue((npext.run_lengths(a, how='i') == [1, 1, 1, 1, 1, 1, 1]).all())
+        # Test with None
+        a = np.arange(100)
+        self.assertEqual(len(npext.run_lengths(a, how='o')), 0)
 
-    def test_handles_edges(self):
+    def test_NaN_handles_edges(self):
         # Define Array
         a = np.array([0, 5, np.NaN, 1., np.NaN, np.NaN, 4.3, -5, -np.Inf, np.NaN, 5.2, np.NaN])
         b = np.array([np.NaN, np.NaN, 0, 5, np.NaN, 1., np.NaN, np.NaN, 4.3, -5, -np.Inf, np.NaN, 5.2])
         # Test
-        self.assertTrue((npext.null_run_lengths(a) == [1, 2, 1, 1]).all())
-        self.assertTrue((npext.null_run_lengths(b) == [2, 1, 2, 1]).all())
+        c = npext.run_lengths(a, how='o')
+        self.assertTrue(np.array_equal(c, np.array([1, 2, 1, 1])))
+        self.assertTrue((npext.run_lengths(b, how='o') == [2, 1, 2, 1]).all())
 
     def test_handle_reshaping(self):
         # Define array
-        a = np.array([np.NaN, np.NaN, 0, 5, np.NaN, 1., np.NaN, np.NaN, 4.3, -5, -np.Inf, np.NaN]).reshape([4, 3])
-        self.assertTrue((npext.null_run_lengths(a) == [2, 1, 2, 1]).all())
+        a = np.array([np.NaN, np.NaN, 1, 1, np.NaN, 2, np.NaN, np.NaN, 3, 3, 3, -np.Inf]).reshape([4, 3])
+        self.assertTrue((npext.run_lengths(a, how='o') == [2, 1, 2]).all())
+        self.assertTrue((npext.run_lengths(a, how='a') == [2, 2, 1, 1, 2, 3, 1]).all())
 
-    def test_handle_none(self):
-        # Define Array
-        a = np.arange(100)
-        self.assertEqual(len(npext.null_run_lengths(a)), 0)
+    def test_position_return(self):
+        a = np.array([0, 0, 0, 1, 1, np.NaN, 1, 1, 1, 1, 1, -1, 1, 1, 1, 1, 2, 3, 0.56, 0.56, 0.56])
+        self.assertTrue((npext.run_lengths(a, how='a', return_positions=True)[1] == [0, 3, 5, 6, 11, 12, 16, 17, 18]).all())
+        self.assertTrue((npext.run_lengths(a, how='i', return_positions=True)[1] == [0, 3, 6, 11, 12, 16, 17, 18]).all())
+        self.assertTrue((npext.run_lengths(a, how='o', return_positions=True)[1] == [5]).all())
+
+    def test_value_return(self):
+        a = np.array([0, 0, 0, 1, 1, np.NaN, 1, 1, 1, 1, 1, -1, 1, 1, 1, 1, 2, 3, 0.56, 0.56, 0.56])
+        self.assertTrue(npext.array_nan_equal(npext.run_lengths(a, how='a', return_values=True)[1],
+                                              [0, 1, np.NaN, 1, -1, 1, 2, 3, 0.56]))
+        self.assertTrue(npext.array_nan_equal(npext.run_lengths(a, how='i', return_values=True)[1],
+                                              [0, 1, 1, -1, 1, 2, 3, 0.56]))
+        self.assertTrue(npext.array_nan_equal(npext.run_lengths(a, how='o', return_values=True)[1], [np.NaN]))

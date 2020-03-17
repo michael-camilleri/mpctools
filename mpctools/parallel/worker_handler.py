@@ -19,7 +19,6 @@ from mpctools.extensions import utils
 from pathos.helpers import mp
 import numpy as np
 import threading
-import weakref
 import queue
 import time
 import abc
@@ -50,7 +49,7 @@ class IWorker(metaclass=abc.ABCMeta):
 
         """
         self.ID = _id
-        self.__queue = weakref.ref(_mgr.Queue)   # Keep Weak-Reference to Handler Class' Queue
+        self.__queue = _mgr.Queue   # This is now a strong reference, due to the weakref seemingly losing the object.
         _mgr._register_worker(_id)
 
     def update_progress(self, progress):
@@ -69,7 +68,7 @@ class IWorker(metaclass=abc.ABCMeta):
         :return: None
         """
         try:
-            self.__queue().put((self.ID, progress), block=False)
+            self.__queue.put((self.ID, progress), block=False)
         except TypeError:
             sys.stderr.write('Warn: TypeError Encountered')
             pass
@@ -218,6 +217,9 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         # Inform and join thread
         self.Queue.put([0, -1])
         self.__thread.join()
+
+        # Delete the Workers explicitly just in case - this prevents the circular referencing from remaining.
+        _workers.clear()
 
         # Return the aggregated information
         return aggregated
