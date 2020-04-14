@@ -42,13 +42,19 @@ pip install opencv-python
 
 ### Installing
 
-Installation is as easy as running the setup script and then installing using pip:
+Installation can be done via pip by pointing to this repository:
   ```bash
-  python setup.py sdist --format=tar
-  pip install dist/mpctools-0.3.23.tar --user
+  pip install git+https://github.com/michael-camilleri/mpctools.git --user
   ```
  The `--user` flag is optional and only necessary when one does not have full system permissions. Note that depending on
  which version the library is at, you may need to change the version number of the install command.
+ 
+ Alternatively, you may choose to install directly from source. This has the added advantage that if you change any of 
+ the implementations, the changes will be reflected without having to rebuild. However, you will have to manually
+ download the source (via git or just zipped and then extracted):
+  ```bash
+  python setup.py build develop --no-deps
+  ```
 
 ### Known Issues
 
