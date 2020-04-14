@@ -241,6 +241,25 @@ def array_nan_equal(left, right):
     return bool(np.logical_or(np.asarray(left == right), np.logical_and(np.isnan(left), np.isnan(right))).all())
 
 
+def round_to_multiple(x, base, how='r'):
+    """
+    Round x's elements to the nearest multiple of 'base'
+
+    :param x: Array to round
+    :param base: The base (integer/float) to round to multiples of:
+    :param how: The method for rounding: 'r' (round), 'f' (floor) or 'c' (ceiling)
+    :return: value rounded up to the nearest multiple of base. The data type will always be float
+    """
+    if how.lower() == 'r':
+        return np.round(np.divide(x, float(base))) * base
+    elif how.lower() == 'f':
+        return np.floor(np.divide(x, float(base))) * base
+    elif how.lower() == 'c':
+        return np.ceil(np.divide(x, float(base))) * base
+    else:
+        raise ValueError('HOW must be one of r/f/c')
+
+
 ################################################################
 #                     Matrix Manipulations                     #
 ################################################################

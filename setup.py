@@ -3,11 +3,12 @@ This is the Setup Script for installing the Library
 """
 
 from setuptools import setup
+import mpctools
 
 setup(
     # Common Setup
     name="mpctools",
-    version="0.3.23",
+    version=mpctools.__version__,
     packages=['mpctools.extensions', 'mpctools.parallel'], # Eventually, do neural
 
     # Requirements
