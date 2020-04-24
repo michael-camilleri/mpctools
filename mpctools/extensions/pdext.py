@@ -27,7 +27,7 @@ def DataFrame(data):
     try:
         return pandas.DataFrame(data)
     except ValueError:
-        return pandas.DataFrame(data, index=[0, ])
+        return pandas.DataFrame(data, index=[0,])
 
 
 def build_dataframe(_d, _idx_names, _idx_values):
@@ -71,7 +71,9 @@ def recategorise(_df, _cat_type, _cols, _map=None):
     """
     if _map is not None:
         for col in _cols:
-            _df.loc[:, col] = _df[col].map(_map)  # Note that this will automatically convert to the appropriate type!
+            _df.loc[:, col] = _df[col].map(
+                _map
+            )  # Note that this will automatically convert to the appropriate type!
             _df.loc[:, col] = _df[col].astype(float, copy=False).astype(_cat_type)
     else:
         for col in _cols:
@@ -98,7 +100,9 @@ def dfmultiindex(df, lvl, vals, indexer=False):
     :param indexer: If True, returns the indexer (slicer) instead of the actual data (allowing more flexible use)
     :return:        The chunk of DataFrame matching the index or the indexer
     """
-    _slicer = tuple(vals if _l == lvl else slice(None) for _l in range(len(df.index.levels)))
+    _slicer = tuple(
+        vals if _l == lvl else slice(None) for _l in range(len(df.index.levels))
+    )
     if indexer:
         return _slicer
     else:
@@ -118,4 +122,3 @@ def time_overlap(tr1, tr2, time_only=False):
         return (tr1[0].time() <= tr2[1].time()) and (tr1[1].time() >= tr2[0].time())
     else:
         return (tr1[0] <= tr2[1]) and (tr1[1] >= tr2[0])
-

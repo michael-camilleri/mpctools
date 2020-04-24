@@ -12,4 +12,4 @@ http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 
-__author__ = 'Michael P. J. Camilleri'
+__author__ = "Michael P. J. Camilleri"

@@ -1,15 +1,16 @@
 """
 A Set of interfaces for multi-processing in python
 
-This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
-License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
-version.
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU
+General Public License as published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
-warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+General Public License for more details.
 
-You should have received a copy of the GNU General Public License along with this program. If not, see
-http://www.gnu.org/licenses/.
+You should have received a copy of the GNU General Public License along with this program. If not,
+see http://www.gnu.org/licenses/.
 
 Author: Michael P. J. Camilleri
 """
@@ -27,24 +28,25 @@ import sys
 
 class IWorker(metaclass=abc.ABCMeta):
     """
-    This is the Worker Interface. All worker-threads should implement this abstract interface, specifically
-    the parallel_compute method.
+    This is the Worker Interface. All worker-threads should implement this abstract interface,
+    specifically the parallel_compute method.
 
-    IWorker instances should be stateless, with all functionality contained within the parallel_compute method. Each
-    worker is managed by the WorkManager (below), which controls instantiation, execution and progress control. The
-    workers communicate with the Manager through a queue (to which each IWorker has access).
+    IWorker instances should be stateless, with all functionality contained within the
+    parallel_compute method. Each worker is managed by the WorkManager (below), which controls
+    instantiation, execution and progress control. The workers communicate with the Manager through
+    a queue (to which each IWorker has access).
     """
 
     def __init__(self, _id, _mgr):
         """
         Initialiser
 
-        Note that the implementation Constructor should follow the same template and not take additional arguments:
-        these must be passed to the parallel_compute method if required.
+        Note that the implementation Constructor should follow the same template and not take
+        additional arguments: these must be passed to the parallel_compute method if required.
 
-        :param _id:  A Unique Identifier: This will be greater than 0! This is typically used not only to identify the
-                        different workers, but could also be used to help ensure a consistent but unique seed to each of
-                        the workers.
+        :param _id:  A Unique Identifier: This will be greater than 0! This is typically used not
+                     only to identify the different workers, but could also be used to help ensure a
+                     consistent but unique seed to each of the workers.
         :param _mgr: An instance of a Worker Handler for getting the queue from.
 
         """
@@ -56,15 +58,17 @@ class IWorker(metaclass=abc.ABCMeta):
         """
         This method should be called (regularly) to indicate progress updates by the worker-thread.
 
-        Internally, it uses the manager queue to update it of progress. Each message consists of two parts:
-            a) ID: this is automatically assigned (and managed) by the Manager, and is a number greater than 0 (which is
-                   reserved for the Manager itself.
+        Internally, it uses the manager queue to update it of progress. Each message consists of two
+        parts:
+            a) ID: this is automatically assigned (and managed) by the Manager, and is a number
+                   greater than 0 (which is reserved for the Manager itself.
             b) Progress: A number between 0 and 100 indicating the current (relative) progress.
 
-        Note, that due to some bug in the MultiProcessing Library, which seems to sometimes reset the connection,
-         I had to wrap this in a try-catch block
+        Note, that due to some bug in the MultiProcessing Library, which seems to sometimes reset
+        the connection, I had to wrap this in a try-catch block
 
-        :param progress: A number between 0 and 100 indicating the *CURRENT* progress as a percentage
+        :param progress: A number between 0 and 100 indicating the *CURRENT* progress as a
+               percentage
         :return: None
         """
         try:
@@ -88,21 +92,22 @@ class IWorker(metaclass=abc.ABCMeta):
 
 class WorkerHandler(metaclass=abc.ABCMeta):
     """
-    This Class Implements an interface for controlling multiple workers. It is itself based on the parallel
-    library from pathos, however, the class adds the following functionality:
-        a) Capability of switching between parallel and multi-threading seamlessly, with a consistent interface
+    This Class Implements an interface for controlling multiple workers. It is itself based on the
+    parallel library from pathos, however, the class adds the following functionality:
+        a) Capability of switching between parallel and multi-threading seamlessly, with a
+           consistent interface
         b) Specific Worker-Server Model, including management of resources and progress tracking.
         c) (Crude) Timing of individual tasks for performance tracking.
 
     Technicalities:
       * Communication is done via a queue interface.
-      * When multi-threading is enabled (as opposed to parallel) the threads are run one at a time (there is no
-            inter-leaving). This can provide a better level of debugging.
+      * When multi-threading is enabled (as opposed to parallel) the threads are run one at a time
+        (there is no inter-leaving). This can provide a better level of debugging.
     """
 
     HANDLER_ID = 0
 
-    # ========================================= Abstract Interface ========================================= #
+    # =================================== Abstract Interface =================================== #
 
     @abc.abstractmethod
     def _aggregate_results(self, results):
@@ -114,7 +119,7 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         """
         raise NotImplementedError()
 
-    # =========================================== Implementation =========================================== #
+    # ===================================== Implementation ===================================== #
 
     @property
     def Queue(self):
@@ -124,10 +129,10 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         """
         Initialiser
 
-        :param num_proc:    Number of processes to employ (default to the number of cores less 2). If 0 or less, then
-                            defaults to Multi-Threading instead of Multi-Processing: this can be especially useful for
-                            debugging.
-        :param sink:        Sink where to write progress to (may be None)
+        :param num_proc: Number of processes to employ (default to the number of cores less 2). If 0
+                         or less, then defaults to Multi-Threading instead of Multi-Processing: this
+                         can be especially useful for debugging.
+        :param sink:     Sink where to write progress to (may be None)
         """
         # Parameters
         self.NumProc = num_proc  # Number of Processes to employ
@@ -179,13 +184,14 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         """
         Starts the Pool of Workers and executes them.
 
-        The method blocks until all workers have completed. However, it also starts a background update-thread which
-        publishes information about progress.
+        The method blocks until all workers have completed. However, it also starts a background
+        update-thread which publishes information about progress.
 
         :param _num_work:   Number of workers to initialise
         :param _type:       The worker type to run
         :param _configs:    These are extensions across all workers: may be None
-        :param _args:       These are arguments per-worker. Must be a list equal in length to _num_work or None
+        :param _args:       These are arguments per-worker. Must be a list equal in length to
+                            _num_work or None
         :return:            Result of the Aggregator
         """
         # Reset Everything
@@ -203,7 +209,9 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         if self.NumProc > 0:
             with mp.Pool(processes=self.NumProc) as pool:
                 processes = [
-                    pool.apply_async(self.__computer, args=(_workers[_i], (_configs, _args[_i])))
+                    pool.apply_async(
+                        self.__computer, args=(_workers[_i], (_configs, _args[_i]))
+                    )
                     for _i in range(_num_work)
                 ]
                 aggregated = self._aggregate_results(
@@ -231,7 +239,8 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         self.Queue.put([0, -1])
         self.__thread.join()
 
-        # Delete the Workers explicitly just in case - this prevents the circular referencing from remaining.
+        # Delete the Workers explicitly just in case - this prevents the circular referencing from
+        # remaining.
         _workers.clear()
 
         # Return the aggregated information

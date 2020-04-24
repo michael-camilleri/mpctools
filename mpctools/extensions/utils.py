@@ -22,6 +22,7 @@ import os
 #            Collections Processing            #
 ################################################
 
+
 def to_tuple(value):
     """
     Static (Module) Method for converting a scalar into a tuple if not already (tuple/list/numpy array). Will also
@@ -30,7 +31,11 @@ def to_tuple(value):
     :param value: The Value to convert
     :return: A Tuple containing value if a scalar, or value if already a list/tuple/numpy array/none
     """
-    return value if (type(value) in (tuple, list, np.ndarray) or value is None) else (value,)
+    return (
+        value
+        if (type(value) in (tuple, list, np.ndarray) or value is None)
+        else (value,)
+    )
 
 
 def to_list(value):
@@ -40,7 +45,11 @@ def to_list(value):
     :param value: The Value to convert
     :return: A List containing value if a scalar, or value if already a list/tuple/numpy array/none
     """
-    return value if (type(value) in (tuple, list, np.ndarray) or value is None) else [value, ]
+    return (
+        value
+        if (type(value) in (tuple, list, np.ndarray) or value is None)
+        else [value,]
+    )
 
 
 def to_scalar(value):
@@ -56,9 +65,9 @@ def to_scalar(value):
 
 def extend_dict(_d1, _d2, deep=False):
     """
-    This function may be used to extend the 'list/array'-type elements of _d1 by corresponding entries in _d2. The elements in either case must support the extend
-    method (i.e. are typically lists) - scalars are however supported through the lister method. Note that if a key
-    exists in _d2 and not in _d1, it is automatically created as a list.
+    This function may be used to extend the 'list/array'-type elements of _d1 by corresponding entries in _d2. The
+    elements in either case must support the extend method (i.e. are typically lists) - scalars are however supported
+    through the lister method. Note that if a key exists in _d2 and not in _d1, it is automatically created as a list.
 
     :param _d1: Dictionary to extend: will be modified
     :param _d2: Dictionary to copy data from.
@@ -133,10 +142,12 @@ def pad(a, length, value):
 #            Printing & Formatting             #
 ################################################
 
+
 class NullableSink:
     """
     Defines a wrapper class which supports a nullable initialisation
     """
+
     def __init__(self, obj=None):
         self.Obj = obj
 
@@ -150,7 +161,7 @@ class NullableSink:
 
     def print(self, *args):
         self.write(*args)
-        self.write('\n')
+        self.write("\n")
         self.flush()
 
 
@@ -163,7 +174,7 @@ def name(obj):
     :return: string representation of 'obj'
     """
     if isinstance(obj, type):
-        if hasattr(obj, '__name__'):
+        if hasattr(obj, "__name__"):
             return obj.__name__
         else:
             return str(obj)
@@ -179,7 +190,7 @@ def float_list(_list, prec=2):
     :param prec:  Precision
     :return:
     """
-    return ['{1:.{0}f}'.format(prec, f) for f in _list]
+    return ["{1:.{0}f}".format(prec, f) for f in _list]
 
 
 def str_width(_iterable):
@@ -213,16 +224,17 @@ def short_int(_int):
     if _int < 1000:
         return str(_int)
     elif _int < 1000000:
-        return '{0:.4g}K'.format(_int/1000)
+        return "{0:.4g}K".format(_int / 1000)
     elif _int < 1000000000:
-        return '{0:.4g}M'.format(_int/1000000)
+        return "{0:.4g}M".format(_int / 1000000)
     else:
-        return '{0:.4g}G'.format(_int/1000000000)
+        return "{0:.4g}G".format(_int / 1000000000)
 
 
 ################################################
 #                OS Manipulation               #
 ################################################
+
 
 def make_dir(_path, _clear=False):
     """
@@ -244,4 +256,5 @@ def make_dir(_path, _clear=False):
     try:
         os.makedirs(_path)
     except OSError:
-        if not os.path.isdir(_path): raise
+        if not os.path.isdir(_path):
+            raise

@@ -40,10 +40,12 @@ def hierarchical_log_loss(y_true, y_prob, mapping, eps=1e-15):
 
     # Now do those which are in the mapping
     for m_s, m_f in mapping.items():
-        _ll[y_true == m_s] = np.multiply(y_prob[y_true == m_s, :], np.asarray(m_f)[np.newaxis, :]).sum(axis=1)
+        _ll[y_true == m_s] = np.multiply(
+            y_prob[y_true == m_s, :], np.asarray(m_f)[np.newaxis, :]
+        ).sum(axis=1)
 
     # Finally compute the actual log-loss (after clipping)
-    return -np.sum(np.log(np.clip(_ll, eps, 1)))/_l
+    return -np.sum(np.log(np.clip(_ll, eps, 1))) / _l
 
 
 def multi_way_split(y, sizes, splitter, random_state=None):
@@ -64,17 +66,34 @@ def multi_way_split(y, sizes, splitter, random_state=None):
     sizes = npext.sum_to_one(sizes)
     # --- Base Case: We know how to do this --- #
     if len(sizes) == 2:
-        return next(splitter(n_splits=1, train_size=sizes[0], test_size=sizes[1],
-                             random_state=random_state).split(y, y))
+        return next(
+            splitter(
+                n_splits=1,
+                train_size=sizes[0],
+                test_size=sizes[1],
+                random_state=random_state,
+            ).split(y, y)
+        )
     # --- Other Cases --- #
     #   This is a bit trickier. We have to first split assuming that all but the first set are grouped together. We then
     #   pass the second set of targets recursively to our function, with the remaining sizes. However, when the indices
     #   are returned, they must be remapped to the original index set, since they are indices into that set.
     else:
         sub_sizes = sizes[1:]
-        left, right = next(splitter(n_splits=1, train_size=sizes[0], test_size=np.sum(sub_sizes),
-                                    random_state=random_state).split(y, y))
-        right_split = multi_way_split(y[right], sub_sizes, splitter, random_state + 1 if random_state is not None else None)
+        left, right = next(
+            splitter(
+                n_splits=1,
+                train_size=sizes[0],
+                test_size=np.sum(sub_sizes),
+                random_state=random_state,
+            ).split(y, y)
+        )
+        right_split = multi_way_split(
+            y[right],
+            sub_sizes,
+            splitter,
+            random_state + 1 if random_state is not None else None,
+        )
         idcs = [left]
         for i in right_split:
             idcs.append(right[i])
@@ -86,7 +105,8 @@ class HierarchicalClustering:
     A Class to wrap Scipy's Linkage methods in a convenient framework similar to sklearn. This adds some flexibility
     to SKLearn's own AgglomerativeClustering, for example in visualising dendrograms.
     """
-    def __init__(self, n_clusters=2, affinity='euclidean', linkage='ward'):
+
+    def __init__(self, n_clusters=2, affinity="euclidean", linkage="ward"):
         """
         Initialise the Clustering
 
@@ -121,22 +141,25 @@ class HierarchicalClustering:
         if n_clusters > 0:
             self.__n_clusters = int(n_clusters)
         else:
-            raise ValueError('Value must be an integer greater than 0')
+            raise ValueError("Value must be an integer greater than 0")
 
     def fit(self, X, y=None):
         """
         Fit a Hierarchical Clustering Scheme to the Data X
+
         :param X: If the affinity metric was set to 'precomputed', this must be a precomputed distance matrix, of size
                   N x N, where entry X_{i,j} is the distance between sample i and sample j. Otherwise it is a 2D array
                   of size N x M where M is the feature-space size.
-        :param y: ignored.
+        :param y: ignored, but provided for compatibility with fit
         :return: self, for chaining.
         """
         # If Precomputed, convert to Condensed Form first
-        if self.__affinity == 'precomputed':
+        if self.__affinity == "precomputed":
             X = squareform(X, checks=False)
         # Cluster
-        self.__clusters = linkage(y=X, method=self.__linkage, metric=self.__affinity, optimal_ordering=True)
+        self.__clusters = linkage(
+            y=X, method=self.__linkage, metric=self.__affinity, optimal_ordering=True
+        )
         # Return self for chaining
         return self
 
@@ -149,7 +172,7 @@ class HierarchicalClustering:
                   original matrix.
         :return:  Cluster Labels for each sample (labelled 0 to NClusters-1)
         """
-        return fcluster(self.__clusters, t=self.__n_clusters, criterion='maxclust')
+        return fcluster(self.__clusters, t=self.__n_clusters, criterion="maxclust")
 
     def fit_predict(self, X, y):
         """
@@ -178,5 +201,12 @@ class HierarchicalClustering:
         """
         if color is None:
             color = -1
-        dendrogram(self.__clusters, ax=ax, labels=labels, leaf_rotation=x_rot, color_threshold=color, leaf_font_size=fs)
+        dendrogram(
+            self.__clusters,
+            ax=ax,
+            labels=labels,
+            leaf_rotation=x_rot,
+            color_threshold=color,
+            leaf_font_size=fs,
+        )
         return self

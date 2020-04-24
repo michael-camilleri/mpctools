@@ -24,6 +24,7 @@ import numpy as np
 #                       Array Operations                       #
 ################################################################
 
+
 def masked_logsumexp(a, axis=None, b=None, keepdims=False, return_sign=False):
     """
     Compute the log of the sum of exponentials of input elements. This is identical to the scipy.special function,
@@ -63,7 +64,7 @@ def masked_logsumexp(a, axis=None, b=None, keepdims=False, return_sign=False):
     if b is not None:
         a, b = np.broadcast_arrays(a, b)
         if np.any(b == 0):
-            a = a + 0.  # promote to at least float
+            a = a + 0.0  # promote to at least float
             a[b == 0] = -np.inf
 
     a_max = np.nanmax(a, axis=axis, keepdims=True)
@@ -80,7 +81,7 @@ def masked_logsumexp(a, axis=None, b=None, keepdims=False, return_sign=False):
         tmp = np.exp(a - a_max)
 
     # suppress warnings about log of zero
-    with np.errstate(divide='ignore'):
+    with np.errstate(divide="ignore"):
         s = np.nansum(tmp, axis=axis, keepdims=keepdims)
         if return_sign:
             sgn = np.sign(s)
@@ -178,7 +179,7 @@ def value_map(array, _to, _from=None, shuffle=False):
         return np.asarray(_to)[sort_idx][idx]
 
 
-def run_lengths(a, how='I', return_values=False, return_positions=False):
+def run_lengths(a, how="I", return_values=False, return_positions=False):
     """
     Compute the length of continuous runs of the same values in an array.
 
@@ -199,17 +200,27 @@ def run_lengths(a, how='I', return_values=False, return_positions=False):
     #  We also need to convert arrays of NaN to lists so that NaN works. This will slow down but cannot be helped.
     if type(a) == np.ndarray:
         a = [i if not np.isnan(i) else np.nan for i in a.flatten()]
-    rls = np.asarray([(sum(1 for _ in l), n) for n, l in iter.groupby(a)])  # Now, compute run-lengths and types.
-    pos = np.asarray([0, *np.cumsum(rls[:, 0])[:-1]], dtype=int) if len(rls) > 0 else []  # Compute positions just in case.
+    rls = np.asarray(
+        [(sum(1 for _ in l), n) for n, l in iter.groupby(a)]
+    )  # Now, compute run-lengths and types.
+    pos = (
+        np.asarray([0, *np.cumsum(rls[:, 0])[:-1]], dtype=int) if len(rls) > 0 else []
+    )  # Compute positions just in case.
     # Compute: Branch on Format
-    if how.lower() == 'a':
+    if how.lower() == "a":
         lens, vals = (rls[:, 0], rls[:, 1]) if len(rls) > 0 else ([], [])
-    elif how.lower() == 'i':
+    elif how.lower() == "i":
         n_nan = ~np.isnan(rls[:, 1])
-        lens, vals, pos = (rls[n_nan, 0], rls[n_nan, 1], pos[n_nan]) if len(n_nan) > 0 else ([], [], [])
-    elif how.lower() == 'o':
+        lens, vals, pos = (
+            (rls[n_nan, 0], rls[n_nan, 1], pos[n_nan])
+            if len(n_nan) > 0
+            else ([], [], [])
+        )
+    elif how.lower() == "o":
         nan = np.isnan(rls[:, 1])
-        lens, vals, pos = (rls[nan, 0], rls[nan, 1], pos[nan]) if len(nan) > 0 else ([], [], [])
+        lens, vals, pos = (
+            (rls[nan, 0], rls[nan, 1], pos[nan]) if len(nan) > 0 else ([], [], [])
+        )
     else:
         raise ValueError('Incorrect format for "how" parameter.')
     # Now Return
@@ -235,13 +246,18 @@ def array_nan_equal(left, right):
         return False
 
     # Check that Shape is correct
-    if left.shape != right.shape: return False
+    if left.shape != right.shape:
+        return False
 
     # Return
-    return bool(np.logical_or(np.asarray(left == right), np.logical_and(np.isnan(left), np.isnan(right))).all())
+    return bool(
+        np.logical_or(
+            np.asarray(left == right), np.logical_and(np.isnan(left), np.isnan(right))
+        ).all()
+    )
 
 
-def round_to_multiple(x, base, how='r'):
+def round_to_multiple(x, base, how="r"):
     """
     Round x's elements to the nearest multiple of 'base'
 
@@ -250,19 +266,20 @@ def round_to_multiple(x, base, how='r'):
     :param how: The method for rounding: 'r' (round), 'f' (floor) or 'c' (ceiling)
     :return: value rounded up to the nearest multiple of base. The data type will always be float
     """
-    if how.lower() == 'r':
+    if how.lower() == "r":
         return np.round(np.divide(x, float(base))) * base
-    elif how.lower() == 'f':
+    elif how.lower() == "f":
         return np.floor(np.divide(x, float(base))) * base
-    elif how.lower() == 'c':
+    elif how.lower() == "c":
         return np.ceil(np.divide(x, float(base))) * base
     else:
-        raise ValueError('HOW must be one of r/f/c')
+        raise ValueError("HOW must be one of r/f/c")
 
 
 ################################################################
 #                     Matrix Manipulations                     #
 ################################################################
+
 
 def non_diag(a: np.ndarray):
     """
@@ -283,7 +300,9 @@ def make_diagonal(on_diag, off_diag, size):
     :param size:        Scalar: Size of the matrix
     :return:            Diagonal matrix
     """
-    return np.eye(size)*on_diag + non_diag(np.full(shape=[size, size], fill_value=off_diag))
+    return np.eye(size) * on_diag + non_diag(
+        np.full(shape=[size, size], fill_value=off_diag)
+    )
 
 
 def maximise_trace(x):
@@ -326,12 +345,13 @@ def ensure2d(a, axis=0):
     elif np.ndim(a) == 1:
         return a[np.newaxis, :] if axis == 0 else a[:, np.newaxis]
     else:
-        return a*np.ones([1, 1])
+        return a * np.ones([1, 1])
 
 
 ################################################################
 #                    Probabilistic Helpers                     #
 ################################################################
+
 
 class Dirichlet:
     """
@@ -339,6 +359,7 @@ class Dirichlet:
         a) Precomputes the normalisation parameters for efficiency
         b) can vectorise over matrices, where the last-dimension is the probability distribution.
     """
+
     def __init__(self, alpha, ignore_zeros=False):
         """
         Initialise the Dirichlet with a particular alpha
@@ -348,17 +369,19 @@ class Dirichlet:
                              matrix, specifically ignoring dimensions which are 1. This is based on the assumption that
                              such dimensions will always be zero and will be known in advance.
         """
-        alpha = np.asarray(alpha)                                       # K   Dimensional
+        alpha = np.asarray(alpha)  # K   Dimensional
         # Do some Checks
         if np.any(alpha <= 0):
-            raise ValueError('All dimensions of Alpha must be greater than 0.')
-        self._alpha = alpha - 1.0                                        # K Dimensional
-        self.__zeros = (alpha == 1)
+            raise ValueError("All dimensions of Alpha must be greater than 0.")
+        self._alpha = alpha - 1.0  # K Dimensional
+        self.__zeros = alpha == 1
         if ignore_zeros:
             self._alpha = np.ma.array(self._alpha, mask=self.__zeros)
             alpha = np.ma.array(alpha, mask=self.__zeros)
-        self.norm = np.prod(gamma(alpha), axis=-1) / gamma(np.sum(alpha, axis=-1))  # K-1 Dimensional
-        self.lognorm = np.log(self.norm)                                            # K-1 Dimensional
+        self.norm = np.prod(gamma(alpha), axis=-1) / gamma(
+            np.sum(alpha, axis=-1)
+        )  # K-1 Dimensional
+        self.lognorm = np.log(self.norm)  # K-1 Dimensional
 
     def pdf(self, x):
         """
@@ -370,7 +393,7 @@ class Dirichlet:
         """
         # Ensure that it is non-zero where zeros are not allowed
         if np.any(x[~self.__zeros] <= 0):
-            raise ValueError('0-valued probabilities are only allowed where alpha=1')
+            raise ValueError("0-valued probabilities are only allowed where alpha=1")
 
         # Note that we can do the below because:
         #   a) If we are not ignoring zeros, then anything raised to 0 is 1 in any case, and since we are taking product
@@ -388,12 +411,12 @@ class Dirichlet:
         """
         # Ensure that it is non-zero where zeros are not allowed
         if np.any(x[~self.__zeros] <= 0):
-            raise ValueError('0-valued probabilities are only allowed where alpha=1')
+            raise ValueError("0-valued probabilities are only allowed where alpha=1")
         # In this case, we must mask to avoid the issues with log since -inf * 0 = NaN... however, we also set the error
         #   state appropriately since the mask does not appear to work on log...
         # Note that while we may wish to support alpha=1 even when non-zero, in any case, this will not have any effect
         #   since for alpha=1, _alpha=0 and hence, the multiplication below will be with 0!
-        with np.errstate(divide='ignore'):
+        with np.errstate(divide="ignore"):
             x = np.ma.array(x, mask=self.__zeros)
             return np.sum(np.multiply(np.log(x), self._alpha), axis=-1) - self.lognorm
 
@@ -440,8 +463,8 @@ def sum_to_one(x, axis=None, norm=False):
     :return: Normalised Array
     """
     _sum = np.sum(x, axis=axis, keepdims=True)  # Find Sum
-    _sum[_sum == 0] = 1.0                       # Avoid Division by Zero
-    return (np.divide(x, _sum), 1.0/_sum.squeeze()) if norm else np.divide(x, _sum)
+    _sum[_sum == 0] = 1.0  # Avoid Division by Zero
+    return (np.divide(x, _sum), 1.0 / _sum.squeeze()) if norm else np.divide(x, _sum)
 
 
 def invert_softmax(x, enforce_unique=None):
@@ -458,9 +481,13 @@ def invert_softmax(x, enforce_unique=None):
 
     # Branch on how we achieve uniqueness
     if enforce_unique is None:
-        return log_x - np.mean(log_x, axis=-1, keepdims=True)           # Eq. (7), substituting Eq. (8) for C.
+        return log_x - np.mean(
+            log_x, axis=-1, keepdims=True
+        )  # Eq. (7), substituting Eq. (8) for C.
     else:
-        return log_x - np.expand_dims(log_x[..., enforce_unique], -1)   # Eq. (7), substituting Eq. (9) for C.
+        return log_x - np.expand_dims(
+            log_x[..., enforce_unique], -1
+        )  # Eq. (7), substituting Eq. (9) for C.
 
 
 def conditional_entropy(emission, prior=None, base=None):
@@ -475,13 +502,18 @@ def conditional_entropy(emission, prior=None, base=None):
     """
     if emission.ndim == 2:
         if prior is None:
-            prior = np.ones(len(emission))/len(emission)
-        return np.matmul(prior, entropy(emission.T, base=base))  # Sum_{l=1}^{|L|} P(L=l) H(V|L=l): see NIP slide 6
+            prior = np.ones(len(emission)) / len(emission)
+        return np.matmul(
+            prior, entropy(emission.T, base=base)
+        )  # Sum_{l=1}^{|L|} P(L=l) H(V|L=l): see NIP slide 6
 
     else:
-        raise ValueError('Function does not support Tensors of dimensionality {}. If you need to compute'
-                         ' for a latent variable of dimensionality 2, then use conditional_entropy_2D()'
-                         .format(emission.ndim))
+        raise ValueError(
+            "Function does not support Tensors of dimensionality {}. If you need to compute"
+            " for a latent variable of dimensionality 2, then use conditional_entropy_2D()".format(
+                emission.ndim
+            )
+        )
 
 
 def conditional_entropy_2D(emission, prior=None, base=None):
@@ -508,8 +540,10 @@ def conditional_entropy_2D(emission, prior=None, base=None):
         return cond_ent
 
     else:
-        raise ValueError('Function does not support Tensors of dimensionality {}. For standard conditional entropy, use'
-                         ' conditional_entropy().'.format(emission.ndim))
+        raise ValueError(
+            "Function does not support Tensors of dimensionality {}. For standard conditional entropy, use"
+            " conditional_entropy().".format(emission.ndim)
+        )
 
 
 def mutual_information(prior, emission, base=None):
@@ -538,14 +572,18 @@ def mutual_information(prior, emission, base=None):
         pXZ = [1 for _ in prior]
         for k in range(len(prior)):
             for variable in emission:
-                pXZ[k] = np.outer(pXZ[k], variable[k, :]).ravel()  # We are continuously increasing in size...
-        emission = np.asarray(pXZ)      # Will be array of size |Z| by |X_1|*|X_2|*...|X_n|
+                pXZ[k] = np.outer(
+                    pXZ[k], variable[k, :]
+                ).ravel()  # We are continuously increasing in size...
+        emission = np.asarray(pXZ)  # Will be array of size |Z| by |X_1|*|X_2|*...|X_n|
 
     # Compute Marginal X:
     pX = np.matmul(prior, emission)
 
     # Now Compute Entropies and return
-    return entropy(pX, base=base) - conditional_entropy(emission=emission, prior=prior, base=base)
+    return entropy(pX, base=base) - conditional_entropy(
+        emission=emission, prior=prior, base=base
+    )
 
 
 def markov_stationary(transition):
@@ -579,4 +617,4 @@ def switch_rate(a, axis=-1, ratio=False):
     a_len = np.shape(a)[axis]
 
     # Return
-    return a_diff/a_len if ratio else a_diff
+    return a_diff / a_len if ratio else a_diff

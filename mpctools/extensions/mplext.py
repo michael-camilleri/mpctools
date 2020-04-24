@@ -20,8 +20,19 @@ import numpy as np
 import warnings
 
 
-def plot_matrix(matrix, mode='hinton', min_max=None, show_val=False, ax=None, cbar=None, labels=None, y_labels=None,
-                x_rot=0, y_rot=0, fmt='.2f'):
+def plot_matrix(
+    matrix,
+    mode="hinton",
+    min_max=None,
+    show_val=False,
+    ax=None,
+    cbar=None,
+    labels=None,
+    y_labels=None,
+    x_rot=0,
+    y_rot=0,
+    fmt=".2f",
+):
     """
     Draw Hinton/Heatmap diagram for visualizing a weight matrix.
 
@@ -56,12 +67,12 @@ def plot_matrix(matrix, mode='hinton', min_max=None, show_val=False, ax=None, cb
     :return:
     """
     # Sort out the mode
-    if mode.lower() == 'hinton':
+    if mode.lower() == "hinton":
         mode = True
-    elif mode.lower() == 'heatmap':
+    elif mode.lower() == "heatmap":
         mode = False
     else:
-        warnings.warn('Unrecognised Mode: Defaulting to Hinton plot', UserWarning)
+        warnings.warn("Unrecognised Mode: Defaulting to Hinton plot", UserWarning)
         mode = True
 
     # Sort out the min_max:
@@ -71,7 +82,10 @@ def plot_matrix(matrix, mode='hinton', min_max=None, show_val=False, ax=None, cb
         elif np.size(min_max) == 1:
             min_max = float(min_max)
         else:
-            warnings.warn('Hinton Plot only accepts a single min_max value: inferring from data', UserWarning)
+            warnings.warn(
+                "Hinton Plot only accepts a single min_max value: inferring from data",
+                UserWarning,
+            )
             min_max = np.power(2, np.ceil(np.log2(np.abs(matrix).max())))
     else:
         if min_max is None:
@@ -79,7 +93,10 @@ def plot_matrix(matrix, mode='hinton', min_max=None, show_val=False, ax=None, cb
         elif np.size(min_max) == 2:
             min_max = np.array(min_max, dtype=float)
         else:
-            warnings.warn('Heatmap requires separate min_max values: inferring from data', UserWarning)
+            warnings.warn(
+                "Heatmap requires separate min_max values: inferring from data",
+                UserWarning,
+            )
             min_max = [matrix.min(), matrix.max()]
 
     # Sort out axes
@@ -87,23 +104,44 @@ def plot_matrix(matrix, mode='hinton', min_max=None, show_val=False, ax=None, cb
 
     # Plot
     if mode:
-        ax.patch.set_facecolor('gray')
-        ax.set_aspect('equal', 'box')
+        ax.patch.set_facecolor("gray")
+        ax.set_aspect("equal", "box")
         ax.xaxis.set_major_locator(plt.NullLocator())
         ax.yaxis.set_major_locator(plt.NullLocator())
         for (y, x), w in np.ndenumerate(matrix):
             size = np.sqrt(np.abs(w) / min_max)
-            ax.add_patch(plt.Rectangle([x-size/2, y-size / 2], size, size, facecolor='white' if w > 0 else 'black',
-                                       edgecolor='white' if w > 0 else 'black'))
+            ax.add_patch(
+                plt.Rectangle(
+                    [x - size / 2, y - size / 2],
+                    size,
+                    size,
+                    facecolor="white" if w > 0 else "black",
+                    edgecolor="white" if w > 0 else "black",
+                )
+            )
             if show_val:
-                ax.text(x, y, '{{:{}}}'.format(fmt).format(w), horizontalalignment='center', verticalalignment='center',
-                        color='black' if w > 0 else 'white')
+                ax.text(
+                    x,
+                    y,
+                    "{{:{}}}".format(fmt).format(w),
+                    horizontalalignment="center",
+                    verticalalignment="center",
+                    color="black" if w > 0 else "white",
+                )
         ax.set_ylim(-1, matrix.shape[0])
         ax.set_xlim(-1, matrix.shape[1])
         ax.invert_yaxis()
     else:
-        sns.heatmap(matrix, vmin=min_max[0], vmax=min_max[1], annot=show_val, fmt=fmt, ax=ax, cbar=cbar is not False,
-                    cbar_ax=cbar if isinstance(cbar, axes.Axes) else None)
+        sns.heatmap(
+            matrix,
+            vmin=min_max[0],
+            vmax=min_max[1],
+            annot=show_val,
+            fmt=fmt,
+            ax=ax,
+            cbar=cbar is not False,
+            cbar_ax=cbar if isinstance(cbar, axes.Axes) else None,
+        )
 
     # Add Ticks/Labels
     if labels is not None:
@@ -112,15 +150,25 @@ def plot_matrix(matrix, mode='hinton', min_max=None, show_val=False, ax=None, cb
             ax.set_xticks(np.arange(len(labels)))
         else:
             ax.set_xticks(np.arange(0.5, len(labels) + 0.5))
-        ax.set_xticklabels(labels, rotation=x_rot, horizontalalignment='center' if x_rot == 0 else 'right')
+        ax.set_xticklabels(
+            labels,
+            rotation=x_rot,
+            horizontalalignment="center" if x_rot == 0 else "right",
+        )
         if mode:
             ax.set_yticks(np.arange(len(y_labels)))
         else:
             ax.set_yticks(np.arange(0.5, len(y_labels) + 0.5))
-        ax.set_yticklabels(y_labels, rotation=y_rot, verticalalignment='center' if y_rot == 0 else 'bottom')
+        ax.set_yticklabels(
+            y_labels,
+            rotation=y_rot,
+            verticalalignment="center" if y_rot == 0 else "bottom",
+        )
 
 
-def plot_blandaltman(series1, series2, mode, labels, model_names, fnt_size=15, ax=None, *args, **kwargs):
+def plot_blandaltman(
+    series1, series2, mode, labels, model_names, fnt_size=15, ax=None, *args, **kwargs
+):
     """
     Generate a Bland-Altman Plot of the data in series1 and 2
 
@@ -143,7 +191,7 @@ def plot_blandaltman(series1, series2, mode, labels, model_names, fnt_size=15, a
     ax = ax if ax is not None else plt.gca()
 
     # Loop over data
-    _g_diff = []    # Need to keep track of this
+    _g_diff = []  # Need to keep track of this
     _g_s1 = []
     _g_s2 = []
     for s1, s2, l in zip(series1, series2, labels):
@@ -160,18 +208,35 @@ def plot_blandaltman(series1, series2, mode, labels, model_names, fnt_size=15, a
     # Find globals:
     _md = np.mean(_g_diff)
     _sd = np.std(_g_diff)
-    ax.axhline(_md, color='gray', linestyle='-')
-    ax.axhline(_md + 1.96 * _sd, color='gray', linestyle='--')
-    ax.axhline(_md - 1.96 * _sd, color='gray', linestyle='--')
+    ax.axhline(_md, color="gray", linestyle="-")
+    ax.axhline(_md + 1.96 * _sd, color="gray", linestyle="--")
+    ax.axhline(_md - 1.96 * _sd, color="gray", linestyle="--")
 
     # Finally, add labels
-    ax.set_xlabel('Sample Mean' if mode is None else model_names[mode], size=fnt_size)
-    ax.set_ylabel('{0} - {1}'.format(*model_names), size=fnt_size)
-    print('Percentage Positive: {0:.3f}%, Mean Diff: {1:.3f}, Mean S1: {2:.3f}, Mean S2: {3:.3f}, Length: {4}'
-          .format(np.sum(np.asarray(_g_diff) >= 0) * 100.0 / len(_g_diff), _md, np.mean(_g_s1), np.mean(_g_s2), len(_g_diff)))
+    ax.set_xlabel("Sample Mean" if mode is None else model_names[mode], size=fnt_size)
+    ax.set_ylabel("{0} - {1}".format(*model_names), size=fnt_size)
+    print(
+        "Percentage Positive: {0:.3f}%, Mean Diff: {1:.3f}, Mean S1: {2:.3f}, Mean S2: {3:.3f}, Length: {4}".format(
+            np.sum(np.asarray(_g_diff) >= 0) * 100.0 / len(_g_diff),
+            _md,
+            np.mean(_g_s1),
+            np.mean(_g_s2),
+            len(_g_diff),
+        )
+    )
 
 
-def plot_categorical(time_series, values, labels, nan=-1, cmap=None, ax=None, y_labels=None, cbar=None, fnt_size=15):
+def plot_categorical(
+    time_series,
+    values,
+    labels,
+    nan=-1,
+    cmap=None,
+    ax=None,
+    y_labels=None,
+    cbar=None,
+    fnt_size=15,
+):
     """
     Plots categorical data in time as a colour-coded series
 
@@ -195,8 +260,10 @@ def plot_categorical(time_series, values, labels, nan=-1, cmap=None, ax=None, y_
     (n_rows, n_cols) = time_series.shape
     N = len(labels)
     ax = plt.gca() if ax is None else ax
-    cmap = 'tab20' if cmap is None else cmap
-    y_labels = [str(l) for l in np.arange(0.5, n_rows, 1.0)] if y_labels is None else y_labels
+    cmap = "tab20" if cmap is None else cmap
+    y_labels = (
+        [str(l) for l in np.arange(0.5, n_rows, 1.0)] if y_labels is None else y_labels
+    )
 
     # Transform Data
     _data = []
@@ -212,17 +279,21 @@ def plot_categorical(time_series, values, labels, nan=-1, cmap=None, ax=None, y_
     cmap_name = base.name + str(N)
 
     # Create and format colour plot
-    plot = ax.pcolormesh(_data, cmap=lsc.from_list(cmap_name, color_list, N), vmin=-0.5, vmax=N-0.5)
-    ax.set_ylim(-0.1, n_rows+0.1)
+    plot = ax.pcolormesh(
+        _data, cmap=lsc.from_list(cmap_name, color_list, N), vmin=-0.5, vmax=N - 0.5
+    )
+    ax.set_ylim(-0.1, n_rows + 0.1)
     for y in range(n_rows):
-        ax.axhline(y+1.0, color='k')  # Horizontal separator line
+        ax.axhline(y + 1.0, color="k")  # Horizontal separator line
     ax.set_yticks(np.arange(0.5, n_rows, 1.0))
     ax.set_yticklabels(y_labels, fontsize=fnt_size)
     ax.tick_params(labelsize=fnt_size)
 
     # Plot the Colour Bar if need be
     if cbar is True or isinstance(cbar, axes.Axes):
-        colorbar = plt.colorbar(plot, ticks=np.arange(N), cax=cbar if isinstance(cbar, axes.Axes) else None)
+        colorbar = plt.colorbar(
+            plot, ticks=np.arange(N), cax=cbar if isinstance(cbar, axes.Axes) else None
+        )
         colorbar.ax.set_yticklabels(labels, fontsize=fnt_size)
     else:
         colorbar = None

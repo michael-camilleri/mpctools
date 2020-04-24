@@ -24,8 +24,8 @@ import cv2
 
 
 # Define Some Constants
-VP_CUR_PROP_POS_MSEC = -100     # Encodes the current frame (rather than next one) in MS
-VP_CUR_PROP_POS_FRAMES = -101   # Encodes the current frame (rather than next one) in index
+VP_CUR_PROP_POS_MSEC = -100  # Current frame (rather than next one) in MS
+VP_CUR_PROP_POS_FRAMES = -101  # Current frame (rather than next one) in index
 
 
 class Homography:
@@ -33,6 +33,7 @@ class Homography:
     Class for fitting a Homography:
         Based on code by Dr Rowland Sillito, ActualAnalytics
     """
+
     def __init__(self, image_coords, world_coords):
         """
         Initialiser
@@ -52,7 +53,11 @@ class Homography:
                        promoted to 2D
         :return:    Image Coordinates
         """
-        return np.squeeze(cv2.perspectiveTransform(np.expand_dims(npext.ensure2d(points, axis=0), axis=0), self.toImg))
+        return np.squeeze(
+            cv2.perspectiveTransform(
+                np.expand_dims(npext.ensure2d(points, axis=0), axis=0), self.toImg
+            )
+        )
 
     def to_world(self, points):
         """
@@ -62,7 +67,11 @@ class Homography:
                        promoted to 2D
         :return:    World Coordinates
         """
-        return np.squeeze(cv2.perspectiveTransform(np.expand_dims(npext.ensure2d(points, axis=0), axis=0), self.toWrld))
+        return np.squeeze(
+            cv2.perspectiveTransform(
+                np.expand_dims(npext.ensure2d(points, axis=0), axis=0), self.toWrld
+            )
+        )
 
 
 def expand_box(c, size):
@@ -74,7 +83,7 @@ def expand_box(c, size):
     :param size:    The size of the rectangle (2-tuple/array, width/height)
     :return:        Four corners of the bounding box, clockwise, from top-left corner
     """
-    x, y = np.asarray(size)/2
+    x, y = np.asarray(size) / 2
     return np.asarray(((c - (x, y)), (c + (x, -y)), (c + (x, y)), (c + (-x, y))))
 
 
@@ -99,39 +108,44 @@ def intersection_over_union(ground_truth, prediction):
         return 0
 
     # Compute the union
-    union = ground_truth[2]*ground_truth[3] + prediction[2]*prediction[3] - intersection
+    union = (
+        ground_truth[2] * ground_truth[3] + prediction[2] * prediction[3] - intersection
+    )
 
     # Return Intersection over Union
-    return intersection/union
+    return intersection / union
 
 
 class VideoParser:
     """
     The Video Parser (Wrapper) Object
     """
+
     def __init__(self, path, qsize=16):
         """
         Initialiser
         """
-        self.thread = None                  # Currently Nothing
-        self.path = path                    # Video-Capture Object
-        self.queue = Queue(maxsize=qsize)   # The Queue-Size
-        self.signal_stop = False            # Signal from main to thread to stop
-        self.signal_started = False         # Signal from thread to main to indicate started
-        self.StartAt = 0                    # Where to Start
-        self.Stride = 1                     # Whether to stride...
+        self.thread = None  # Currently Nothing
+        self.path = path  # Video-Capture Object
+        self.queue = Queue(maxsize=qsize)  # The Queue-Size
+        self.signal_stop = False  # Signal from main to thread to stop
+        self.signal_started = False  # Signal from thread to main to indicate started
+        self.StartAt = 0  # Where to Start
+        self.Stride = 1  # Whether to stride...
 
         # Now some other State-Control
-        self.properties = {VP_CUR_PROP_POS_MSEC: None,
-                           VP_CUR_PROP_POS_FRAMES: None,
-                           cv2.CAP_PROP_POS_MSEC: 0.0,
-                           cv2.CAP_PROP_POS_FRAMES: 0,
-                           cv2.CAP_PROP_FRAME_WIDTH: None,
-                           cv2.CAP_PROP_FRAME_HEIGHT: None,
-                           cv2.CAP_PROP_FPS: None,
-                           cv2.CAP_PROP_CONVERT_RGB: -1,
-                           cv2.CAP_PROP_FRAME_COUNT: -1,
-                           cv2.CAP_PROP_FOURCC: None}
+        self.properties = {
+            VP_CUR_PROP_POS_MSEC: None,
+            VP_CUR_PROP_POS_FRAMES: None,
+            cv2.CAP_PROP_POS_MSEC: 0.0,
+            cv2.CAP_PROP_POS_FRAMES: 0,
+            cv2.CAP_PROP_FRAME_WIDTH: None,
+            cv2.CAP_PROP_FRAME_HEIGHT: None,
+            cv2.CAP_PROP_FPS: None,
+            cv2.CAP_PROP_CONVERT_RGB: -1,
+            cv2.CAP_PROP_FRAME_COUNT: -1,
+            cv2.CAP_PROP_FOURCC: None,
+        }
 
     def start(self, start=None, stride=1):
         """
@@ -149,7 +163,7 @@ class VideoParser:
         self.signal_stop = False
         self.signal_started = False
         self.StartAt = start if start is not None else 0
-        self.Stride = int(max(0, stride-1))   # guard against negative striding
+        self.Stride = int(max(0, stride - 1))  # guard against negative striding
 
         # Start Thread for processing
         self.thread = Thread(target=self.__read, args=())
@@ -158,7 +172,7 @@ class VideoParser:
 
         # Wait until started
         while not self.signal_started:
-            tm.sleep(0.001) # Sleep and release GIL so other thread can execute
+            tm.sleep(0.001)  # Sleep and release GIL so other thread can execute
 
         # Indicate success
         return True
@@ -178,10 +192,16 @@ class VideoParser:
         if self.thread is None:
             if self.queue.qsize() > 0:
                 _data = self.queue.get(block=False)
-                if _data[0] is not None:  # Because it could happen that the stop signal came in after the EOF found
-                    self.properties[VP_CUR_PROP_POS_MSEC] = float(self.properties[cv2.CAP_PROP_POS_MSEC])
+                if (
+                    _data[0] is not None
+                ):  # Because it could happen that the stop signal came in after the EOF found
+                    self.properties[VP_CUR_PROP_POS_MSEC] = float(
+                        self.properties[cv2.CAP_PROP_POS_MSEC]
+                    )
                     self.properties[cv2.CAP_PROP_POS_MSEC] = _data[0]
-                    self.properties[VP_CUR_PROP_POS_FRAMES] = self.properties[cv2.CAP_PROP_POS_FRAMES]
+                    self.properties[VP_CUR_PROP_POS_FRAMES] = self.properties[
+                        cv2.CAP_PROP_POS_FRAMES
+                    ]
                     self.properties[cv2.CAP_PROP_POS_FRAMES] = _data[1]
                     return True, _data[2]
                 else:
@@ -200,9 +220,13 @@ class VideoParser:
 
             # Now parse
             if _data[0] is not None:
-                self.properties[VP_CUR_PROP_POS_MSEC] = float(self.properties[cv2.CAP_PROP_POS_MSEC])
+                self.properties[VP_CUR_PROP_POS_MSEC] = float(
+                    self.properties[cv2.CAP_PROP_POS_MSEC]
+                )
                 self.properties[cv2.CAP_PROP_POS_MSEC] = _data[0]
-                self.properties[VP_CUR_PROP_POS_FRAMES] = self.properties[cv2.CAP_PROP_POS_FRAMES]
+                self.properties[VP_CUR_PROP_POS_FRAMES] = self.properties[
+                    cv2.CAP_PROP_POS_FRAMES
+                ]
                 self.properties[cv2.CAP_PROP_POS_FRAMES] = _data[1]
                 return True, _data[2]
             else:
@@ -217,7 +241,8 @@ class VideoParser:
         :return: None
         """
         # Nothing to stop if nothing is running
-        if self.signal_stop or self.thread is None: return
+        if self.signal_stop or self.thread is None:
+            return
 
         # Set signal to stop & join
         self.signal_stop = True
@@ -248,7 +273,7 @@ class VideoParser:
         # If seeking
         if self.StartAt > 0:
             stream.set(cv2.CAP_PROP_POS_FRAMES, self.StartAt)
-            assert(stream.get(cv2.CAP_PROP_POS_FRAMES) == self.StartAt)
+            assert stream.get(cv2.CAP_PROP_POS_FRAMES) == self.StartAt
 
         # Store/Initialise some properties
         self.properties[cv2.CAP_PROP_POS_MSEC] = stream.get(cv2.CAP_PROP_POS_MSEC)
@@ -271,15 +296,22 @@ class VideoParser:
             _fnum = stream.get(cv2.CAP_PROP_POS_FRAMES)
             # If Striding, need to add stride: however, only do this, if we are not at the end...
             if self.Stride > 0 and _fnum < self.properties[cv2.CAP_PROP_FRAME_COUNT]:
-                stream.set(cv2.CAP_PROP_POS_FRAMES, min(_fnum + self.Stride, self.properties[cv2.CAP_PROP_FRAME_COUNT]))
+                stream.set(
+                    cv2.CAP_PROP_POS_FRAMES,
+                    min(_fnum + self.Stride, self.properties[cv2.CAP_PROP_FRAME_COUNT]),
+                )
                 _fnum = stream.get(cv2.CAP_PROP_POS_FRAMES)
             # Check Read
             _msec = stream.get(cv2.CAP_PROP_POS_MSEC)
             # Push to queue
             while not self.signal_stop:
                 try:
-                    self.queue.put((_msec, _fnum, frame) if ret else (None, None, None), block=True, timeout=0.1)
-                    break   # Break out of this inner loop
+                    self.queue.put(
+                        (_msec, _fnum, frame) if ret else (None, None, None),
+                        block=True,
+                        timeout=0.1,
+                    )
+                    break  # Break out of this inner loop
                 except Full:
                     pass
 
@@ -298,7 +330,7 @@ class SwCLAHE:
      b) For the true lut, perform clipping based on the number of frames used in the histogram computation.
     """
 
-    def __init__(self, imgSize, clipLimit=2.0, tileGridSize=(8, 8), padding='reflect'):
+    def __init__(self, imgSize, clipLimit=2.0, tileGridSize=(8, 8), padding="reflect"):
         """
         Initialiser
 
@@ -321,8 +353,10 @@ class SwCLAHE:
         self.__seen = 0  # How many Images seen so far.
 
         # Now prepare placeholder for Histograms
-        self.__hst = np.zeros([self.__H, self.__W, 256])                             # Maintains Raw Counts
-        self.__lut = np.zeros([self.__H, self.__W, 256], dtype=np.uint8, order='C')  # Maintains Clipped Counts
+        self.__hst = np.zeros([self.__H, self.__W, 256])  # Maintains Raw Counts
+        self.__lut = np.zeros(
+            [self.__H, self.__W, 256], dtype=np.uint8, order="C"
+        )  # Maintains Clipped Counts
 
     def clear_histogram(self):
         """
@@ -331,8 +365,10 @@ class SwCLAHE:
         :return: self, for chaining.
         """
         # Re-Initialise Histograms
-        self.__hst = np.zeros([self.__H, self.__W, 256])                             # Maintains Raw Counts
-        self.__lut = np.zeros([self.__H, self.__W, 256], dtype=np.uint8, order='C')  # Maintains Clipped Counts
+        self.__hst = np.zeros([self.__H, self.__W, 256])  # Maintains Raw Counts
+        self.__lut = np.zeros(
+            [self.__H, self.__W, 256], dtype=np.uint8, order="C"
+        )  # Maintains Clipped Counts
         self.__seen = 0
 
         # Return Self
@@ -374,7 +410,12 @@ class SwCLAHE:
         :return:  self, for chaining
         """
         # CLip
-        self.__clip_limit(self.__hst, float(self.__seen * self.__clip), self.__lut, float(self.__scale / self.__seen))
+        self.__clip_limit(
+            self.__hst,
+            float(self.__seen * self.__clip),
+            self.__lut,
+            float(self.__scale / self.__seen),
+        )
 
         # Return Self
         return self
@@ -404,7 +445,10 @@ class SwCLAHE:
         return self.update_model(img).transform(img)
 
     @staticmethod
-    @jit(signature_or_function=(uint8[:, :], uint8, uint8, uint16[:, :, :]), nopython=True)
+    @jit(
+        signature_or_function=(uint8[:, :], uint8, uint8, uint16[:, :, :]),
+        nopython=True,
+    )
     def __update_hist(padded, row_pad, col_pad, hist):
         """
         A Private Method (to just Numba) to compute the Histogram for the Padded Image
@@ -417,7 +461,10 @@ class SwCLAHE:
         """
         # Compute Valid ranges for Rows and Columns
         valid_rows = (row_pad, padded.shape[0] - row_pad - 1)
-        valid_cols = (col_pad+1, padded.shape[1] - col_pad - 1) # Note that due to scheme, we start with col_pad+1
+        valid_cols = (
+            col_pad + 1,
+            padded.shape[1] - col_pad - 1,
+        )  # Note that due to scheme, we start with col_pad+1
 
         # Now Iterate over Pixels in a Row-Column Basis
         for r_img in range(*valid_rows):
@@ -426,17 +473,17 @@ class SwCLAHE:
             # Compute First Pixel:
             # Not that there is a special case when this is the top-left corner, which we must compute from scratch.
             if r_hst == 0:
-                for nbh_r in range(row_pad*2 + 1):
-                    for nbh_c in range(col_pad*2 + 1):
+                for nbh_r in range(row_pad * 2 + 1):
+                    for nbh_c in range(col_pad * 2 + 1):
                         hist[0, 0, padded[nbh_r, nbh_c]] += 1
             # Otherwise, we can initialise from the upper row.
             else:
-                hist[r_hst, 0, :] = hist[r_hst-1, 0, :]
+                hist[r_hst, 0, :] = hist[r_hst - 1, 0, :]
                 # Compute the Previous/Next Row (in image space)
                 r_prev = r_img - row_pad - 1
                 r_next = r_img + row_pad
                 # Iterate over the columns, subtracting the previous row and adding the next one in turn
-                for nbh_c in range(col_pad*2 + 1):
+                for nbh_c in range(col_pad * 2 + 1):
                     hist[r_hst, 0, padded[r_prev, nbh_c]] -= 1
                     hist[r_hst, 0, padded[r_next, nbh_c]] += 1
             # Now iterate over columns
@@ -452,7 +499,10 @@ class SwCLAHE:
                     hist[r_hst, c_hst, padded[nbh_r, c_next]] += 1
 
     @staticmethod
-    @jit(signature_or_function=(double[:, :, ::1], double, uint8[:, :, ::1], double), nopython=True)
+    @jit(
+        signature_or_function=(double[:, :, ::1], double, uint8[:, :, ::1], double),
+        nopython=True,
+    )
     def __clip_limit(hist, limit, lut, scaler):
         """
         Here hist should be float (to avoid truncation), but lut is integer!
@@ -475,7 +525,7 @@ class SwCLAHE:
                         to_clip += hist[r, c, h] - limit
                         hist[r, c, h] = limit
                 # Now Redistribute - Note that I will ignore residuals (handled through rounding)
-                hist[r, c, :] += to_clip/256
+                hist[r, c, :] += to_clip / 256
                 # Now Transform to Lookup Table (rounding) - Had to do this manually due to issues with Numba!
                 cumsum = 0
                 for h in range(256):
@@ -483,7 +533,10 @@ class SwCLAHE:
                     lut[r, c, h] = round(cumsum * scaler)
 
     @staticmethod
-    @jit(signature_or_function=(uint8[:, :, ::1], uint8[:, ::1], uint8[:, ::1]), nopython=True)
+    @jit(
+        signature_or_function=(uint8[:, :, ::1], uint8[:, ::1], uint8[:, ::1]),
+        nopython=True,
+    )
     def __transform(lut, img, out):
         """
         Numba JIT to transform the image (lookup table)
