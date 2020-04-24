@@ -49,7 +49,7 @@ class IWorker(metaclass=abc.ABCMeta):
 
         """
         self.ID = _id
-        self.__queue = _mgr.Queue   # This is now a strong reference, due to the weakref seemingly losing the object.
+        self.__queue = _mgr.Queue  # Has to be a strong reference (weakref loses object)
         _mgr._register_worker(_id)
 
     def update_progress(self, progress):
@@ -70,7 +70,7 @@ class IWorker(metaclass=abc.ABCMeta):
         try:
             self.__queue.put((self.ID, progress), block=False)
         except TypeError:
-            sys.stderr.write('Warn: TypeError Encountered')
+            sys.stderr.write("Warn: TypeError Encountered")
             pass
 
     @abc.abstractmethod
@@ -99,8 +99,8 @@ class WorkerHandler(metaclass=abc.ABCMeta):
       * When multi-threading is enabled (as opposed to parallel) the threads are run one at a time (there is no
             inter-leaving). This can provide a better level of debugging.
     """
-    HANDLER_ID = 0
 
+    HANDLER_ID = 0
 
     # ========================================= Abstract Interface ========================================= #
 
@@ -130,22 +130,22 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         :param sink:        Sink where to write progress to (may be None)
         """
         # Parameters
-        self.NumProc = num_proc                 # Number of Processes to employ
+        self.NumProc = num_proc  # Number of Processes to employ
 
         # Management
-        self._queue = mp.Manager().Queue() if num_proc > 0 else queue.Queue()   # Queue
-        self.__timers = {}                                                      # Timers
-        self.__thread = None                                                    # Progress Thread Handler
-        self.__worker_set = None                                                # List of Workers and progress
-        self.__done = 0                             # How many are finished
-        self.__tasks_done = 0                       # How many (workers) are finished
-        self.__progress = None                      # Eventually will be the progress bar
-        self.__sink = utils.NullableSink(sink)      # Sink to write to
+        self._queue = mp.Manager().Queue() if num_proc > 0 else queue.Queue()  # Queue
+        self.__timers = {}  # Timers
+        self.__thread = None  # Progress Thread Handler
+        self.__worker_set = None  # List of Workers and progress
+        self.__done = 0  # How many are finished
+        self.__tasks_done = 0  # How many (workers) are finished
+        self.__progress = None  # Eventually will be the progress bar
+        self.__sink = utils.NullableSink(sink)  # Sink to write to
 
     def _reset(self, num_workers):
         self.__thread = threading.Thread(target=self.__handler_thread)
-        self.__worker_set = np.zeros(num_workers)  # Set of Workers and associated progress
-        self.__tasks_done = 0                      # How many (workers) are finished
+        self.__worker_set = np.zeros(num_workers)  # Set of Workers (for progress)
+        self.__tasks_done = 0  # How many (workers) are finished
 
     def start_timer(self, name):
         """
@@ -196,18 +196,31 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         self.__progress = ProgressBar(100 * _num_work, sink=self.__sink.Obj)
 
         # Create List of Worker Objects, and initialise thread
-        _workers = [_type(_i+1, self) for _i in range(_num_work)]
+        _workers = [_type(_i + 1, self) for _i in range(_num_work)]
         self.__thread.start()
 
         # Start Pool and aggregate results
         if self.NumProc > 0:
             with mp.Pool(processes=self.NumProc) as pool:
-                processes = [pool.apply_async(self.__computer, args=(_workers[_i], (_configs, _args[_i]))) for _i in range(_num_work)]
-                aggregated = self._aggregate_results([result.get() for result in processes])
+                processes = [
+                    pool.apply_async(self.__computer, args=(_workers[_i], (_configs, _args[_i])))
+                    for _i in range(_num_work)
+                ]
+                aggregated = self._aggregate_results(
+                    [result.get() for result in processes]
+                )
         else:
             r_q = queue.Queue()
-            threads = [threading.Thread(target=self.__threader, args=(_workers[_i], (_configs, _args[_i]), r_q)) for _i in range(_num_work)]
-            for thr in threads: thr.start(); thr.join()
+            threads = [
+                threading.Thread(
+                    target=self.__threader,
+                    args=(_workers[_i], (_configs, _args[_i]), r_q),
+                )
+                for _i in range(_num_work)
+            ]
+            for thr in threads:
+                thr.start()
+                thr.join()
             results = []
             while not r_q.empty():
                 results.append(r_q.get())
@@ -238,8 +251,8 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         :param wrk_id:
         :return:
         """
-        assert wrk_id > 0, 'Worker ID must be greater than 0'
-        self.__worker_set[wrk_id-1] = 0.0
+        assert wrk_id > 0, "Worker ID must be greater than 0"
+        self.__worker_set[wrk_id - 1] = 0.0
 
     def _write(self, *args):
         self.__sink.write(*args)
@@ -249,7 +262,7 @@ class WorkerHandler(metaclass=abc.ABCMeta):
 
     def _print(self, *args):
         self.__sink.write(*args)
-        self.__sink.write('\n')
+        self.__sink.write("\n")
         self.__sink.flush()
 
     def __handler_thread(self):
@@ -257,9 +270,16 @@ class WorkerHandler(metaclass=abc.ABCMeta):
         _continue = True
 
         # Print First one
-        self.__progress.reset(prefix=('Working [{0} Proc]'.format(self.NumProc) if self.NumProc > 0 else
-                                      'Working [Multi-Thread]'),
-                              suffix=('Completed {0}/{1} Tasks'.format(self.__done, len(self.__worker_set))))
+        self.__progress.reset(
+            prefix=(
+                "Working [{0} Proc]".format(self.NumProc)
+                if self.NumProc > 0
+                else "Working [Multi-Thread]"
+            ),
+            suffix=(
+                "Completed {0}/{1} Tasks".format(self.__done, len(self.__worker_set))
+            ),
+        )
 
         # This provides an infinite loop until signalled to stop
         while _continue:
@@ -267,18 +287,26 @@ class WorkerHandler(metaclass=abc.ABCMeta):
             _msg = self.Queue.get()
             if _msg[0] > self.HANDLER_ID:
                 # Update Counts (and done count if this is the first time)
-                if _msg[1] == 100.0 and self.__worker_set[_msg[0]-1] < 100: self.__done += 1
-                self.__worker_set[_msg[0]-1] = _msg[1]
+                if _msg[1] == 100.0 and self.__worker_set[_msg[0] - 1] < 100:
+                    self.__done += 1
+                self.__worker_set[_msg[0] - 1] = _msg[1]
                 # Print Progress
-                self.__progress.update(value=self.__worker_set.sum(),
-                                       suffix='Completed {0}/{1} Tasks'.format(self.__done, len(self.__worker_set)))
+                self.__progress.update(
+                    value=self.__worker_set.sum(),
+                    suffix="Completed {0}/{1} Tasks".format(
+                        self.__done, len(self.__worker_set)
+                    ),
+                )
             else:
                 _continue = False
                 if self.__progress.Sink is not None:
-                    self.__progress.Sink.write('Done: Completed All Tasks\n' if self.__done == len(self.__worker_set)
-                                               else '\nStopped after {0}/{1} Tasks\n'
-                                               .format(self.__done, len(self.__worker_set)))
+                    self.__progress.Sink.write(
+                        "Done: Completed All Tasks\n"
+                        if self.__done == len(self.__worker_set)
+                        else "\nStopped after {0}/{1} Tasks\n".format(
+                            self.__done, len(self.__worker_set)
+                        )
+                    )
 
             # Indicate Task Done
             self.Queue.task_done()
-

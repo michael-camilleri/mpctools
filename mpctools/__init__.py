@@ -12,8 +12,5 @@ http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 
-__author__ = 'Michael P. J. Camilleri'
+__author__ = "Michael P. J. Camilleri"
 __version__ = "0.3.24"
-
-# Define as an alias
-version = __version__

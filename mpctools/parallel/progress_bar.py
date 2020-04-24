@@ -47,7 +47,7 @@ class ProgressBar:
     def Sink(self):
         return self.__sink
 
-    def reset(self, prefix='', suffix=''):
+    def reset(self, prefix="", suffix=""):
         """
         Convenience Function for starting the Progress bar:
 
@@ -57,7 +57,7 @@ class ProgressBar:
         """
         return self.update(value=0, prefix=prefix, suffix=suffix)
 
-    def update(self, update=None, value=None, prefix=None, suffix=''):
+    def update(self, update=None, value=None, prefix=None, suffix=""):
         """
         Update the Progress. By default, this amounts to adding 1 to the count. However, set has precedence over
         updating.
@@ -86,11 +86,18 @@ class ProgressBar:
 
             # Write Out
             _progress = self.__width * self.__count / self.__total
-            self.__sink.write('\r{0} |{1}{2}| {3:.{4}f}% {5}'.format(self.__prefix, '\u2588'*int(_progress),
-                                                                     '-'*(self.__width - int(_progress)), _progress,
-                                                                     self.__prec, suffix))
+            self.__sink.write(
+                "\r{0} |{1}{2}| {3:.{4}f}% {5}".format(
+                    self.__prefix,
+                    "\u2588" * int(_progress),
+                    "-" * (self.__width - int(_progress)),
+                    _progress,
+                    self.__prec,
+                    suffix,
+                )
+            )
             if int(_progress) == int(self.__width):
-                self.__sink.write(' [DONE]\n')
+                self.__sink.write(" [DONE]\n")
             self.__sink.flush()
 
         return self
