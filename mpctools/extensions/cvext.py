@@ -278,7 +278,9 @@ class VideoParser:
         # Store/Initialise some properties
         self.properties[cv2.CAP_PROP_POS_MSEC] = stream.get(cv2.CAP_PROP_POS_MSEC)
         self.properties[cv2.CAP_PROP_POS_FRAMES] = stream.get(cv2.CAP_PROP_POS_FRAMES)
-        self.properties[cv2.CAP_PROP_FRAME_HEIGHT] = stream.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        self.properties[cv2.CAP_PROP_FRAME_HEIGHT] = stream.get(
+            cv2.CAP_PROP_FRAME_HEIGHT
+        )
         self.properties[cv2.CAP_PROP_FRAME_WIDTH] = stream.get(cv2.CAP_PROP_FRAME_WIDTH)
         self.properties[cv2.CAP_PROP_FPS] = stream.get(cv2.CAP_PROP_FPS)
         self.properties[cv2.CAP_PROP_FRAME_COUNT] = stream.get(cv2.CAP_PROP_FRAME_COUNT)

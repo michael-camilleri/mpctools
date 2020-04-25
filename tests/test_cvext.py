@@ -8,7 +8,6 @@ H = 64
 
 
 class TestSWAHE(unittest.TestCase):
-
     @staticmethod
     def brute_force_equalisation(img, pad_r, pad_c, hist):
 
@@ -26,7 +25,9 @@ class TestSWAHE(unittest.TestCase):
     def brute_force_clipping(hist, limit, scaler):
         hist = hist.copy()
         higher = hist > limit
-        to_clip = (np.ma.masked_array(hist, np.logical_not(higher)) - limit).sum(axis=-1, keepdims=True)
+        to_clip = (np.ma.masked_array(hist, np.logical_not(higher)) - limit).sum(
+            axis=-1, keepdims=True
+        )
         hist[higher] = limit
         hist += to_clip / 256.0
         return np.around(hist.cumsum(axis=-1) * scaler)
@@ -39,7 +40,11 @@ class TestSWAHE(unittest.TestCase):
         np.random.seed(100)
 
         # Create First Matrix and compute Histogram Equalisation based on CLAHE and Brute-Force
-        a = np.pad(np.random.randint(0, 255, [H, W], dtype=np.uint8), pad_width=8, mode='symmetric')
+        a = np.pad(
+            np.random.randint(0, 255, [H, W], dtype=np.uint8),
+            pad_width=8,
+            mode="symmetric",
+        )
         hist_s = np.zeros([H, W, 256], dtype=np.uint16)
         cvext.SwCLAHE._SwCLAHE__update_hist(a, 8, 8, hist_s)
         hist_b = np.zeros([H, W, 256], dtype=np.uint16)
@@ -47,7 +52,11 @@ class TestSWAHE(unittest.TestCase):
         self.assertTrue(np.array_equal(hist_s, hist_b))
 
         # Do Second One
-        b = np.pad(np.random.randint(0, 255, [H, W], dtype=np.uint8), pad_width=[[3], [7]], mode='symmetric')
+        b = np.pad(
+            np.random.randint(0, 255, [H, W], dtype=np.uint8),
+            pad_width=[[3], [7]],
+            mode="symmetric",
+        )
         hist_s = np.zeros([H, W, 256], dtype=np.uint16)
         cvext.SwCLAHE._SwCLAHE__update_hist(b, 3, 7, hist_s)
         hist_b = np.zeros([H, W, 256], dtype=np.uint16)
@@ -145,36 +154,65 @@ class TestSWAHE(unittest.TestCase):
 
 
 class TestIntersectionOverUnion(unittest.TestCase):
-
     def test_equal(self):
         # A bunch of equal rectangles
-        self.assertEqual(cvext.intersection_over_union([0, 0, 100, 20], [0, 0, 100, 20]), 1.0)
-        self.assertEqual(cvext.intersection_over_union([10, 20, 40, 20], [10, 20, 40, 20]), 1.0)
-        self.assertEqual(cvext.intersection_over_union([-5, -1, 40, 30], [-5, -1, 40, 30]), 1.0)
+        self.assertEqual(
+            cvext.intersection_over_union([0, 0, 100, 20], [0, 0, 100, 20]), 1.0
+        )
+        self.assertEqual(
+            cvext.intersection_over_union([10, 20, 40, 20], [10, 20, 40, 20]), 1.0
+        )
+        self.assertEqual(
+            cvext.intersection_over_union([-5, -1, 40, 30], [-5, -1, 40, 30]), 1.0
+        )
 
     def test_pred_within(self):
         # A bunch of predictions fully contained within the ground-truth
-        self.assertEqual(cvext.intersection_over_union([0, 0, 10, 10], [0, 0, 5, 10]), 0.5)
-        self.assertEqual(cvext.intersection_over_union([10, 10, 10, 10], [12, 11, 5, 5]), 0.25)
-        self.assertEqual(cvext.intersection_over_union([-1, -1, 20, 20], [0, 0, 10, 10]), 0.25)
+        self.assertEqual(
+            cvext.intersection_over_union([0, 0, 10, 10], [0, 0, 5, 10]), 0.5
+        )
+        self.assertEqual(
+            cvext.intersection_over_union([10, 10, 10, 10], [12, 11, 5, 5]), 0.25
+        )
+        self.assertEqual(
+            cvext.intersection_over_union([-1, -1, 20, 20], [0, 0, 10, 10]), 0.25
+        )
 
     def test_gt_within(self):
         # A bunch of predictions fully encompassing the ground-truth
-        self.assertEqual(cvext.intersection_over_union([0, 0, 5, 10], [0, 0, 10, 10]), 0.5)
-        self.assertEqual(cvext.intersection_over_union([12, 11, 5, 5], [10, 10, 10, 10]), 0.25)
-        self.assertEqual(cvext.intersection_over_union([0, 0, 5, 5], [-1, -1, 10, 10]), 0.25)
+        self.assertEqual(
+            cvext.intersection_over_union([0, 0, 5, 10], [0, 0, 10, 10]), 0.5
+        )
+        self.assertEqual(
+            cvext.intersection_over_union([12, 11, 5, 5], [10, 10, 10, 10]), 0.25
+        )
+        self.assertEqual(
+            cvext.intersection_over_union([0, 0, 5, 5], [-1, -1, 10, 10]), 0.25
+        )
 
     def test_outwith(self):
         # A bunch of predictions entirely disjoint from the ground-truth
-        self.assertEqual(cvext.intersection_over_union([0, 0, 5, 5], [5, 5, 6, 10]), 0.0)
-        self.assertEqual(cvext.intersection_over_union([5, 5, 6, 10], [0, 0, 5, 5]), 0.0)
-        self.assertEqual(cvext.intersection_over_union([-10, -10, 10, 11], [5, 5, 6, 10]), 0.0)
+        self.assertEqual(
+            cvext.intersection_over_union([0, 0, 5, 5], [5, 5, 6, 10]), 0.0
+        )
+        self.assertEqual(
+            cvext.intersection_over_union([5, 5, 6, 10], [0, 0, 5, 5]), 0.0
+        )
+        self.assertEqual(
+            cvext.intersection_over_union([-10, -10, 10, 11], [5, 5, 6, 10]), 0.0
+        )
 
     def test_partial(self):
         # A bunch of predictions with partial overlap
-        self.assertEqual(cvext.intersection_over_union([2, 3, 10, 10], [7, 8, 10, 10]), 25/175)
-        self.assertEqual(cvext.intersection_over_union([2, 3, 10, 10], [7, 8, 20, 20]), 25/475)
-        self.assertEqual(cvext.intersection_over_union([7, 8, 10, 10], [2, 3, 10, 10]), 25/175)
-        self.assertEqual(cvext.intersection_over_union([7, 8, 20, 20], [2, 3, 10, 10]), 25/475)
-
-
+        self.assertEqual(
+            cvext.intersection_over_union([2, 3, 10, 10], [7, 8, 10, 10]), 25 / 175
+        )
+        self.assertEqual(
+            cvext.intersection_over_union([2, 3, 10, 10], [7, 8, 20, 20]), 25 / 475
+        )
+        self.assertEqual(
+            cvext.intersection_over_union([7, 8, 10, 10], [2, 3, 10, 10]), 25 / 175
+        )
+        self.assertEqual(
+            cvext.intersection_over_union([7, 8, 20, 20], [2, 3, 10, 10]), 25 / 475
+        )
