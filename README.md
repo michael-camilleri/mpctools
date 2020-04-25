@@ -18,7 +18,6 @@ More details for each library are provided as doxygen-style comments in the modu
 ### Requirements
 
 This Library has the following dependencies:
-  * scikit-multilearn
   * scikit-learn
   * matplotlib
   * seaborn

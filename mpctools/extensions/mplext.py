@@ -13,6 +13,7 @@ Author: Michael P. J. Camilleri
 """
 
 from matplotlib.colors import LinearSegmentedColormap as lsc
+from scipy.stats import multivariate_normal as mv_norm
 from matplotlib import pyplot as plt, axes
 from mpctools.extensions import npext
 import seaborn as sns
@@ -299,3 +300,38 @@ def plot_categorical(
         colorbar = None
 
     return plot, colorbar
+
+
+def plot_contour(axs=None, x=None, y=None, kind='G', params=(np.zeros(2), np.eye(2)), res=100):
+    """
+    Generate a contour plot
+
+    :param axs:   The axis to plot on: if not specified, then will generate a new axis - note that if axs is not
+                  specified, then X and Y CANNOT be None
+    :param x:     The limits of the X-values - will be ignored if axs is specified
+    :param y:     The limits of the Y-values - will be ignored if axs is specified
+    :param kind:  The type of plot: must be one of:
+                  'G' - Gaussian plot
+                  An executable function which takes two 2D lists of X/Y combinations and returns the value at each pt
+    :param params: Any additional parameters to use when using the Gaussian plot
+    :param res:   The resolution along the X and Y.
+    :return:      The plot parameters as returned by pyplot.contour()
+    """
+    # Handle specified options
+    if axs is None:
+        axs = plt.gca()
+        assert (x is not None and y is not None), 'If Axes is not specified, you MUST specify X and Y'
+        x = np.linspace(*x, res)
+        y = np.linspace(*y, res)
+    else:
+        if x is not None or y is not None:
+            warnings.warn('Axs has been specified: X/Y will be ignored!', UserWarning)
+        x = np.linspace(*axs.get_xlim(), res)
+        y = np.linspace(*axs.get_ylim(), res)
+    X, Y = np.meshgrid(x, y) # Generate Mesh Grid
+
+    # Handle Kind
+    if type(kind) == str and kind.lower() == 'g':
+        axs.contour(X, Y, mv_norm.pdf(np.stack((X, Y), axis=-1), *params))
+    else:
+        raise NotImplementedError('Executable Kind is not yet implemented')

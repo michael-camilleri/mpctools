@@ -67,7 +67,7 @@ def extend_dict(_d1, _d2, deep=False):
     """
     This function may be used to extend the 'list/array'-type elements of _d1 by corresponding entries in _d2. The
     elements in either case must support the extend method (i.e. are typically lists) - scalars are however supported
-    through the lister method. Note that if a key exists in _d2 and not in _d1, it is automatically created as a list.
+    through the to_list method. Note that if a key exists in _d2 and not in _d1, it is automatically created as a list.
 
     :param _d1: Dictionary to extend: will be modified
     :param _d2: Dictionary to copy data from.
