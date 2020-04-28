@@ -75,7 +75,6 @@ class IWorker(metaclass=abc.ABCMeta):
             self.__queue.put((self.ID, progress), block=False)
         except TypeError:
             sys.stderr.write("Warn: TypeError Encountered")
-            pass
 
     @abc.abstractmethod
     def parallel_compute(self, _common, _data):

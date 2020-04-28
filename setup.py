@@ -9,7 +9,7 @@ setup(
     # Common Setup
     name="mpctools",
     version=mpctools.__version__,
-    packages=["mpctools.extensions", "mpctools.parallel"],  # Eventually, do neural
+    packages=["mpctools.extensions", "mpctools.parallel"],
     # Requirements
     install_requires=[
         "numpy",
@@ -25,9 +25,18 @@ setup(
     # Meta-Data
     author="Michael P. J. Camilleri",
     author_email="michael.p.camilleri@ed.ac.uk",
-    description="A set of tools and utilities for extending common libraries and"
-                " providing parallel capabilities.",
+    description="A set of tools and utilities for extending common libraries and providing parallel"
+                " capabilities.",
     license="GNU GPL",
-    keywords="extensions parallel",
+    keywords=["extensions", "parallel", "utilities"],
     url="https://github.com/michael-camilleri/mpctools",
+    download_url="https://github.com/michael-camilleri/mpctools/archive/v_0400.tar.gz",
+    # PyPi Data
+    classifiers=[
+        "Development Status :: 4 - Beta",
+        "Intended Audience :: Developers",
+        "Topic :: Software Development :: Libraries",
+        "License :: OSI Approved :: GNU General Public License (GPL)",
+        "Programming Language :: Python :: 3 :: Only"
+    ],
 )

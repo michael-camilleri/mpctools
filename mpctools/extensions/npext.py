@@ -1,13 +1,14 @@
 """
-This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
-License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
-version.
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU
+General Public License as published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
-warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+General Public License for more details.
 
-You should have received a copy of the GNU General Public License along with this program. If not, see
-http://www.gnu.org/licenses/.
+You should have received a copy of the GNU General Public License along with this program. If not,
+see http://www.gnu.org/licenses/.
 
 Author: Michael P. J. Camilleri
 """
@@ -16,8 +17,8 @@ from scipy.optimize import linear_sum_assignment as hungarian
 from scipy.special import gamma
 from scipy.stats import entropy
 from functools import reduce
-import itertools as iter
 import numpy as np
+import itertools
 
 
 ################################################################
@@ -201,7 +202,7 @@ def run_lengths(a, how="I", return_values=False, return_positions=False):
     if type(a) == np.ndarray:
         a = [i if not np.isnan(i) else np.nan for i in a.flatten()]
     rls = np.asarray(
-        [(sum(1 for _ in l), n) for n, l in iter.groupby(a)]
+        [(sum(1 for _ in l), n) for n, l in itertools.groupby(a)]
     )  # Now, compute run-lengths and types.
     pos = (
         np.asarray([0, *np.cumsum(rls[:, 0])[:-1]], dtype=int) if len(rls) > 0 else []

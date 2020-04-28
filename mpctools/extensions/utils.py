@@ -1,13 +1,14 @@
 """
-This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
-License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
-version.
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU
+General Public License as published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
-warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+General Public License for more details.
 
-You should have received a copy of the GNU General Public License along with this program. If not, see
-http://www.gnu.org/licenses/.
+You should have received a copy of the GNU General Public License along with this program. If not,
+see http://www.gnu.org/licenses/.
 
 Author: Michael P. J. Camilleri
 """
@@ -25,8 +26,8 @@ import os
 
 def to_tuple(value):
     """
-    Static (Module) Method for converting a scalar into a tuple if not already (tuple/list/numpy array). Will also
-    ignore None. Note, that this does not handle dict types!
+    Static (Module) Method for converting a scalar into a tuple if not already (tuple/list/numpy
+    array). Will also ignore None. Note, that this does not handle dict types!
 
     :param value: The Value to convert
     :return: A Tuple containing value if a scalar, or value if already a list/tuple/numpy array/none
@@ -40,7 +41,8 @@ def to_tuple(value):
 
 def to_list(value):
     """
-    Static (Module) Method for converting a scalar into a list if is not already an iterable (tuple/list/array)
+    Static (Module) Method for converting a scalar into a list if is not already an iterable
+    (tuple/list/array)
 
     :param value: The Value to convert
     :return: A List containing value if a scalar, or value if already a list/tuple/numpy array/none
@@ -54,8 +56,8 @@ def to_list(value):
 
 def to_scalar(value):
     """
-    Converts a single-element tuple into a scalar value if not already. To do this, it attempts to dereference the
-    first element if it is of type tuple, list or np.ndarray
+    Converts a single-element tuple into a scalar value if not already. To do this, it attempts to
+    dereference the first element if it is of type tuple, list or np.ndarray
 
     :param value:
     :return:
@@ -65,9 +67,10 @@ def to_scalar(value):
 
 def extend_dict(_d1, _d2, deep=False):
     """
-    This function may be used to extend the 'list/array'-type elements of _d1 by corresponding entries in _d2. The
-    elements in either case must support the extend method (i.e. are typically lists) - scalars are however supported
-    through the to_list method. Note that if a key exists in _d2 and not in _d1, it is automatically created as a list.
+    This function may be used to extend the 'list/array'-type elements of _d1 by corresponding
+    entries in _d2. The elements in either case must support the extend method (i.e. are typically
+    lists) - scalars are however supported through the to_list method. Note that if a key exists
+    in _d2 and not in _d1, it is automatically created as a list.
 
     :param _d1: Dictionary to extend: will be modified
     :param _d2: Dictionary to copy data from.
@@ -103,7 +106,8 @@ def dict_invert(_dict):
     The function also works on lists (putting values as keys and the index in the list as values
 
     :param _dict: The dictionary to invert or a list to extract from
-    :return:      A new dict object which the key-value entries reversed (i.e. values become keys and v.v.)
+    :return: A new dict object which the key-value entries reversed (i.e. values become keys and
+             v.v.)
     """
     if type(_dict) is dict:
         return {v: k for k, v in _dict.items()}
@@ -167,8 +171,9 @@ class NullableSink:
 
 def name(obj):
     """
-    Static (Module) Method for outputting the name of a data type. This amounts to calling the __name__ method on
-    the passed obj (or its class type) if it exists, or calling string otherwise on it... (mainly for None Types)
+    Static (Module) Method for outputting the name of a data type. This amounts to calling the
+    __name__ method on the passed obj (or its class type) if it exists, or calling string
+    otherwise on it... (mainly for None Types)
 
     :param obj: An instance or class type.
     :return: string representation of 'obj'
@@ -205,8 +210,8 @@ def str_width(_iterable):
 
 def dict_width(_dict):
     """
-    Returns the maximum length of all elements in a dictionary. Note that if the dict contains strings, strwidth should
-    be used, as this will always return 1.
+    Returns the maximum length of all elements in a dictionary. Note that if the dict contains
+    strings, strwidth should be used, as this will always return 1.
 
     :param _dict: Dictionary: elements may or may not implement the len function
     :return:
@@ -238,7 +243,8 @@ def short_int(_int):
 
 def make_dir(_path, _clear=False):
     """
-    Static (Module) Method for ensuring that the given path exists, and if not, will attempt to create it.
+    Static (Module) Method for ensuring that the given path exists, and if not, will attempt to
+    create it.
 
     :param _path: The Full Directory to create. Note that this will silently ignore None Paths
     :param _clear: If True, will clear any contents previously in the directory if it existed.

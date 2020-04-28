@@ -1,13 +1,14 @@
 """
-This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
-License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
-version.
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU
+General Public License as published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
-warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+General Public License for more details.
 
-You should have received a copy of the GNU General Public License along with this program. If not, see
-http://www.gnu.org/licenses/.
+You should have received a copy of the GNU General Public License along with this program. If not,
+see http://www.gnu.org/licenses/.
 
 Author: Michael P. J. Camilleri
 """
@@ -173,20 +174,21 @@ def plot_blandaltman(
     """
     Generate a Bland-Altman Plot of the data in series1 and 2
 
-    The plot allows handling of multiple classes. To support this, both series1 and series2 must be lists of numpy
-    arrays. If the data is 1-dimensional, then just wrap in a list
+    The plot allows handling of multiple classes. To support this, both series1 and series2 must be
+    lists of numpy arrays. If the data is 1-dimensional, then just wrap in a list
 
     :param series1: The Lead Data: Difference will be Series 1 - Series 2
     :param series2: The other Data (in same order)
-    :param mode:    The Bland-Altman diagram's abscissa can be in one of two forms: either the mean, or one of the data
-                        series. If None, then the mean is plotted: else, if 0 plot series1, if 1 plot series2.
+    :param mode:    The Bland-Altman diagram's abscissa can be in one of two forms: either the mean,
+                    or one of the data series. If None, then the mean is plotted: else, if 0 plot
+                    series1, if 1 plot series2.
     :param labels:  Labels for the different classes
     :param model_names: The names of the Model
     :param fnt_size: Size of font for labels etc...
     :param ax:      Axes to plot on: if None, create own axes
     :param args:    Arguments to pass on to plt.scatter
     :param kwargs:  Key-Word Arguments to pass on to plt.scatter
-    :return:
+    :return:        Description String
     """
     # Resolve Axes
     ax = ax if ax is not None else plt.gca()
@@ -216,15 +218,16 @@ def plot_blandaltman(
     # Finally, add labels
     ax.set_xlabel("Sample Mean" if mode is None else model_names[mode], size=fnt_size)
     ax.set_ylabel("{0} - {1}".format(*model_names), size=fnt_size)
-    print(
-        "Percentage Positive: {0:.3f}%, Mean Diff: {1:.3f}, Mean S1: {2:.3f}, Mean S2: {3:.3f}, Length: {4}".format(
-            np.sum(np.asarray(_g_diff) >= 0) * 100.0 / len(_g_diff),
-            _md,
-            np.mean(_g_s1),
-            np.mean(_g_s2),
-            len(_g_diff),
-        )
-    )
+
+    # Return Description String
+    return "Percentage Positive: {0:.3f}%, Mean Diff: {1:.3f}, Mean S1: {2:.3f}, Mean S2: " \
+           "{3:.3f}, Length: {4}".format(
+                np.sum(np.asarray(_g_diff) >= 0) * 100.0 / len(_g_diff),
+                _md,
+                np.mean(_g_s1),
+                np.mean(_g_s2),
+                len(_g_diff)
+            )
 
 
 def plot_categorical(
@@ -258,7 +261,7 @@ def plot_categorical(
     :return:            Tuple consisting of Color plot Collections and optionally the color map
     """
     # Format Input
-    (n_rows, n_cols) = time_series.shape
+    n_rows = time_series.shape[0]
     N = len(labels)
     ax = plt.gca() if ax is None else ax
     cmap = "tab20" if cmap is None else cmap

@@ -1,15 +1,16 @@
 """
 This Module will serve as an alternative and extension to opencv - hence the name
 
-This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public
-License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later
-version.
+This program is free software: you can redistribute it and/or modify it under the terms of the GNU
+General Public License as published by the Free Software Foundation, either version 3 of the
+License, or (at your option) any later version.
 
-This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied
-warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without
+even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+General Public License for more details.
 
-You should have received a copy of the GNU General Public License along with this program. If not, see
-http://www.gnu.org/licenses/.
+You should have received a copy of the GNU General Public License along with this program. If not,
+see http://www.gnu.org/licenses/.
 
 Author: Michael P. J. Camilleri
 """
@@ -181,20 +182,19 @@ class VideoParser:
         """
         This is the read-method, with the same signature as the OpenCV one.
 
-        Note that the method blocks if the queue is empty but there is more stuff to get. Note that this can be called
-        even after calling stop, to get the remaining ones
+        Note that the method blocks if the queue is empty but there is more stuff to get. Note that
+        this can be called even after calling stop, to get the remaining ones
 
         :return:    ret, frame
         """
-        # If we have intentionally stopped, then we do not need to block and wait, since if the queue is empty, it
-        #   means that nothing else will be put in there (either because the thread received the stop signal and
-        #   terminated, or because the end-of-file was actually reached in the meantime!
+        # If we have intentionally stopped, then we do not need to block and wait, since if the
+        #   queue is empty, it means that nothing else will be put in there (either because the
+        #   thread received the stop signal and terminated, or because the end-of-file was
+        #   actually reached in the meantime!
         if self.thread is None:
             if self.queue.qsize() > 0:
                 _data = self.queue.get(block=False)
-                if (
-                    _data[0] is not None
-                ):  # Because it could happen that the stop signal came in after the EOF found
+                if _data[0] is not None:  # Stop signal came in after the EOF found
                     self.properties[VP_CUR_PROP_POS_MSEC] = float(
                         self.properties[cv2.CAP_PROP_POS_MSEC]
                     )
@@ -204,11 +204,10 @@ class VideoParser:
                     ]
                     self.properties[cv2.CAP_PROP_POS_FRAMES] = _data[1]
                     return True, _data[2]
-                else:
-                    return False, None
-            else:
                 return False, None
-        # Otherwise, we need to use a while-loop to ensure that we never block indefinitely due to race conditions
+            return False, None
+        # Otherwise, we need to use a while-loop to ensure that we never block indefinitely due to
+        # race conditions
         else:
             _data = None
             # Get the Data, at all costs!
