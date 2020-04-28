@@ -5,6 +5,9 @@ This is the Setup Script for installing the Library
 from setuptools import setup
 import mpctools
 
+with open("README.md", "r") as fh:
+    long_description = fh.read()
+
 setup(
     # Common Setup
     name="mpctools",
@@ -31,6 +34,8 @@ setup(
     keywords=["extensions", "parallel", "utilities"],
     url="https://github.com/michael-camilleri/mpctools",
     download_url="https://github.com/michael-camilleri/mpctools/archive/v_0400.tar.gz",
+    long_description=long_description,
+    long_description_content_type="text/markdown",
     # PyPi Data
     classifiers=[
         "Development Status :: 4 - Beta",

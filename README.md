@@ -1,6 +1,7 @@
 # mpctools
-A set of python tools for extending standard (and non-standard) libraries. These originated from my own needs and those
-of my students, and I decided to put them here in case they may be useful to other people.
+A set of python tools for extending standard (and non-standard) libraries. These originated from
+ my own needs and those of my students, and I decided to put them here in case they may be useful
+ to other people.
 
 ## Features
 
@@ -41,17 +42,15 @@ pip install opencv-python
 
 ### Installing
 
-Installation can be done via pip by pointing to this repository:
-  ```bash
-  pip install git+https://github.com/michael-camilleri/mpctools.git --user
+The project is available on [PyPi](https://pypi.org/project/mpctools/0.4.0/), and hence the
+ latest (stable) release can be installed simply:
+  ```shell script
+  pip install mpctools
   ```
- The `--user` flag is optional and only necessary when one does not have full system permissions. Note that depending on
- which version the library is at, you may need to change the version number of the install command.
- 
- Alternatively, you may choose to install directly from source. This has the added advantage that if you change any of 
- the implementations, the changes will be reflected without having to rebuild. However, you will have to manually
- download the source (via git or just zipped and then extracted):
-  ```bash
+Alternatively, you may choose to install directly from source. This has the added advantage that if 
+you change any of the implementations, the changes will be reflected without having to rebuild. 
+However, you will have to manually download the source (via git or just zipped and then extracted):
+  ```shell script
   python setup.py build develop --no-deps
   ```
 
