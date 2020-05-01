@@ -15,14 +15,70 @@ Author: Michael P. J. Camilleri
 
 import numpy as np
 import unittest
+import cv2
+import os
 
 from mpctools.extensions import cvext
 
-W = 256
-H = 64
+
+class TestVideoParser(unittest.TestCase):
+    """
+    Tests for the Video Parser
+
+    TODO:
+     1. Reading Parameters
+     2. Reading forward as normal and using striding of 1 (should be same)
+     2. Reading backward using striding of -1
+     3. Seeking then reading forward
+     4. Seeking then reading backward
+     5. Reading forward, stopping and then getting frames (using waits)
+    """
+    W = 64
+    H = 32
+    L = 200
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        # Create Dummy Video File
+        writer = cv2.VideoWriter(
+            "test_video_parser.mp4",
+            fourcc=int(cvext.FourCC.to_int('avc1')),
+            fps=25,
+            frameSize=(TestVideoParser.W, TestVideoParser.H),
+            isColor=True,
+            apiPreference=cv2.CAP_ANY,
+        )
+        cls.colours = np.random.randint(0, 255, size=[TestVideoParser.L, 3])
+        for l in range(TestVideoParser.L):
+            writer.write(np.tile(cls.colours[l, :], [TestVideoParser.H, TestVideoParser.W, 1]).astype(np.uint8))
+        writer.release()
+
+    def test_reading_file(self):
+        """
+        Test basic reading of file
+        :return:
+        """
+        self.assertRaises(cv2.error, cvext.VideoParser('inexistent').start)
+
+    def test_reading_forward(self):
+        """
+        Test reading forward using both normal and striding of 1
+        :return:
+        """
+        # First Sub-Test is with no striding
+
+
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        # Delete Class
+        os.remove("test_video_parser.mp4")
 
 
 class TestSWAHE(unittest.TestCase):
+    W = 256
+    H = 64
+
     @staticmethod
     def brute_force_equalisation(img, pad_r, pad_c, hist):
 
@@ -56,25 +112,25 @@ class TestSWAHE(unittest.TestCase):
 
         # Create First Matrix and compute Histogram Equalisation based on CLAHE and Brute-Force
         a = np.pad(
-            np.random.randint(0, 255, [H, W], dtype=np.uint8),
+            np.random.randint(0, 255, [TestSWAHE.H, TestSWAHE.W], dtype=np.uint8),
             pad_width=8,
             mode="symmetric",
         )
-        hist_s = np.zeros([H, W, 256], dtype=np.uint16)
+        hist_s = np.zeros([TestSWAHE.H, TestSWAHE.W, 256], dtype=np.uint16)
         cvext.SwCLAHE._SwCLAHE__update_hist(a, 8, 8, hist_s)
-        hist_b = np.zeros([H, W, 256], dtype=np.uint16)
+        hist_b = np.zeros([TestSWAHE.H, TestSWAHE.W, 256], dtype=np.uint16)
         self.brute_force_equalisation(a, 8, 8, hist_b)
         self.assertTrue(np.array_equal(hist_s, hist_b))
 
         # Do Second One
         b = np.pad(
-            np.random.randint(0, 255, [H, W], dtype=np.uint8),
+            np.random.randint(0, 255, [TestSWAHE.H, TestSWAHE.W], dtype=np.uint8),
             pad_width=[[3], [7]],
             mode="symmetric",
         )
-        hist_s = np.zeros([H, W, 256], dtype=np.uint16)
+        hist_s = np.zeros([TestSWAHE.H, TestSWAHE.W, 256], dtype=np.uint16)
         cvext.SwCLAHE._SwCLAHE__update_hist(b, 3, 7, hist_s)
-        hist_b = np.zeros([H, W, 256], dtype=np.uint16)
+        hist_b = np.zeros([TestSWAHE.H, TestSWAHE.W, 256], dtype=np.uint16)
         self.brute_force_equalisation(b, 3, 7, hist_b)
         self.assertTrue(np.array_equal(hist_s, hist_b))
 
@@ -89,11 +145,11 @@ class TestSWAHE(unittest.TestCase):
         # The Scaler computation is based as follows. With a randint of 20, the mean is 10. This means that across 256
         #  channels, the total count is on average 2560. This would amount to having 2560 cells for histogram. Hence,
         #  256/2560 is 0.1. However, to be sure, use a slightly smaller value.
-        h = np.random.randint(0, 20, [H, W, 256]).astype(float)
+        h = np.random.randint(0, 20, [TestSWAHE.H, TestSWAHE.W, 256]).astype(float)
         h_cpy = h.copy()
 
         # Perform the SwClahe version
-        lut_s = np.zeros([H, W, 256], dtype=np.uint8)
+        lut_s = np.zeros([TestSWAHE.H, TestSWAHE.W, 256], dtype=np.uint8)
         cvext.SwCLAHE._SwCLAHE__clip_limit(h, 10.0, lut_s, 0.08)
         # Ensure that nothing changed...
         self.assertTrue(np.array_equal(h_cpy, h))
@@ -102,7 +158,7 @@ class TestSWAHE(unittest.TestCase):
         self.assertTrue(np.array_equal(lut_s, lut_b))
 
         # Do Second One: this time, scaler < 256/(256*15) = 0.06667
-        h = np.random.randint(0, 30, [H, W, 256]).astype(float)
+        h = np.random.randint(0, 30, [TestSWAHE.H, TestSWAHE.W, 256]).astype(float)
         h_cpy = h.copy()
         # Perform the SwClahe version: however, do not initialise lut_s....
         cvext.SwCLAHE._SwCLAHE__clip_limit(h, 10.0, lut_s, 0.05)
@@ -120,12 +176,12 @@ class TestSWAHE(unittest.TestCase):
         np.random.seed(100)
 
         # Create SwCLAHE object
-        swclahe = cvext.SwCLAHE([W, H])
+        swclahe = cvext.SwCLAHE([TestSWAHE.W, TestSWAHE.H])
 
         # Create 'Image'
-        a = np.random.randint(0, 255, [H, W], dtype=np.uint8)
+        a = np.random.randint(0, 255, [TestSWAHE.H, TestSWAHE.W], dtype=np.uint8)
         a_cpy = a.copy()
-        b = np.random.randint(0, 255, [H, W], dtype=np.uint8)
+        b = np.random.randint(0, 255, [TestSWAHE.H, TestSWAHE.W], dtype=np.uint8)
 
         # ----- Test that Histogram is currently 0 ------- #
         self.assertTrue((swclahe.transform(a_cpy) == 0).all())
@@ -231,3 +287,7 @@ class TestIntersectionOverUnion(unittest.TestCase):
         self.assertEqual(
             cvext.intersection_over_union([7, 8, 20, 20], [2, 3, 10, 10]), 25 / 475
         )
+
+
+if __name__ == "__main__":
+    unittest.main()

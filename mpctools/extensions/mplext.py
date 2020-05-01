@@ -220,14 +220,16 @@ def plot_blandaltman(
     ax.set_ylabel("{0} - {1}".format(*model_names), size=fnt_size)
 
     # Return Description String
-    return "Percentage Positive: {0:.3f}%, Mean Diff: {1:.3f}, Mean S1: {2:.3f}, Mean S2: " \
-           "{3:.3f}, Length: {4}".format(
-                np.sum(np.asarray(_g_diff) >= 0) * 100.0 / len(_g_diff),
-                _md,
-                np.mean(_g_s1),
-                np.mean(_g_s2),
-                len(_g_diff)
-            )
+    return (
+        "Percentage Positive: {0:.3f}%, Mean Diff: {1:.3f}, Mean S1: {2:.3f}, Mean S2: "
+        "{3:.3f}, Length: {4}".format(
+            np.sum(np.asarray(_g_diff) >= 0) * 100.0 / len(_g_diff),
+            _md,
+            np.mean(_g_s1),
+            np.mean(_g_s2),
+            len(_g_diff),
+        )
+    )
 
 
 def plot_categorical(
@@ -305,7 +307,9 @@ def plot_categorical(
     return plot, colorbar
 
 
-def plot_contour(axs=None, x=None, y=None, kind='G', params=(np.zeros(2), np.eye(2)), res=100):
+def plot_contour(
+    axs=None, x=None, y=None, kind="G", params=(np.zeros(2), np.eye(2)), res=100
+):
     """
     Generate a contour plot
 
@@ -323,18 +327,20 @@ def plot_contour(axs=None, x=None, y=None, kind='G', params=(np.zeros(2), np.eye
     # Handle specified options
     if axs is None:
         axs = plt.gca()
-        assert (x is not None and y is not None), 'If Axes is not specified, you MUST specify X and Y'
+        assert (
+            x is not None and y is not None
+        ), "If Axes is not specified, you MUST specify X and Y"
         x = np.linspace(*x, res)
         y = np.linspace(*y, res)
     else:
         if x is not None or y is not None:
-            warnings.warn('Axs has been specified: X/Y will be ignored!', UserWarning)
+            warnings.warn("Axs has been specified: X/Y will be ignored!", UserWarning)
         x = np.linspace(*axs.get_xlim(), res)
         y = np.linspace(*axs.get_ylim(), res)
-    X, Y = np.meshgrid(x, y) # Generate Mesh Grid
+    X, Y = np.meshgrid(x, y)  # Generate Mesh Grid
 
     # Handle Kind
-    if type(kind) == str and kind.lower() == 'g':
+    if type(kind) == str and kind.lower() == "g":
         axs.contour(X, Y, mv_norm.pdf(np.stack((X, Y), axis=-1), *params))
     else:
-        raise NotImplementedError('Executable Kind is not yet implemented')
+        raise NotImplementedError("Executable Kind is not yet implemented")
