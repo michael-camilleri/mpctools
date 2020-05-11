@@ -90,6 +90,52 @@ def expand_box(c, size):
     return np.asarray(((c - (x, y)), (c + (x, -y)), (c + (x, y)), (c + (-x, y))))
 
 
+def line(img, start, end, color, thickness, linestyle='--'):
+    """
+    Draws a line (much like cv2.line()) but allows for other line-styles.
+
+    Args:
+        linestyle: specifies the line-style (currently only dashed format)
+        For other arguments, see cv2.line()
+
+    @TODO: Some fancy checks to ensure that line ends with a dash.
+    """
+    # Some Error-Checks
+    if thickness < 1:
+        raise ValueError('Thickness must be > 0.')
+    if linestyle != '--':
+        raise ValueError('Currently supported style is only `--`.')
+    start = np.asarray(start)
+    end = np.asarray(end)
+
+    # Some Calculations
+    seg_len = 25 * thickness
+    line_length = np.sqrt((np.square(end) - np.square(start)).sum())
+    dvect_sld = np.divide(end - start, line_length) * 15 * thickness
+    dvect_full = np.divide(end - start, line_length) * seg_len
+
+    # Draw
+    for i in range(np.ceil(line_length / seg_len).astype(int)):
+        st = start + dvect_full * i
+        nd = st + dvect_sld
+        cv2.line(img, (int(st[0]), int(st[1])), (int(min(nd[0], end[0])), int(min(nd[1], end[1]))), color, thickness, cv2.LINE_AA)
+
+
+def rectangle(img, pt1, pt2, color, thickness, linestyle='--'):
+    """
+    Draws a Rectangle at the specified position
+
+    Args:
+        linestyle: specifies the line-style (see cvext.line())
+        For other arguments see cv2.rectangle()
+
+    """
+    line(img, pt1, (pt2[0], pt1[1]), color, thickness, linestyle)
+    line(img, (pt2[0], pt1[1]), pt2, color, thickness, linestyle)
+    line(img, pt1, (pt1[0], pt2[1]), color, thickness, linestyle)
+    line(img, (pt1[0], pt2[1]), pt2, color, thickness, linestyle)
+
+
 def intersection_over_union(ground_truth, prediction):
     """
     Computes the Intersection over Union.
@@ -121,17 +167,21 @@ def intersection_over_union(ground_truth, prediction):
 
 class TimeFrame:
     """
-    A Convertor class for switching between time/frame numbers. Note that time is always
-    returned in MS
+    A Convertor class for switching between time/frame numbers.
+
+    Note:
+        time is always returned in MS.
+        frames are by default 1-offset, but this can be changed in the initialiser
     """
-    def __init__(self, fps=25):
+    def __init__(self, fps=25, frm_offset=1):
         self.FPS = fps
+        self.offset = frm_offset
 
     def to_frame(self, ms):
-        return np.round(ms * self.FPS / 1000)
+        return int(np.round(ms * self.FPS / 1000) + self.offset)
 
     def to_time(self, frm):
-        return frm * 1000 / self.FPS
+        return (frm - self.offset) * 1000 / self.FPS
 
 
 class VideoParser:
