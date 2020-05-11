@@ -39,9 +39,10 @@ class Homography:
         """
         Initialiser
 
-        :param image_coords: A 2D Numpy array of image coordinates, with x/y along the second axis. Must be of length at
-                                least 4.
-        :param world_coords: A 2D Numpy arra of corresponding world-coordinates: must be same shape as image_coords
+        :param image_coords: A 2D Numpy array of image coordinates, with x/y along the second axis.
+                             Must be of length at least 4.
+        :param world_coords: A 2D Numpy arra of corresponding world-coordinates: must be same shape
+                            as image_coords
         """
         self.toImg = cv2.findHomography(world_coords, image_coords)[0]
         self.toWrld = cv2.findHomography(image_coords, world_coords)[0]
@@ -50,8 +51,8 @@ class Homography:
         """
         Convert world coordinates to image coordinates
 
-        :param points: 2D Numpy array, with the last dimension of size 2 (X/Y coordinates): if 1D will be automatically
-                       promoted to 2D
+        :param points: 2D Numpy array, with the last dimension of size 2 (X/Y coordinates): if 1D
+                       will be automatically promoted to 2D
         :return:    Image Coordinates
         """
         return np.squeeze(
@@ -64,8 +65,8 @@ class Homography:
         """
         Convert Image coordinates to world-coordinates
 
-        :param points: 2D Numpy array, with the last dimension of size 2 (X/Y coordinates): if 1D will be automatically
-                       promoted to 2D
+        :param points: 2D Numpy array, with the last dimension of size 2 (X/Y coordinates): if 1D
+                       will be automatically promoted to 2D
         :return:    World Coordinates
         """
         return np.squeeze(
@@ -77,8 +78,9 @@ class Homography:
 
 def expand_box(c, size):
     """
-    Create a Rectangle of the specified size, centred at the point. Note that since this is aimed for images, it assumes
-    that Y grows downwards (this is relevant in specifying what is meant by the top-left corner)
+    Create a Rectangle of the specified size, centred at the point. Note that since this is aimed
+    for images, it assumes that Y grows downwards (this is relevant in specifying what is meant
+    by the top-left corner)
 
     :param c:       Centre (2-tuple/array, X/Y)
     :param size:    The size of the rectangle (2-tuple/array, width/height)
@@ -117,6 +119,21 @@ def intersection_over_union(ground_truth, prediction):
     return intersection / union
 
 
+class TimeFrame:
+    """
+    A Convertor class for switching between time/frame numbers. Note that time is always
+    returned in MS
+    """
+    def __init__(self, fps=25):
+        self.FPS = fps
+
+    def to_frame(self, ms):
+        return np.round(ms * self.FPS / 1000)
+
+    def to_time(self, frm):
+        return frm * 1000 / self.FPS
+
+
 class VideoParser:
     """
     The Video Parser (Wrapper) Object
@@ -152,8 +169,9 @@ class VideoParser:
         """
         Start the Parsing Loop
         :param start:   If not None (default) then signifies an index of the frame at which to start
-        :param stride:  How much to stride: default is to just add 1... (this is in terms of frames). Note that when
-                        striding, the last frame is ALWAYS read even if it is not a multiple of the stride...
+        :param stride:  How much to stride: default is to just add 1 (this is in terms of frames).
+                        Note that when striding, the last frame is ALWAYS read even if it is not
+                        a multiple of the stride.
         :return:        True if successful, false otherwise
         """
         # Check that not already processing

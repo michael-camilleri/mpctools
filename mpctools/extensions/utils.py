@@ -96,7 +96,7 @@ def dzip(*_dcts):
     :return:        Enumerated iteration over common elements of dictionaries
     """
     for i in sorted(set(_dcts[0]).intersection(*_dcts[1:])):
-        yield (i, tuple(d[i] for d in _dcts))
+        yield i, tuple(d[i] for d in _dcts)
 
 
 def dict_invert(_dict):

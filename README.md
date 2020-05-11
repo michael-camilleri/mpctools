@@ -42,8 +42,8 @@ pip install opencv-python
 
 ### Installing
 
-The project is available on [PyPi](https://pypi.org/project/mpctools/0.4.0/), and hence the
- latest (stable) release can be installed simply:
+The project is available on [PyPi](https://pypi.org/project/mpctools/), and hence the latest
+ (stable) release can be installed simply:
   ```shell script
   pip install mpctools
   ```
