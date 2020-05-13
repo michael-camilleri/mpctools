@@ -1,6 +1,11 @@
 """
 This Module will serve as an alternative and extension to opencv - hence the name
 
+Some notes re compatibility with OpenCV.
+
+ 1. Sizes: OpenCV expects sizes to be passed as [W x H]. However, in following with normal matrix
+    manipulations, Images are passed as [H x W x 3]
+
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU
 General Public License as published by the Free Software Foundation, either version 3 of the
 License, or (at your option) any later version.
@@ -27,6 +32,19 @@ import cv2
 # Define Some Constants
 VP_CUR_PROP_POS_MSEC = -100  # Current frame (rather than next one) in MS
 VP_CUR_PROP_POS_FRAMES = -101  # Current frame (rather than next one) in index
+
+
+class FourCC:
+    """
+    FourCC Wrapper to allow conversions between Integer and String Representation
+    """
+    @classmethod
+    def to_int(cls, fourcc) -> int:
+        return int(cv2.VideoWriter_fourcc(*fourcc))
+
+    @classmethod
+    def to_str(cls, fourcc) -> str:
+        return "".join([chr((int(fourcc) >> 8 * i) & 0xFF) for i in range(4)])
 
 
 class Homography:
@@ -457,27 +475,31 @@ class VideoParser:
 
 class SwCLAHE:
     """
-    Class for implementing the CLAHE algorithm by way of a sliding window. Note that this is a loose adaptation, and I
-    do cut some corners in the interest of some efficiency. Note, that this requires the Image data to be in 8-bit
-    Format! The reason for this implementation is to separate the histogram computation from the equalisation step.
+    Class for implementing the CLAHE algorithm by way of a sliding window. Note that this is a loose
+    adaptation, and I do cut some corners in the interest of some efficiency. Note, that this
+    requires the Image data to be in 8-bit Format! The reason for this implementation is to
+    separate the histogram computation from the equalisation step.
 
     Note that the algorithm is modified as follows to allow a history:
      a) Keep track of per-pixel raw-counts in a histogram.
-     b) For the true lut, perform clipping based on the number of frames used in the histogram computation.
+     b) For the true lut, perform clipping based on the number of frames used in the histogram
+        computation.
     """
 
     def __init__(self, imgSize, clipLimit=2.0, tileGridSize=(8, 8), padding="reflect"):
         """
         Initialiser
 
-        :param imgSize:         The Dimensions of the Image (Width[C] x Height[R])
-        :param clipLimit:       The Clip Limit to Employ. Note that this will be the clip-limit per image added to the
-                                histogram (computed retroactively). If not required, pass None
-        :param tileGridSize:    The Tile-Size to compute with. Note that in our case, this signifies the padding around
-                                the pixel, which is a deviation from the OpenCV Implementation! The padding is in terms
-                                of width and height respectivel.
-        :param padding:         Type of padding to employ when computing along the edges. See the documentation for
-                                numpy.pad
+        :param imgSize:      The Dimensions of the Image (Width[C] x Height[R])
+        :param clipLimit:    The Clip Limit to Employ. Note that this will be the clip-limit per
+                             image added to the histogram (computed retroactively). If not
+                             required, pass None
+        :param tileGridSize: The Tile-Size to compute with. Note that in our case, this signifies
+                             the padding around the pixel, which is a deviation from the OpenCV
+                             Implementation! The padding is in terms of width and height
+                             respectivel.
+        :param padding:      Type of padding to employ when computing along the edges. See the
+                             documentation for numpy.pad
         """
         # Store some Values for later
         self.__W, self.__H = imgSize
@@ -512,10 +534,11 @@ class SwCLAHE:
 
     def update_model(self, img):
         """
-        Update the Histogram and perform Clipping. This creates a usable LUT, and is equivalent to calling
-        update_histogram() followed by generate_lut().
+        Update the Histogram and perform Clipping. This creates a usable LUT, and is equivalent to
+        calling update_histogram() followed by generate_lut().
 
-        :param img: Input image to use to update the Histogram with. Must be a single channel image of type uint8.
+        :param img: Input image to use to update the Histogram with. Must be a single channel image
+                    of type uint8.
         :return:    self, for chaining
         """
         return self.update_histogram(img).generate_lut()
@@ -524,7 +547,8 @@ class SwCLAHE:
         """
         Update the Histogram only, without perform any clipping
 
-        :param img: Input image to use to update the Histogram with. Must be a single channel image of type uint8
+        :param img: Input image to use to update the Histogram with. Must be a single channel image
+                    of type uint8
         :return:    self, for chaining
         """
         # First PAD the image: this will allow computation being much easier...
@@ -569,8 +593,8 @@ class SwCLAHE:
 
     def apply(self, img, clear=True):
         """
-        Convenience Method for joining together updating of histogram and transform... This emulates the default
-        CLAHE implementation which clears the histogram after each iteration
+        Convenience Method for joining together updating of histogram and transform... This emulates
+        the default CLAHE implementation which clears the histogram after each iteration
 
         :param img:     The image to operate on
         :param clear:   If True, then re-generate the histogram.
@@ -606,8 +630,8 @@ class SwCLAHE:
         for r_img in range(*valid_rows):
             # Get the Histogram Row we are working on...
             r_hst = r_img - row_pad
-            # Compute First Pixel:
-            # Not that there is a special case when this is the top-left corner, which we must compute from scratch.
+            # Compute First Pixel: Not that there is a special case when this is the top-left
+            # corner, which we must compute from scratch.
             if r_hst == 0:
                 for nbh_r in range(row_pad * 2 + 1):
                     for nbh_c in range(col_pad * 2 + 1):
@@ -618,7 +642,8 @@ class SwCLAHE:
                 # Compute the Previous/Next Row (in image space)
                 r_prev = r_img - row_pad - 1
                 r_next = r_img + row_pad
-                # Iterate over the columns, subtracting the previous row and adding the next one in turn
+                # Iterate over the columns, subtracting the previous row and adding the next one in
+                # turn
                 for nbh_c in range(col_pad * 2 + 1):
                     hist[r_hst, 0, padded[r_prev, nbh_c]] -= 1
                     hist[r_hst, 0, padded[r_next, nbh_c]] += 1
@@ -644,7 +669,8 @@ class SwCLAHE:
         Here hist should be float (to avoid truncation), but lut is integer!
 
         :param hist:   The Original Histogram (raw)
-        :param limit:  This should take into consideration the number of samples seen so far (i.e. a multiplicated)
+        :param limit:  This should take into consideration the number of samples seen so far (i.e.
+                       a multiplicated)
         :param lut:    The Lookup table (placeholder)
         :param scaler: should be 256 / boxsize
         :return:
@@ -662,7 +688,8 @@ class SwCLAHE:
                         hist[r, c, h] = limit
                 # Now Redistribute - Note that I will ignore residuals (handled through rounding)
                 hist[r, c, :] += to_clip / 256
-                # Now Transform to Lookup Table (rounding) - Had to do this manually due to issues with Numba!
+                # Now Transform to Lookup Table (rounding) - Had to do this manually due to issues
+                # with Numba!
                 cumsum = 0
                 for h in range(256):
                     cumsum += hist[r, c, h]
