@@ -76,18 +76,85 @@ class Homography:
         )
 
 
-def expand_box(c, size):
+class BoundingBox:
     """
-    Create a Rectangle of the specified size, centred at the point. Note that since this is aimed
-    for images, it assumes that Y grows downwards (this is relevant in specifying what is meant
-    by the top-left corner)
+    A Wrapper for describing Bounding Boxes
+    """
+    def __init__(self, tl=None, br=None, sz=None, c=None):
+        """
+        Initialiser.
 
-    :param c:       Centre (2-tuple/array, X/Y)
-    :param size:    The size of the rectangle (2-tuple/array, width/height)
-    :return:        Four corners of the bounding box, clockwise, from top-left corner
-    """
-    x, y = np.asarray(size) / 2
-    return np.asarray(((c - (x, y)), (c + (x, -y)), (c + (x, y)), (c + (-x, y))))
+        Two and only two of the parameters must be defined
+        :param tl:
+        :param br:
+        :param sz:
+        :param c:
+        """
+        if sum(1 for l in locals().values() if l) != 3:
+            raise ValueError('Exactly two of tl/br/c/sz must be specified!')
+
+        self.TL = np.asarray(tl, dtype=int) if tl else None
+        self.BR = np.asarray(tl, dtype=int) if tl else None
+        self.C = np.asarray(tl, dtype=int) if tl else None
+        self.SZ = np.asarray(tl, dtype=int) if tl else None
+
+    @property
+    def top_left(self):
+        if self.TL is None:
+            if self.BR is not None:
+                if self.SZ is not None:
+                    self.TL = self.BR - self.SZ
+                else:
+                    self.TL = self.C - (self.BR - self.C)
+            else:
+                self.TL = self.C - self.SZ/2
+        return self.TL
+
+    @property
+    def bottom_right(self):
+        if self.BR is None:
+            if self.TL is not None:
+                if self.SZ is not None:
+                    self.BR = self.TL + self.SZ
+                else:
+                    self.BR = self.C + (self.C-self.TL)
+            else:
+                self.BR = self.C + self.SZ/2
+        return self.BR
+
+    @property
+    def size(self):
+        if self.SZ is None:
+            if self.TL is not None:
+                if self.BR is not None:
+                    self.SZ = self.BR - self.TL
+                else:
+                    self.SZ = (self.C - self.TL)*2
+            else:
+                self.SZ = (self.BR - self.C)*2
+        return self.SZ
+
+    @property
+    def center(self):
+        if self.C is None:
+            if self.TL is not None:
+                if self.BR is not None:
+                    self.C = (self.TL + self.BR)/2
+                else:
+                    self.C = self.TL + self.SZ/2
+            else:
+                self.C = self.BR - self.SZ/2
+        return self.SZ
+
+    @property
+    def corners(self):
+        """
+        Returns all corners, in a clockwise fashion, start from top-left
+        :return:
+        """
+        x, y = self.size / 2
+        c = self.C
+        return np.asarray(((c - (x, y)), (c + (x, -y)), (c + (x, y)), (c + (-x, y))))
 
 
 def line(img, start, end, color, thickness, linestyle='--'):

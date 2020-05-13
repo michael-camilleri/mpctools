@@ -22,6 +22,10 @@ W = 256
 H = 64
 
 
+class TestBoundingBox(unittest.TestCase):
+
+    def test_
+
 class TestSWAHE(unittest.TestCase):
     @staticmethod
     def brute_force_equalisation(img, pad_r, pad_c, hist):
@@ -231,3 +235,4 @@ class TestIntersectionOverUnion(unittest.TestCase):
         self.assertEqual(
             cvext.intersection_over_union([7, 8, 20, 20], [2, 3, 10, 10]), 25 / 475
         )
+
