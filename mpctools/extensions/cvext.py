@@ -27,6 +27,7 @@ from threading import Thread
 import numpy as np
 import time as tm
 import cv2
+import os
 
 
 # Define Some Constants
@@ -116,13 +117,17 @@ class BoundingBox:
         :param sz:  Size (X/Y)
         :param c:   Center (X/Y)
         """
-        if sum(1 for l in locals().values() if l) != 3:
+        if sum(1 for l in locals().values() if l is not None) != 3:
             raise ValueError("Exactly two of tl/br/c/sz must be specified!")
 
         self.TL = np.asarray(tl, dtype=float) if tl is not None else None
         self.BR = np.asarray(br, dtype=float) if br is not None else None
         self.C = np.asarray(c, dtype=float) if c is not None else None
         self.SZ = np.asarray(sz, dtype=float) if sz is not None else None
+
+    def __repr__(self):
+        return f"[({self.top_left[0]:.1f}, {self.top_left[1]:.1f}), " \
+               f"({self.bottom_right[0]:.1f}, {self.bottom_right[1]:.1f})]"
 
     @property
     def top_left(self):
@@ -172,16 +177,6 @@ class BoundingBox:
                 self.C = self.BR - self.SZ / 2
         return self.C
 
-    @property
-    def corners(self):
-        """
-        Returns all corners, in a clockwise fashion, starting from top-left
-        :return:
-        """
-        x, y = self.size / 2
-        c = self.C
-        return np.asarray(((c - (x, y)), (c + (x, -y)), (c + (x, y)), (c + (-x, y))))
-
     def __getitem__(self, item):
         item = item.lower()
         if item == "tl":
@@ -195,8 +190,17 @@ class BoundingBox:
         else:
             raise ValueError("Invalid Attribute")
 
-    def __repr__(self):
-        return f"[{self.top_left}, {self.bottom_right}]"
+    def corners(self):
+        """
+        Returns all corners, in a clockwise fashion, starting from top-left
+        :return:
+        """
+        x, y = self.size / 2
+        c = self.C
+        return np.asarray(((c - (x, y)), (c + (x, -y)), (c + (x, y)), (c + (-x, y))))
+
+    def iou(self, other):
+        pass
 
 
 def line(img, start, end, color, thickness=None, lineType=None, shift=None, linestyle="-"):
@@ -244,14 +248,14 @@ def line(img, start, end, color, thickness=None, lineType=None, shift=None, line
         end = np.asarray(end)
 
         # Some Calculations
-        seg_len = 5 * thickness
+        seg_len = 10 * thickness
         line_length = np.sqrt((np.square(end) - np.square(start)).sum())
         dvect_full = np.divide(end - start, line_length) * seg_len
 
         for i in range(np.ceil(line_length / seg_len).astype(int)):
             st = start + dvect_full * i
-            cv2.circle(img, (int(st[0]), int(st[1])), thickness, color, -1)
-        cv2.circle(img, (int(end[0]), int(end[1])), thickness, color, -1)
+            cv2.circle(img, (int(st[0]), int(st[1])), thickness, color, -1, cv2.LINE_AA)
+        cv2.circle(img, (int(end[0]), int(end[1])), thickness, color, -1, cv2.LINE_AA)
 
 
 def rectangle(img, pt1, pt2, color, thickness=None, lineType=None, shift=None, linestyle="-"):
@@ -519,6 +523,36 @@ class VideoParser:
 
         # Stop Stream
         stream.release()
+
+
+class FrameGetter:
+    """
+    Wrapper for reading successive frames from disk.
+    """
+    def __init__(self, path, fmt='{:06d}.jpg'):
+        """
+        Initialiser
+
+        :param path: Path to the extracted frames
+        :param fmt:  The format mode for the name
+        """
+        if not os.path.isdir(path):
+            raise RuntimeError(f'Specified Directory "{path}" does not exist!')
+        self.Path = path
+        self.Fmt = fmt
+
+    def __getitem__(self, item):
+        """
+        Retrieve a frame by Number
+
+        :param item: Frame Number. Note that this is translated directly to image name.
+        :return: OpenCV Image
+        :raises  ValueError if the frame does not exist
+        """
+        _pth = os.path.join(self.Path, self.Fmt.format(item))
+        if os.path.exists(_pth):
+            return cv2.imread(_pth)
+        raise ValueError(f'Image {item} does not exist.')
 
 
 class SwCLAHE:

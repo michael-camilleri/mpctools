@@ -15,7 +15,7 @@ see http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 
-
+import time as tm
 import sys
 
 
@@ -39,6 +39,7 @@ class ProgressBar:
         self.__width = round(float(width))
         self.__sink = sink
         self.__prec = prec
+        self.__strt = None
 
         # State Control
         self.__count = int(0)
@@ -56,6 +57,7 @@ class ProgressBar:
         :param suffix: Suffix to write
         :return: Self, for chaining
         """
+        self.__strt = tm.time()
         return self.update(value=0, prefix=prefix, suffix=suffix)
 
     def update(self, update=None, value=None, prefix=None, suffix=""):
@@ -88,12 +90,13 @@ class ProgressBar:
             # Write Out
             _progress = self.__width * self.__count / self.__total
             self.__sink.write(
-                "\r{0} |{1}{2}| {3:.{4}f}% {5}".format(
+                "\r{0} |{1}{2}| {3:.{4}f}% ({5:.{4}f} it/s) {6}".format(
                     self.__prefix,
                     "\u2588" * int(_progress),
                     "-" * (self.__width - int(_progress)),
                     _progress,
                     self.__prec,
+                    self.__count/(tm.time() - self.__strt),
                     suffix,
                 )
             )
