@@ -38,6 +38,7 @@ class FourCC:
     """
     FourCC Wrapper to allow conversions between Integer and String Representation
     """
+
     @classmethod
     def to_int(cls, fourcc) -> int:
         return int(cv2.VideoWriter_fourcc(*fourcc))
@@ -104,6 +105,7 @@ class BoundingBox:
     coordinates grow downwards and to the right, meaning that BR > TL always. No checks are done
     for this.
     """
+
     def __init__(self, tl=None, br=None, sz=None, c=None):
         """
         Initialiser.
@@ -115,7 +117,7 @@ class BoundingBox:
         :param c:   Center (X/Y)
         """
         if sum(1 for l in locals().values() if l) != 3:
-            raise ValueError('Exactly two of tl/br/c/sz must be specified!')
+            raise ValueError("Exactly two of tl/br/c/sz must be specified!")
 
         self.TL = np.asarray(tl, dtype=float) if tl is not None else None
         self.BR = np.asarray(br, dtype=float) if br is not None else None
@@ -131,7 +133,7 @@ class BoundingBox:
                 else:
                     self.TL = self.C - (self.BR - self.C)
             else:
-                self.TL = self.C - self.SZ/2
+                self.TL = self.C - self.SZ / 2
         return self.TL
 
     @property
@@ -141,9 +143,9 @@ class BoundingBox:
                 if self.SZ is not None:
                     self.BR = self.TL + self.SZ
                 else:
-                    self.BR = self.C + (self.C-self.TL)
+                    self.BR = self.C + (self.C - self.TL)
             else:
-                self.BR = self.C + self.SZ/2
+                self.BR = self.C + self.SZ / 2
         return self.BR
 
     @property
@@ -153,9 +155,9 @@ class BoundingBox:
                 if self.BR is not None:
                     self.SZ = self.BR - self.TL
                 else:
-                    self.SZ = (self.C - self.TL)*2
+                    self.SZ = (self.C - self.TL) * 2
             else:
-                self.SZ = (self.BR - self.C)*2
+                self.SZ = (self.BR - self.C) * 2
         return self.SZ
 
     @property
@@ -163,11 +165,11 @@ class BoundingBox:
         if self.C is None:
             if self.TL is not None:
                 if self.BR is not None:
-                    self.C = (self.TL + self.BR)/2
+                    self.C = (self.TL + self.BR) / 2
                 else:
-                    self.C = self.TL + self.SZ/2
+                    self.C = self.TL + self.SZ / 2
             else:
-                self.C = self.BR - self.SZ/2
+                self.C = self.BR - self.SZ / 2
         return self.C
 
     @property
@@ -182,53 +184,77 @@ class BoundingBox:
 
     def __getitem__(self, item):
         item = item.lower()
-        if item == 'tl':
+        if item == "tl":
             return self.top_left
-        elif item == 'br':
+        elif item == "br":
             return self.bottom_right
-        elif item == 'c':
+        elif item == "c":
             return self.center
-        elif item == 'sz':
+        elif item == "sz":
             return self.size
         else:
-            raise ValueError('Invalid Attribute')
+            raise ValueError("Invalid Attribute")
 
     def __repr__(self):
-        return f'[{self.top_left}, {self.bottom_right}]'
+        return f"[{self.top_left}, {self.bottom_right}]"
 
 
-def line(img, start, end, color, thickness, linestyle='--'):
+def line(img, start, end, color, thickness=None, lineType=None, shift=None, linestyle="-"):
     """
     Draws a line (much like cv2.line()) but allows for other line-styles.
 
     Args:
-        linestyle: specifies the line-style (currently only dashed format)
-        For other arguments, see cv2.line()
+        linestyle: specifies the line-style: currently, supports:
+            '-': Standard (default)
+            '--': Dashed Line
+            '.': Dotted line
+        For other arguments, see cv2.line(). Note that lineType and shift are ignored if
+        linestyle is not '-'
 
     @TODO: Some fancy checks to ensure that line ends with a dash.
     """
-    # Some Error-Checks
-    if thickness < 1:
-        raise ValueError('Thickness must be > 0.')
-    if linestyle != '--':
-        raise ValueError('Currently supported style is only `--`.')
-    start = np.asarray(start)
-    end = np.asarray(end)
+    if linestyle == "-":
+        return cv2.line(img, start, end, color, thickness, lineType, shift)
 
-    # Some Calculations
-    seg_len = 25 * thickness
-    line_length = np.sqrt((np.square(end) - np.square(start)).sum())
-    dvect_sld = np.divide(end - start, line_length) * 15 * thickness
-    dvect_full = np.divide(end - start, line_length) * seg_len
+    elif linestyle == "__":
+        start = np.asarray(start)
+        end = np.asarray(end)
 
-    # Draw
-    for i in range(np.ceil(line_length / seg_len).astype(int)):
-        st = start + dvect_full * i
-        nd = st + dvect_sld
-        cv2.line(img, (int(st[0]), int(st[1])), (int(min(nd[0], end[0])), int(min(nd[1], end[1]))), color, thickness, cv2.LINE_AA)
+        # Some Calculations
+        seg_len = 25 * thickness
+        line_length = np.sqrt((np.square(end) - np.square(start)).sum())
+        dvect_sld = np.divide(end - start, line_length) * 15 * thickness
+        dvect_full = np.divide(end - start, line_length) * seg_len
+
+        # Draw
+        for i in range(np.ceil(line_length / seg_len).astype(int)):
+            st = start + dvect_full * i
+            nd = st + dvect_sld
+            cv2.line(
+                img,
+                (int(st[0]), int(st[1])),
+                (int(min(nd[0], end[0])), int(min(nd[1], end[1]))),
+                color,
+                thickness,
+                cv2.LINE_AA,
+            )
+
+    elif linestyle == ".":
+        start = np.asarray(start)
+        end = np.asarray(end)
+
+        # Some Calculations
+        seg_len = 5 * thickness
+        line_length = np.sqrt((np.square(end) - np.square(start)).sum())
+        dvect_full = np.divide(end - start, line_length) * seg_len
+
+        for i in range(np.ceil(line_length / seg_len).astype(int)):
+            st = start + dvect_full * i
+            cv2.circle(img, (int(st[0]), int(st[1])), thickness, color, -1)
+        cv2.circle(img, (int(end[0]), int(end[1])), thickness, color, -1)
 
 
-def rectangle(img, pt1, pt2, color, thickness, linestyle='--'):
+def rectangle(img, pt1, pt2, color, thickness=None, lineType=None, shift=None, linestyle="-"):
     """
     Draws a Rectangle at the specified position
 
@@ -237,10 +263,14 @@ def rectangle(img, pt1, pt2, color, thickness, linestyle='--'):
         For other arguments see cv2.rectangle()
 
     """
-    line(img, pt1, (pt2[0], pt1[1]), color, thickness, linestyle)
-    line(img, (pt2[0], pt1[1]), pt2, color, thickness, linestyle)
-    line(img, pt1, (pt1[0], pt2[1]), color, thickness, linestyle)
-    line(img, (pt1[0], pt2[1]), pt2, color, thickness, linestyle)
+    if linestyle == "-":
+        cv2.rectangle(img, pt1, pt2, color, thickness, lineType, shift)
+
+    else:
+        line(img, pt1, (pt2[0], pt1[1]), color, thickness, lineType, shift, linestyle)
+        line(img, (pt2[0], pt1[1]), pt2, color, thickness, lineType, shift, linestyle)
+        line(img, pt1, (pt1[0], pt2[1]), color, thickness, lineType, shift, linestyle)
+        line(img, (pt1[0], pt2[1]), pt2, color, thickness, lineType, shift, linestyle)
 
 
 def intersection_over_union(ground_truth, prediction):
@@ -264,9 +294,7 @@ def intersection_over_union(ground_truth, prediction):
         return 0
 
     # Compute the union
-    union = (
-        ground_truth[2] * ground_truth[3] + prediction[2] * prediction[3] - intersection
-    )
+    union = ground_truth[2] * ground_truth[3] + prediction[2] * prediction[3] - intersection
 
     # Return Intersection over Union
     return intersection / union
@@ -280,6 +308,7 @@ class TimeFrame:
         time is always returned in MS.
         frames are by default 0-offset, but this can be changed in the initialiser
     """
+
     def __init__(self, fps=25, frm_offset=0):
         self.FPS = fps
         self.offset = frm_offset
@@ -399,9 +428,7 @@ class VideoParser:
                     self.properties[cv2.CAP_PROP_POS_MSEC]
                 )
                 self.properties[cv2.CAP_PROP_POS_MSEC] = _data[0]
-                self.properties[VP_CUR_PROP_POS_FRAMES] = self.properties[
-                    cv2.CAP_PROP_POS_FRAMES
-                ]
+                self.properties[VP_CUR_PROP_POS_FRAMES] = self.properties[cv2.CAP_PROP_POS_FRAMES]
                 self.properties[cv2.CAP_PROP_POS_FRAMES] = _data[1]
                 return True, _data[2]
             else:
@@ -453,9 +480,7 @@ class VideoParser:
         # Store/Initialise some properties
         self.properties[cv2.CAP_PROP_POS_MSEC] = stream.get(cv2.CAP_PROP_POS_MSEC)
         self.properties[cv2.CAP_PROP_POS_FRAMES] = stream.get(cv2.CAP_PROP_POS_FRAMES)
-        self.properties[cv2.CAP_PROP_FRAME_HEIGHT] = stream.get(
-            cv2.CAP_PROP_FRAME_HEIGHT
-        )
+        self.properties[cv2.CAP_PROP_FRAME_HEIGHT] = stream.get(cv2.CAP_PROP_FRAME_HEIGHT)
         self.properties[cv2.CAP_PROP_FRAME_WIDTH] = stream.get(cv2.CAP_PROP_FRAME_WIDTH)
         self.properties[cv2.CAP_PROP_FPS] = stream.get(cv2.CAP_PROP_FPS)
         self.properties[cv2.CAP_PROP_FRAME_COUNT] = stream.get(cv2.CAP_PROP_FRAME_COUNT)
@@ -629,8 +654,7 @@ class SwCLAHE:
 
     @staticmethod
     @jit(
-        signature_or_function=(uint8[:, :], uint8, uint8, uint16[:, :, :]),
-        nopython=True,
+        signature_or_function=(uint8[:, :], uint8, uint8, uint16[:, :, :]), nopython=True,
     )
     def __update_hist(padded, row_pad, col_pad, hist):
         """
@@ -684,8 +708,7 @@ class SwCLAHE:
 
     @staticmethod
     @jit(
-        signature_or_function=(double[:, :, ::1], double, uint8[:, :, ::1], double),
-        nopython=True,
+        signature_or_function=(double[:, :, ::1], double, uint8[:, :, ::1], double), nopython=True,
     )
     def __clip_limit(hist, limit, lut, scaler):
         """
@@ -720,8 +743,7 @@ class SwCLAHE:
 
     @staticmethod
     @jit(
-        signature_or_function=(uint8[:, :, ::1], uint8[:, ::1], uint8[:, ::1]),
-        nopython=True,
+        signature_or_function=(uint8[:, :, ::1], uint8[:, ::1], uint8[:, ::1]), nopython=True,
     )
     def __transform(lut, img, out):
         """
