@@ -142,6 +142,26 @@ def pad(a, length, value):
         return copy.copy(a)
 
 
+def masked_list(l, m, mask_in=True):
+    """
+    Returns a copy of a list in which the elements in list are masked in/out as None
+
+    :param l: List to operate on. Will be copied
+    :param m: The indices of the elements to mask in/out
+    :param mask_in: If True (default), then elements **NOT** in m will be masked out: otherwise,
+              elements in m will be masked out.
+    :return:  Copy of the list with appropriate elements masked out.
+    """
+    if mask_in:
+        lcpy = [None for _ in l]
+        for e in m:
+            lcpy[e] = l[e]
+    else:
+        lcpy = copy.deepcopy(l)
+        for e in m:
+            lcpy[e] = None
+    return lcpy
+
 ################################################
 #            Printing & Formatting             #
 ################################################

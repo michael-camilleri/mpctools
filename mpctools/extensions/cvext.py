@@ -97,24 +97,30 @@ class Homography:
 class BoundingBox:
     """
     A Wrapper for describing Bounding Boxes
+
+    The class supports both accessing through properties as well as indexing style access []. Note
+    that the Class deals with floating point values and as such, care must be taken when handling
+    center coordinates to convert to correct pixel indices.  Note also that it assumes that image
+    coordinates grow downwards and to the right, meaning that BR > TL always. No checks are done
+    for this.
     """
     def __init__(self, tl=None, br=None, sz=None, c=None):
         """
         Initialiser.
 
         Two and only two of the parameters must be defined
-        :param tl:
-        :param br:
-        :param sz:
-        :param c:
+        :param tl:  Top-Left Corner (X/Y)
+        :param br:  Bottom-Right Corner (X/Y)
+        :param sz:  Size (X/Y)
+        :param c:   Center (X/Y)
         """
         if sum(1 for l in locals().values() if l) != 3:
             raise ValueError('Exactly two of tl/br/c/sz must be specified!')
 
-        self.TL = np.asarray(tl, dtype=int) if tl else None
-        self.BR = np.asarray(tl, dtype=int) if tl else None
-        self.C = np.asarray(tl, dtype=int) if tl else None
-        self.SZ = np.asarray(tl, dtype=int) if tl else None
+        self.TL = np.asarray(tl, dtype=float) if tl is not None else None
+        self.BR = np.asarray(br, dtype=float) if br is not None else None
+        self.C = np.asarray(c, dtype=float) if c is not None else None
+        self.SZ = np.asarray(sz, dtype=float) if sz is not None else None
 
     @property
     def top_left(self):
@@ -162,17 +168,33 @@ class BoundingBox:
                     self.C = self.TL + self.SZ/2
             else:
                 self.C = self.BR - self.SZ/2
-        return self.SZ
+        return self.C
 
     @property
     def corners(self):
         """
-        Returns all corners, in a clockwise fashion, start from top-left
+        Returns all corners, in a clockwise fashion, starting from top-left
         :return:
         """
         x, y = self.size / 2
         c = self.C
         return np.asarray(((c - (x, y)), (c + (x, -y)), (c + (x, y)), (c + (-x, y))))
+
+    def __getitem__(self, item):
+        item = item.lower()
+        if item == 'tl':
+            return self.top_left
+        elif item == 'br':
+            return self.bottom_right
+        elif item == 'c':
+            return self.center
+        elif item == 'sz':
+            return self.size
+        else:
+            raise ValueError('Invalid Attribute')
+
+    def __repr__(self):
+        return f'[{self.top_left}, {self.bottom_right}]'
 
 
 def line(img, start, end, color, thickness, linestyle='--'):

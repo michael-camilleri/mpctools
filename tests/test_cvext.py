@@ -14,14 +14,49 @@ Author: Michael P. J. Camilleri
 """
 
 import numpy as np
+import itertools
 import unittest
 
-from mpctools.extensions import cvext
+
+from mpctools.extensions import cvext, utils
+
+# @TODO include tests for Video Parser Seeking
 
 
 class TestBoundingBox(unittest.TestCase):
 
-    def test_
+    BBs = [[[0, 0], [2, 2], [2, 2], [1, 1]],  # Integer Center
+           [[5, 3], [7, 8], [2, 5], [6, 5.5]]]  # Fractional Center
+    P = ['TL', 'BR', 'SZ', 'C']
+
+    # Check that initialisation with wrong # parameters fails.
+    def test_init(self):
+        bb = self.BBs[0]
+        # Try with 0 parameters
+        with self.subTest(f'# Params = 0'):
+            self.assertRaises(ValueError, cvext.BoundingBox)
+
+        for num_params in range(1, 5):
+            with self.subTest(f'# Params = {num_params}'):
+                for combo in itertools.combinations(range(4), num_params):
+                    if num_params != 2:
+                        self.assertRaises(ValueError, cvext.BoundingBox, *utils.masked_list(bb, combo))
+                    else:
+                        cvext.BoundingBox(*utils.masked_list(bb, combo))
+
+    # Check correct computation based on initialisation from different points and asking for
+    # different parameters
+    def test_conversions(self):
+        # Iterate over BBs
+        for bb in self.BBs:
+            # Iterate over Initialisation mode
+            for inits in itertools.combinations(range(4), 2):
+                for ask_order in itertools.permutations(range(4), 4):
+                    with self.subTest(f'{bb} init with: {inits}, asking in order {ask_order}'):
+                        bbobj = cvext.BoundingBox(*utils.masked_list(bb, inits))
+                        for prop in ask_order:
+                            self.assertListEqual(bbobj[self.P[prop]].tolist(), bb[prop])
+
 
 class TestSWAHE(unittest.TestCase):
     W = 256
