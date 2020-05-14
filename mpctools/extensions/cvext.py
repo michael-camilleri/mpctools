@@ -238,9 +238,9 @@ class TimeFrame:
 
     Note:
         time is always returned in MS.
-        frames are by default 1-offset, but this can be changed in the initialiser
+        frames are by default 0-offset, but this can be changed in the initialiser
     """
-    def __init__(self, fps=25, frm_offset=1):
+    def __init__(self, fps=25, frm_offset=0):
         self.FPS = fps
         self.offset = frm_offset
 
@@ -285,7 +285,8 @@ class VideoParser:
     def start(self, start=None, stride=1):
         """
         Start the Parsing Loop
-        :param start:   If not None (default) then signifies an index of the frame at which to start
+        :param start:   If not None (default) then signifies an index of the frame at which to
+        start (0-offset)
         :param stride:  How much to stride: default is to just add 1 (this is in terms of frames).
                         Note that when striding, the last frame is ALWAYS read even if it is not
                         a multiple of the stride.
