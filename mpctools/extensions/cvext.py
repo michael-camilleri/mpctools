@@ -126,8 +126,19 @@ class BoundingBox:
         self.SZ = np.asarray(sz, dtype=float) if sz is not None else None
 
     def __repr__(self):
-        return f"[({self.top_left[0]:.1f}, {self.top_left[1]:.1f}), " \
-               f"({self.bottom_right[0]:.1f}, {self.bottom_right[1]:.1f})]"
+        return (
+            f"[({self.top_left[0]:.1f}, {self.top_left[1]:.1f}), "
+            f"({self.bottom_right[0]:.1f}, {self.bottom_right[1]:.1f})]"
+        )
+
+    def __eq__(self, other):
+        """
+        Equality is defined in terms of top-left and bottom-right values. Note that this is
+        susceptible to the usual issue in comparing equality of floating point values!
+        """
+        return np.array_equal(self.top_left, other.top_left) and np.array_equal(
+            self.bottom_right, other.bottom_right
+        )
 
     @property
     def top_left(self):
@@ -529,7 +540,8 @@ class FrameGetter:
     """
     Wrapper for reading successive frames from disk.
     """
-    def __init__(self, path, fmt='{:06d}.jpg'):
+
+    def __init__(self, path, fmt="{:06d}.jpg"):
         """
         Initialiser
 
@@ -552,7 +564,7 @@ class FrameGetter:
         _pth = os.path.join(self.Path, self.Fmt.format(item))
         if os.path.exists(_pth):
             return cv2.imread(_pth)
-        raise ValueError(f'Image {item} does not exist.')
+        raise ValueError(f"Image {item} does not exist.")
 
 
 class SwCLAHE:

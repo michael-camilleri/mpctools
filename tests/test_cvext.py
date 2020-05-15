@@ -25,22 +25,26 @@ from mpctools.extensions import cvext, utils
 
 class TestBoundingBox(unittest.TestCase):
 
-    BBs = [[[0, 0], [2, 2], [2, 2], [1, 1]],  # Integer Center
-           [[5, 3], [7, 8], [2, 5], [6, 5.5]]]  # Fractional Center
-    P = ['TL', 'BR', 'SZ', 'C']
+    BBs = [
+        [[0, 0], [2, 2], [2, 2], [1, 1]],  # Integer Center
+        [[5, 3], [7, 8], [2, 5], [6, 5.5]],
+    ]  # Fractional Center
+    P = ["TL", "BR", "SZ", "C"]
 
     # Check that initialisation with wrong # parameters fails.
     def test_init(self):
         bb = self.BBs[0]
         # Try with 0 parameters
-        with self.subTest(f'# Params = 0'):
+        with self.subTest(f"# Params = 0"):
             self.assertRaises(ValueError, cvext.BoundingBox)
 
         for num_params in range(1, 5):
-            with self.subTest(f'# Params = {num_params}'):
+            with self.subTest(f"# Params = {num_params}"):
                 for combo in itertools.combinations(range(4), num_params):
                     if num_params != 2:
-                        self.assertRaises(ValueError, cvext.BoundingBox, *utils.masked_list(bb, combo))
+                        self.assertRaises(
+                            ValueError, cvext.BoundingBox, *utils.masked_list(bb, combo)
+                        )
                     else:
                         cvext.BoundingBox(*utils.masked_list(bb, combo))
 
@@ -52,10 +56,48 @@ class TestBoundingBox(unittest.TestCase):
             # Iterate over Initialisation mode
             for inits in itertools.combinations(range(4), 2):
                 for ask_order in itertools.permutations(range(4), 4):
-                    with self.subTest(f'{bb} init with: {inits}, asking in order {ask_order}'):
+                    with self.subTest(f"{bb} init with: {inits}, asking in order {ask_order}"):
                         bbobj = cvext.BoundingBox(*utils.masked_list(bb, inits))
                         for prop in ask_order:
                             self.assertListEqual(bbobj[self.P[prop]].tolist(), bb[prop])
+
+    # Check that correct output type irrespective of initialisation etc...
+    def test_types(self):
+        # Iterate over BBs
+        for bb in self.BBs:
+            # Iterate over Initialisation mode
+            for inits in itertools.combinations(range(4), 2):
+                for ask_order in itertools.permutations(range(4), 4):
+                    with self.subTest(f"{bb} init with: {inits}, asking in order {ask_order}"):
+                        bbobj = cvext.BoundingBox(*utils.masked_list(bb, inits))
+                        for prop in ask_order:
+                            val = bbobj[self.P[prop]]
+                            self.assertEqual(type(val), np.ndarray)
+                            self.assertEqual(val.dtype, float)
+
+    # Check equality computation
+    def test_equality(self):
+        # Iterate over BBs
+        for bb in self.BBs:
+            # Iterate over Initialisation modes
+            for inits_l in itertools.combinations(range(4), 2):
+                for inits_r in itertools.combinations(range(4), 2):
+                    with self.subTest(f"{bb} init left: {inits_l}, init right {inits_r}"):
+                        self.assertEqual(
+                            cvext.BoundingBox(*utils.masked_list(bb, inits_l)),
+                            cvext.BoundingBox(*utils.masked_list(bb, inits_r)),
+                        )
+
+    def test_inequality(self):
+        # I am going to use first and second bounding-box
+        # Iterate over Initialisation modes
+        for inits_l in itertools.combinations(range(4), 2):
+            for inits_r in itertools.combinations(range(4), 2):
+                with self.subTest(f"init left: {inits_l}, init right {inits_r}"):
+                    self.assertNotEqual(
+                        cvext.BoundingBox(*utils.masked_list(self.BBs[0], inits_l)),
+                        cvext.BoundingBox(*utils.masked_list(self.BBs[1], inits_r)),
+                    )
 
 
 class TestSWAHE(unittest.TestCase):
@@ -210,68 +252,35 @@ class TestSWAHE(unittest.TestCase):
 class TestIntersectionOverUnion(unittest.TestCase):
     def test_equal(self):
         # A bunch of equal rectangles
-        self.assertEqual(
-            cvext.intersection_over_union([0, 0, 100, 20], [0, 0, 100, 20]), 1.0
-        )
-        self.assertEqual(
-            cvext.intersection_over_union([10, 20, 40, 20], [10, 20, 40, 20]), 1.0
-        )
-        self.assertEqual(
-            cvext.intersection_over_union([-5, -1, 40, 30], [-5, -1, 40, 30]), 1.0
-        )
+        self.assertEqual(cvext.intersection_over_union([0, 0, 100, 20], [0, 0, 100, 20]), 1.0)
+        self.assertEqual(cvext.intersection_over_union([10, 20, 40, 20], [10, 20, 40, 20]), 1.0)
+        self.assertEqual(cvext.intersection_over_union([-5, -1, 40, 30], [-5, -1, 40, 30]), 1.0)
 
     def test_pred_within(self):
         # A bunch of predictions fully contained within the ground-truth
-        self.assertEqual(
-            cvext.intersection_over_union([0, 0, 10, 10], [0, 0, 5, 10]), 0.5
-        )
-        self.assertEqual(
-            cvext.intersection_over_union([10, 10, 10, 10], [12, 11, 5, 5]), 0.25
-        )
-        self.assertEqual(
-            cvext.intersection_over_union([-1, -1, 20, 20], [0, 0, 10, 10]), 0.25
-        )
+        self.assertEqual(cvext.intersection_over_union([0, 0, 10, 10], [0, 0, 5, 10]), 0.5)
+        self.assertEqual(cvext.intersection_over_union([10, 10, 10, 10], [12, 11, 5, 5]), 0.25)
+        self.assertEqual(cvext.intersection_over_union([-1, -1, 20, 20], [0, 0, 10, 10]), 0.25)
 
     def test_gt_within(self):
         # A bunch of predictions fully encompassing the ground-truth
-        self.assertEqual(
-            cvext.intersection_over_union([0, 0, 5, 10], [0, 0, 10, 10]), 0.5
-        )
-        self.assertEqual(
-            cvext.intersection_over_union([12, 11, 5, 5], [10, 10, 10, 10]), 0.25
-        )
-        self.assertEqual(
-            cvext.intersection_over_union([0, 0, 5, 5], [-1, -1, 10, 10]), 0.25
-        )
+        self.assertEqual(cvext.intersection_over_union([0, 0, 5, 10], [0, 0, 10, 10]), 0.5)
+        self.assertEqual(cvext.intersection_over_union([12, 11, 5, 5], [10, 10, 10, 10]), 0.25)
+        self.assertEqual(cvext.intersection_over_union([0, 0, 5, 5], [-1, -1, 10, 10]), 0.25)
 
     def test_outwith(self):
         # A bunch of predictions entirely disjoint from the ground-truth
-        self.assertEqual(
-            cvext.intersection_over_union([0, 0, 5, 5], [5, 5, 6, 10]), 0.0
-        )
-        self.assertEqual(
-            cvext.intersection_over_union([5, 5, 6, 10], [0, 0, 5, 5]), 0.0
-        )
-        self.assertEqual(
-            cvext.intersection_over_union([-10, -10, 10, 11], [5, 5, 6, 10]), 0.0
-        )
+        self.assertEqual(cvext.intersection_over_union([0, 0, 5, 5], [5, 5, 6, 10]), 0.0)
+        self.assertEqual(cvext.intersection_over_union([5, 5, 6, 10], [0, 0, 5, 5]), 0.0)
+        self.assertEqual(cvext.intersection_over_union([-10, -10, 10, 11], [5, 5, 6, 10]), 0.0)
 
     def test_partial(self):
         # A bunch of predictions with partial overlap
-        self.assertEqual(
-            cvext.intersection_over_union([2, 3, 10, 10], [7, 8, 10, 10]), 25 / 175
-        )
-        self.assertEqual(
-            cvext.intersection_over_union([2, 3, 10, 10], [7, 8, 20, 20]), 25 / 475
-        )
-        self.assertEqual(
-            cvext.intersection_over_union([7, 8, 10, 10], [2, 3, 10, 10]), 25 / 175
-        )
-        self.assertEqual(
-            cvext.intersection_over_union([7, 8, 20, 20], [2, 3, 10, 10]), 25 / 475
-        )
+        self.assertEqual(cvext.intersection_over_union([2, 3, 10, 10], [7, 8, 10, 10]), 25 / 175)
+        self.assertEqual(cvext.intersection_over_union([2, 3, 10, 10], [7, 8, 20, 20]), 25 / 475)
+        self.assertEqual(cvext.intersection_over_union([7, 8, 10, 10], [2, 3, 10, 10]), 25 / 175)
+        self.assertEqual(cvext.intersection_over_union([7, 8, 20, 20], [2, 3, 10, 10]), 25 / 475)
 
 
 if __name__ == "__main__":
     unittest.main()
-
