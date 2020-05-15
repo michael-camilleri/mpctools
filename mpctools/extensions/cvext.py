@@ -214,7 +214,7 @@ class BoundingBox:
         pass
 
 
-def line(img, start, end, color, thickness=None, lineType=None, shift=None, linestyle="-"):
+def line(img, pt1, pt2, color, thickness=1, lineType=8, shift=0, linestyle="-"):
     """
     Draws a line (much like cv2.line()) but allows for other line-styles.
 
@@ -228,48 +228,57 @@ def line(img, start, end, color, thickness=None, lineType=None, shift=None, line
 
     @TODO: Some fancy checks to ensure that line ends with a dash.
     """
-    if linestyle == "-":
-        return cv2.line(img, start, end, color, thickness, lineType, shift)
 
-    elif linestyle == "__":
-        start = np.asarray(start)
-        end = np.asarray(end)
+    if linestyle == "-":
+        return cv2.line(
+            img,
+            (int(pt1[0]), int(pt1[1])),
+            (int(pt2[0]), int(pt2[1])),
+            color,
+            thickness,
+            lineType,
+            shift,
+        )
+
+    elif linestyle == "--":
+        pt1 = np.asarray(pt1)
+        pt2 = np.asarray(pt2)
 
         # Some Calculations
-        seg_len = 25 * thickness
-        line_length = np.sqrt((np.square(end) - np.square(start)).sum())
-        dvect_sld = np.divide(end - start, line_length) * 15 * thickness
-        dvect_full = np.divide(end - start, line_length) * seg_len
+        seg_len = 12 * thickness
+        line_length = np.sqrt((np.square(pt2 - pt1)).sum())
+        dvect_sld = np.divide(pt2 - pt1, line_length) * 7 * thickness
+        dvect_full = np.divide(pt2 - pt1, line_length) * seg_len
 
         # Draw
         for i in range(np.ceil(line_length / seg_len).astype(int)):
-            st = start + dvect_full * i
+            st = pt1 + dvect_full * i
             nd = st + dvect_sld
             cv2.line(
                 img,
                 (int(st[0]), int(st[1])),
-                (int(min(nd[0], end[0])), int(min(nd[1], end[1]))),
+                (int(min(nd[0], pt2[0])), int(min(nd[1], pt2[1]))),
                 color,
                 thickness,
                 cv2.LINE_AA,
             )
 
     elif linestyle == ".":
-        start = np.asarray(start)
-        end = np.asarray(end)
+        pt1 = np.asarray(pt1)
+        pt2 = np.asarray(pt2)
 
         # Some Calculations
-        seg_len = 10 * thickness
-        line_length = np.sqrt((np.square(end) - np.square(start)).sum())
-        dvect_full = np.divide(end - start, line_length) * seg_len
+        seg_len = 4 * thickness
+        line_length = np.sqrt((np.square(pt2 - pt1)).sum())
+        dvect_full = np.divide(pt2 - pt1, line_length) * seg_len
 
         for i in range(np.ceil(line_length / seg_len).astype(int)):
-            st = start + dvect_full * i
+            st = pt1 + dvect_full * i
             cv2.circle(img, (int(st[0]), int(st[1])), thickness, color, -1, cv2.LINE_AA)
-        cv2.circle(img, (int(end[0]), int(end[1])), thickness, color, -1, cv2.LINE_AA)
+        cv2.circle(img, (int(pt2[0]), int(pt2[1])), thickness, color, -1, cv2.LINE_AA)
 
 
-def rectangle(img, pt1, pt2, color, thickness=None, lineType=None, shift=None, linestyle="-"):
+def rectangle(img, pt1, pt2, color, thickness=1, lineType=8, shift=0, linestyle="-"):
     """
     Draws a Rectangle at the specified position
 
@@ -278,14 +287,10 @@ def rectangle(img, pt1, pt2, color, thickness=None, lineType=None, shift=None, l
         For other arguments see cv2.rectangle()
 
     """
-    if linestyle == "-":
-        cv2.rectangle(img, pt1, pt2, color, thickness, lineType, shift)
-
-    else:
-        line(img, pt1, (pt2[0], pt1[1]), color, thickness, lineType, shift, linestyle)
-        line(img, (pt2[0], pt1[1]), pt2, color, thickness, lineType, shift, linestyle)
-        line(img, pt1, (pt1[0], pt2[1]), color, thickness, lineType, shift, linestyle)
-        line(img, (pt1[0], pt2[1]), pt2, color, thickness, lineType, shift, linestyle)
+    line(img, pt1, (pt2[0], pt1[1]), color, thickness, lineType, shift, linestyle)
+    line(img, (pt2[0], pt1[1]), pt2, color, thickness, lineType, shift, linestyle)
+    line(img, pt1, (pt1[0], pt2[1]), color, thickness, lineType, shift, linestyle)
+    line(img, (pt1[0], pt2[1]), pt2, color, thickness, lineType, shift, linestyle)
 
 
 def intersection_over_union(ground_truth, prediction):

@@ -32,11 +32,7 @@ def to_tuple(value):
     :param value: The Value to convert
     :return: A Tuple containing value if a scalar, or value if already a list/tuple/numpy array/none
     """
-    return (
-        value
-        if (type(value) in (tuple, list, np.ndarray) or value is None)
-        else (value,)
-    )
+    return value if (type(value) in (tuple, list, np.ndarray) or value is None) else (value,)
 
 
 def to_list(value):
@@ -48,9 +44,7 @@ def to_list(value):
     :return: A List containing value if a scalar, or value if already a list/tuple/numpy array/none
     """
     return (
-        value
-        if (type(value) in (tuple, list, np.ndarray) or value is None)
-        else [value,]
+        value if (type(value) in (tuple, list, np.ndarray) or value is None) else [value,]
     )
 
 
@@ -161,6 +155,7 @@ def masked_list(l, m, mask_in=True):
         for e in m:
             lcpy[e] = None
     return lcpy
+
 
 ################################################
 #            Printing & Formatting             #

@@ -101,9 +101,7 @@ def dfmultiindex(df, lvl, vals, indexer=False):
     :param indexer: If True, returns the indexer (slicer) instead of the actual data (allowing more flexible use)
     :return:        The chunk of DataFrame matching the index or the indexer
     """
-    _slicer = tuple(
-        vals if _l == lvl else slice(None) for _l in range(len(df.index.levels))
-    )
+    _slicer = tuple(vals if _l == lvl else slice(None) for _l in range(len(df.index.levels)))
     if indexer:
         return _slicer
     else:

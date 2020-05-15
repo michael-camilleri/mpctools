@@ -85,8 +85,7 @@ def plot_matrix(
             min_max = float(min_max)
         else:
             warnings.warn(
-                "Hinton Plot only accepts a single min_max value: inferring from data",
-                UserWarning,
+                "Hinton Plot only accepts a single min_max value: inferring from data", UserWarning,
             )
             min_max = np.power(2, np.ceil(np.log2(np.abs(matrix).max())))
     else:
@@ -96,8 +95,7 @@ def plot_matrix(
             min_max = np.array(min_max, dtype=float)
         else:
             warnings.warn(
-                "Heatmap requires separate min_max values: inferring from data",
-                UserWarning,
+                "Heatmap requires separate min_max values: inferring from data", UserWarning,
             )
             min_max = [matrix.min(), matrix.max()]
 
@@ -153,18 +151,14 @@ def plot_matrix(
         else:
             ax.set_xticks(np.arange(0.5, len(labels) + 0.5))
         ax.set_xticklabels(
-            labels,
-            rotation=x_rot,
-            horizontalalignment="center" if x_rot == 0 else "right",
+            labels, rotation=x_rot, horizontalalignment="center" if x_rot == 0 else "right",
         )
         if mode:
             ax.set_yticks(np.arange(len(y_labels)))
         else:
             ax.set_yticks(np.arange(0.5, len(y_labels) + 0.5))
         ax.set_yticklabels(
-            y_labels,
-            rotation=y_rot,
-            verticalalignment="center" if y_rot == 0 else "bottom",
+            y_labels, rotation=y_rot, verticalalignment="center" if y_rot == 0 else "bottom",
         )
 
 
@@ -233,15 +227,7 @@ def plot_blandaltman(
 
 
 def plot_categorical(
-    time_series,
-    values,
-    labels,
-    nan=-1,
-    cmap=None,
-    ax=None,
-    y_labels=None,
-    cbar=None,
-    fnt_size=15,
+    time_series, values, labels, nan=-1, cmap=None, ax=None, y_labels=None, cbar=None, fnt_size=15,
 ):
     """
     Plots categorical data in time as a colour-coded series
@@ -255,10 +241,12 @@ def plot_categorical(
     :param values:      The allowable values: in ascending order
     :param labels:      String description of categorical labels
     :param nan:         Value to replace NaN with
-    :param cmap:        Color map to use. It must have at least as many distinct colours as num_labels
+    :param cmap:        Color map to use. It must have at least as many distinct colours as
+                        num_labels
     :param ax:          An axis to plot: if not specified, uses the current axis.
     :param y_labels:    The labels for the y-axis
-    :param cbar:        If True or an Axis object, then plots a colour bar (on the provided axis if any) - else nothing
+    :param cbar:        If True or an Axis object, then plots a colour bar (on the provided axis if
+                        any) - else nothing
     :param fnt_size:    Size to use for fonts
     :return:            Tuple consisting of Color plot Collections and optionally the color map
     """
@@ -267,9 +255,7 @@ def plot_categorical(
     N = len(labels)
     ax = plt.gca() if ax is None else ax
     cmap = "tab20" if cmap is None else cmap
-    y_labels = (
-        [str(l) for l in np.arange(0.5, n_rows, 1.0)] if y_labels is None else y_labels
-    )
+    y_labels = [str(l) for l in np.arange(0.5, n_rows, 1.0)] if y_labels is None else y_labels
 
     # Transform Data
     _data = []
@@ -307,19 +293,18 @@ def plot_categorical(
     return plot, colorbar
 
 
-def plot_contour(
-    axs=None, x=None, y=None, kind="G", params=(np.zeros(2), np.eye(2)), res=100
-):
+def plot_contour(axs=None, x=None, y=None, kind="G", params=(np.zeros(2), np.eye(2)), res=100):
     """
     Generate a contour plot
 
-    :param axs:   The axis to plot on: if not specified, then will generate a new axis - note that if axs is not
-                  specified, then X and Y CANNOT be None
+    :param axs:   The axis to plot on: if not specified, then will generate a new axis - note that
+                  if axs is not specified, then X and Y CANNOT be None
     :param x:     The limits of the X-values - will be ignored if axs is specified
     :param y:     The limits of the Y-values - will be ignored if axs is specified
     :param kind:  The type of plot: must be one of:
-                  'G' - Gaussian plot
-                  An executable function which takes two 2D lists of X/Y combinations and returns the value at each pt
+                  'G' - Gaussian plot, or
+                  An executable function which takes two 2D lists of X/Y combinations and returns
+                  the value at each pt
     :param params: Any additional parameters to use when using the Gaussian plot
     :param res:   The resolution along the X and Y.
     :return:      The plot parameters as returned by pyplot.contour()
@@ -327,9 +312,7 @@ def plot_contour(
     # Handle specified options
     if axs is None:
         axs = plt.gca()
-        assert (
-            x is not None and y is not None
-        ), "If Axes is not specified, you MUST specify X and Y"
+        assert x is not None and y is not None, "If Axes is not specified, you MUST specify X and Y"
         x = np.linspace(*x, res)
         y = np.linspace(*y, res)
     else:

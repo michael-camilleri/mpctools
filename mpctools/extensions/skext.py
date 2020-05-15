@@ -72,10 +72,7 @@ def multi_way_split(y, sizes, splitter, random_state=None):
     if len(sizes) == 2:
         return next(
             splitter(
-                n_splits=1,
-                train_size=sizes[0],
-                test_size=sizes[1],
-                random_state=random_state,
+                n_splits=1, train_size=sizes[0], test_size=sizes[1], random_state=random_state,
             ).split(y, y)
         )
     # --- Other Cases --- #
@@ -86,17 +83,11 @@ def multi_way_split(y, sizes, splitter, random_state=None):
     sub_sizes = sizes[1:]
     left, right = next(
         splitter(
-            n_splits=1,
-            train_size=sizes[0],
-            test_size=np.sum(sub_sizes),
-            random_state=random_state,
+            n_splits=1, train_size=sizes[0], test_size=np.sum(sub_sizes), random_state=random_state,
         ).split(y, y)
     )
     right_split = multi_way_split(
-        y[right],
-        sub_sizes,
-        splitter,
-        random_state + 1 if random_state is not None else None,
+        y[right], sub_sizes, splitter, random_state + 1 if random_state is not None else None,
     )
     idcs = [left]
     for i in right_split:
