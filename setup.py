@@ -8,10 +8,14 @@ import mpctools
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
+with open("mpctools/__init__.py") as fh:
+    version = {}
+    exec(fh.read(), version)
+
 setup(
     # Common Setup
     name="mpctools",
-    version=mpctools.__version__,
+    version=version['__version__'],
     packages=["mpctools.extensions", "mpctools.parallel"],
     # Requirements
     install_requires=[
