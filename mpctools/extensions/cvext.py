@@ -26,6 +26,7 @@ from queue import Queue, Empty, Full
 from threading import Thread
 import numpy as np
 import time as tm
+import math
 import cv2
 import os
 
@@ -201,6 +202,9 @@ class BoundingBox:
         else:
             raise ValueError("Invalid Attribute")
 
+    def area(self):
+        return np.prod(self.size)
+
     def corners(self):
         """
         Returns all corners, in a clockwise fashion, starting from top-left
@@ -211,7 +215,42 @@ class BoundingBox:
         return np.asarray(((c - (x, y)), (c + (x, -y)), (c + (x, y)), (c + (-x, y))))
 
     def iou(self, other):
-        pass
+        """
+            Computes the Intersection over Union.
+            Code modifed from: https://gist.github.com/meyerjo/dd3533edc97c81258898f60d8978eddc
+
+            :param other:  The other bounding box instance
+            :return:
+            """
+        # Determine the bounds of the intersection:
+        x_tl = max(self.top_left[0], other.top_left[0])
+        y_tl = max(self.top_left[1], other.top_left[1])
+        x_br = min(self.bottom_right[0], other.bottom_right[0])
+        y_br = min(self.bottom_right[1], other.bottom_right[1])
+
+        # Compute intersection:
+        intersection = max(x_br - x_tl, 0) * max(y_br - y_tl, 0)
+        if intersection == 0:
+            return 0
+
+        # Compute the union
+        union = self.area() + other.area() - intersection
+
+        # Return Intersection over Union
+        return intersection / union
+
+    def __contains__(self, item):
+        """
+        Returns true if the item is entirely enclosed by the bounding box
+
+        :param item: Currently a 2D point (tuple, list or array)
+        :return: True if the point item is within the Bounding Box, false otherwise
+        """
+        if item[0] < self.top_left[0] or item[0] > self.bottom_right[0]:
+            return False
+        if item[1] < self.top_left[1] or item[1] > self.bottom_right[1]:
+            return False
+        return True
 
 
 def line(img, pt1, pt2, color, thickness=1, lineType=8, shift=0, linestyle="-"):
@@ -304,31 +343,23 @@ def rectangle(img, pt1, pt2, color, thickness=1, lineType=8, shift=0, linestyle=
         line(img, (pt1[0], pt2[1]), pt2, color, thickness, lineType, shift, linestyle)
 
 
-def intersection_over_union(ground_truth, prediction):
+def point(img, center, color, size=1, style="."):
     """
-    Computes the Intersection over Union.
-    Code modifed from https://gist.github.com/meyerjo/dd3533edc97c81258898f60d8978eddc
+    Draws a point at a particular x/y coordinates
 
-    :param ground_truth: The ground-truth rectangle. Stored as [X_tl, Y_tl, W, H]
-    :param prediction:   The predicted rectangle. Stored as [X_tl, Y_tl, W, H]
-    :return:
+    :param img: Image to modify
+    :param center:  X/Y coordinates of point center
+    :param color: Point Colour
+    :param size: Size of the point
+    :param style: Allowed styles so far are:
+        * '.' Filled circle
+        * 'o' Empty circle
+    :return: None
     """
-    # Determine the bounds of the intersection:
-    x_tl = max(ground_truth[0], prediction[0])
-    y_tl = max(ground_truth[1], prediction[1])
-    x_br = min(ground_truth[0] + ground_truth[2], prediction[0] + prediction[2])
-    y_br = min(ground_truth[1] + ground_truth[3], prediction[1] + prediction[3])
-
-    # Compute intersection:
-    intersection = max(x_br - x_tl, 0) * max(y_br - y_tl, 0)
-    if intersection == 0:
-        return 0
-
-    # Compute the union
-    union = ground_truth[2] * ground_truth[3] + prediction[2] * prediction[3] - intersection
-
-    # Return Intersection over Union
-    return intersection / union
+    if style == ".":
+        cv2.circle(img, (int(center[0]), int(center[1])), size, color, -1)
+    elif style == "o":
+        cv2.circle(img, (int(center[0]), int(center[1])), size, color, int(math.ceil(size / 5)))
 
 
 class TimeFrame:

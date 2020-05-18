@@ -214,7 +214,7 @@ def float_list(_list, prec=2):
     return ["{1:.{0}f}".format(prec, f) for f in _list]
 
 
-def time_list(_list, fmt='%H:%M:%S'):
+def time_list(_list, fmt="%H:%M:%S"):
     """
     Formats a list of time-points in 'HH:MM:SS'. Currently, only supports _list values in ms
 

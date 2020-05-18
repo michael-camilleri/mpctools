@@ -21,7 +21,7 @@ import unittest
 from mpctools.extensions import cvext, utils
 
 # @TODO include tests for Video Parser Seeking
-
+# @TODO Fix tests for BoundingBox IoU
 
 class TestBoundingBox(unittest.TestCase):
 
@@ -98,6 +98,48 @@ class TestBoundingBox(unittest.TestCase):
                         cvext.BoundingBox(*utils.masked_list(self.BBs[0], inits_l)),
                         cvext.BoundingBox(*utils.masked_list(self.BBs[1], inits_r)),
                     )
+
+    def test_iou(self):
+        with self.subTest("Equal BBs"):
+            self.assertEqual(cvext.BoundingBox(tl=())
+
+
+
+    class TestIntersectionOverUnion(unittest.TestCase):
+        def test_equal(self):
+            # A bunch of equal rectangles
+            cvext.intersection_over_union([0, 0, 100, 20], [0, 0, 100, 20]), 1.0)
+            self.assertEqual(cvext.intersection_over_union([10, 20, 40, 20], [10, 20, 40, 20]), 1.0)
+            self.assertEqual(cvext.intersection_over_union([-5, -1, 40, 30], [-5, -1, 40, 30]), 1.0)
+
+        def test_pred_within(self):
+            # A bunch of predictions fully contained within the ground-truth
+            self.assertEqual(cvext.intersection_over_union([0, 0, 10, 10], [0, 0, 5, 10]), 0.5)
+            self.assertEqual(cvext.intersection_over_union([10, 10, 10, 10], [12, 11, 5, 5]), 0.25)
+            self.assertEqual(cvext.intersection_over_union([-1, -1, 20, 20], [0, 0, 10, 10]), 0.25)
+
+        def test_gt_within(self):
+            # A bunch of predictions fully encompassing the ground-truth
+            self.assertEqual(cvext.intersection_over_union([0, 0, 5, 10], [0, 0, 10, 10]), 0.5)
+            self.assertEqual(cvext.intersection_over_union([12, 11, 5, 5], [10, 10, 10, 10]), 0.25)
+            self.assertEqual(cvext.intersection_over_union([0, 0, 5, 5], [-1, -1, 10, 10]), 0.25)
+
+        def test_outwith(self):
+            # A bunch of predictions entirely disjoint from the ground-truth
+            self.assertEqual(cvext.intersection_over_union([0, 0, 5, 5], [5, 5, 6, 10]), 0.0)
+            self.assertEqual(cvext.intersection_over_union([5, 5, 6, 10], [0, 0, 5, 5]), 0.0)
+            self.assertEqual(cvext.intersection_over_union([-10, -10, 10, 11], [5, 5, 6, 10]), 0.0)
+
+        def test_partial(self):
+            # A bunch of predictions with partial overlap
+            self.assertEqual(cvext.intersection_over_union([2, 3, 10, 10], [7, 8, 10, 10]),
+                             25 / 175)
+            self.assertEqual(cvext.intersection_over_union([2, 3, 10, 10], [7, 8, 20, 20]),
+                             25 / 475)
+            self.assertEqual(cvext.intersection_over_union([7, 8, 10, 10], [2, 3, 10, 10]),
+                             25 / 175)
+            self.assertEqual(cvext.intersection_over_union([7, 8, 20, 20], [2, 3, 10, 10]),
+                             25 / 475)
 
 
 class TestSWAHE(unittest.TestCase):
@@ -247,39 +289,6 @@ class TestSWAHE(unittest.TestCase):
         swclahe.apply(b, clear=False)
         self.assertFalse(np.array_equal(tr_1, swclahe.transform(a_cpy)))
         self.assertTrue(np.array_equal(a, a_cpy))
-
-
-class TestIntersectionOverUnion(unittest.TestCase):
-    def test_equal(self):
-        # A bunch of equal rectangles
-        self.assertEqual(cvext.intersection_over_union([0, 0, 100, 20], [0, 0, 100, 20]), 1.0)
-        self.assertEqual(cvext.intersection_over_union([10, 20, 40, 20], [10, 20, 40, 20]), 1.0)
-        self.assertEqual(cvext.intersection_over_union([-5, -1, 40, 30], [-5, -1, 40, 30]), 1.0)
-
-    def test_pred_within(self):
-        # A bunch of predictions fully contained within the ground-truth
-        self.assertEqual(cvext.intersection_over_union([0, 0, 10, 10], [0, 0, 5, 10]), 0.5)
-        self.assertEqual(cvext.intersection_over_union([10, 10, 10, 10], [12, 11, 5, 5]), 0.25)
-        self.assertEqual(cvext.intersection_over_union([-1, -1, 20, 20], [0, 0, 10, 10]), 0.25)
-
-    def test_gt_within(self):
-        # A bunch of predictions fully encompassing the ground-truth
-        self.assertEqual(cvext.intersection_over_union([0, 0, 5, 10], [0, 0, 10, 10]), 0.5)
-        self.assertEqual(cvext.intersection_over_union([12, 11, 5, 5], [10, 10, 10, 10]), 0.25)
-        self.assertEqual(cvext.intersection_over_union([0, 0, 5, 5], [-1, -1, 10, 10]), 0.25)
-
-    def test_outwith(self):
-        # A bunch of predictions entirely disjoint from the ground-truth
-        self.assertEqual(cvext.intersection_over_union([0, 0, 5, 5], [5, 5, 6, 10]), 0.0)
-        self.assertEqual(cvext.intersection_over_union([5, 5, 6, 10], [0, 0, 5, 5]), 0.0)
-        self.assertEqual(cvext.intersection_over_union([-10, -10, 10, 11], [5, 5, 6, 10]), 0.0)
-
-    def test_partial(self):
-        # A bunch of predictions with partial overlap
-        self.assertEqual(cvext.intersection_over_union([2, 3, 10, 10], [7, 8, 10, 10]), 25 / 175)
-        self.assertEqual(cvext.intersection_over_union([2, 3, 10, 10], [7, 8, 20, 20]), 25 / 475)
-        self.assertEqual(cvext.intersection_over_union([7, 8, 10, 10], [2, 3, 10, 10]), 25 / 175)
-        self.assertEqual(cvext.intersection_over_union([7, 8, 20, 20], [2, 3, 10, 10]), 25 / 475)
 
 
 if __name__ == "__main__":
