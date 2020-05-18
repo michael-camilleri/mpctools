@@ -114,7 +114,7 @@ def exp10(a):
 def clamp(a, cutoff, limits):
     """
     Clamp the values in a to limits at the cutoff: specifically, values less than or equal to the
-    cutoff are converted to limits[0] and values greather than cutoff are converted to limits[1].
+    cutoff are converted to limits[0] and values greater than cutoff are converted to limits[1].
     This is a counterpart to the clip function.
 
     :param a:       Array
@@ -145,7 +145,7 @@ def mad(a, b, axis=None, keepdims=False):
 
 def multiply(arrays):
     """
-    Multiply (element-wise) a series of arrays: they must all abe of the same shape!
+    Multiply (element-wise) a series of arrays: they must all be of the same shape!
 
     :param arrays:  Tuple/list of arrays to multiply
     :return:        Element-wise multiple

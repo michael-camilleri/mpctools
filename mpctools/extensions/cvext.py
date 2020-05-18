@@ -287,10 +287,21 @@ def rectangle(img, pt1, pt2, color, thickness=1, lineType=8, shift=0, linestyle=
         For other arguments see cv2.rectangle()
 
     """
-    line(img, pt1, (pt2[0], pt1[1]), color, thickness, lineType, shift, linestyle)
-    line(img, (pt2[0], pt1[1]), pt2, color, thickness, lineType, shift, linestyle)
-    line(img, pt1, (pt1[0], pt2[1]), color, thickness, lineType, shift, linestyle)
-    line(img, (pt1[0], pt2[1]), pt2, color, thickness, lineType, shift, linestyle)
+    if linestyle == "-":
+        cv2.rectangle(
+            img,
+            (int(pt1[0]), int(pt1[1])),
+            (int(pt2[0]), int(pt2[1])),
+            color,
+            thickness,
+            lineType,
+            shift,
+        )
+    else:
+        line(img, pt1, (pt2[0], pt1[1]), color, thickness, lineType, shift, linestyle)
+        line(img, (pt2[0], pt1[1]), pt2, color, thickness, lineType, shift, linestyle)
+        line(img, pt1, (pt1[0], pt2[1]), color, thickness, lineType, shift, linestyle)
+        line(img, (pt1[0], pt2[1]), pt2, color, thickness, lineType, shift, linestyle)
 
 
 def intersection_over_union(ground_truth, prediction):
@@ -334,7 +345,10 @@ class TimeFrame:
         self.offset = frm_offset
 
     def to_frame(self, ms):
-        return int(np.round(ms * self.FPS / 1000) + self.offset)
+        if type(ms) == np.ndarray:
+            return (np.around(ms * self.FPS / 1000) + self.offset).astype(int)
+        else:
+            return int(np.round(ms * self.FPS / 1000) + self.offset)
 
     def to_time(self, frm):
         return (frm - self.offset) * 1000 / self.FPS

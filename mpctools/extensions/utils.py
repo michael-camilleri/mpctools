@@ -13,6 +13,7 @@ see http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 
+from datetime import timedelta, datetime
 import numpy as np
 import shutil
 import copy
@@ -211,6 +212,20 @@ def float_list(_list, prec=2):
     :return:
     """
     return ["{1:.{0}f}".format(prec, f) for f in _list]
+
+
+def time_list(_list, fmt='%H:%M:%S'):
+    """
+    Formats a list of time-points in 'HH:MM:SS'. Currently, only supports _list values in ms
+
+    :param _list:
+    :param fmt:  String format to employ
+    :return: String representation
+    """
+    s_l = []
+    for t in _list:
+        s_l.append((datetime(1970, 1, 1) + timedelta(milliseconds=t)).strftime(fmt))
+    return s_l
 
 
 def str_width(_iterable):
