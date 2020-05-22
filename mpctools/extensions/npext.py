@@ -460,6 +460,47 @@ class Dirichlet:
             return sample
 
 
+class RangedMedian:
+    """
+    Implements an efficient way for computing a median of an input stream
+    """
+    def __init__(self, shape, _range: int):
+        """
+        Assumes that the range of values exists in [0, _range) (inclusive).
+
+        :param shape:   Shape of the input data: this is augmented by an extra dimension at the end
+                        of size _range
+        :param _range:  The range of allowable numbers
+        """
+        self.__running_entries = np.zeros(shape=(np.prod(shape), _range), dtype=int)
+        self.__shape = shape
+
+    def update(self, sample) -> None:
+        """
+        Updates the sample list by the new sample
+
+        :param sample: A matrix of the original shape specified. This should be of some integer
+        type.
+        :return:None
+        """
+        self.__running_entries[np.prod(self.__shape), sample.ravel()] += 1
+
+    def median(self) -> np.ndarray:
+        """
+        Computes the Median of a set of numbers
+
+        @ToDo - verify that the median is correctly computed: for now, just a rough estimate.
+
+        :return: The median
+        """
+        cumsum = np.cumsum(self.__running_entries, axis=1)
+        med_id = cumsum[:, -1] / 2  # Median index
+        median = np.zeros(np.prod(self.__shape), dtype=int)
+        for i in range(len(median)):
+            median[i] = np.searchsorted(cumsum[i, :], med_id[i], side='right')
+        return median.reshape(self.__shape)
+
+
 def sum_to_one(x, axis=None, norm=False):
     """
     Ensure that the elements of x sum to 1 (normally for probabilities), by dividing by their sum.

@@ -18,19 +18,6 @@ import numpy as np
 from mpctools.extensions.utils import dict_width
 
 
-def DataFrame(data):
-    """
-    Wrapper around DataFrame constructor to support instantiation from a scalar
-
-    :param data:
-    :return:
-    """
-    try:
-        return pandas.DataFrame(data)
-    except ValueError:
-        return pandas.DataFrame(data, index=[0,])
-
-
 def build_dataframe(_d, _idx_names, _idx_values):
     """
     Creates a dataframe of arbitrary length with a specific index set
@@ -56,6 +43,19 @@ def build_dataframe(_d, _idx_names, _idx_values):
 
     # Return DataFrame
     return _df
+
+
+def df_equal(df1, df2, sort_on):
+    """
+    Compares two dataframes after sorting on a column
+
+    :param df1: First dataframe
+    :param df2: Other dataframe
+    :param sort_on: Column (in both DFs) to sort on:
+    :return: Comparison DF: see pd.DataFrame.eq()
+    """
+    return df1.sort_values(by=sort_on).reset_index(drop=True).eq(df2.sort_values(
+        by=sort_on).reset_index(drop=True))
 
 
 def recategorise(_df, _cat_type, _cols, _map=None):

@@ -20,11 +20,11 @@ see http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 
-from numba import jit, uint8, uint16, double
 from mpctools.extensions import npext
 from queue import Queue, Empty, Full
 from threading import Thread
 import numpy as np
+import numba as nb
 import time as tm
 import math
 import cv2
@@ -251,6 +251,46 @@ class BoundingBox:
         if item[1] < self.top_left[1] or item[1] > self.bottom_right[1]:
             return False
         return True
+
+
+class MedianBGSubtractor:
+    """
+    Implements a Median-based Background Subtractor
+
+    Currently, only works on grayscale images
+    """
+    def __init__(self, imgSize, threshold=20):
+        """
+        Initialises the subtractor
+
+        :param imgSize: The size of the image:
+        """
+        self.__buffer = npext.RangedMedian(imgSize, 256)
+        self.__thresh = threshold
+        self.__median = None
+
+    def update_model(self, img):
+        """
+        Updates the current statistics
+
+        :param img: Image to update with
+        :return: self, for chaining
+        """
+        self.__buffer.update(img.astype(int))
+        self.__median = None  # Invalidate median
+        return self
+
+    def transform(self, img):
+        """
+        Extracts background/fore-ground mask
+
+        :param img: Img to process
+        :return: Binary image (bool) where true implies foreground and black background
+        """
+        # Compute median if need be
+        self.__median = self.__buffer.median() if self.__median is None else self.__median
+        # Perform truncation
+        return np.abs(img - self.__median) > self.__thresh
 
 
 def line(img, pt1, pt2, color, thickness=1, lineType=8, shift=0, linestyle="-"):
@@ -746,11 +786,12 @@ class SwCLAHE:
         """
         if clear:
             self.clear_histogram()
-        return self.update_model(img).transform(img)
+        return self.update_model(img).generate_lut().transform(img)
 
     @staticmethod
-    @jit(
-        signature_or_function=(uint8[:, :], uint8, uint8, uint16[:, :, :]), nopython=True,
+    @nb.jit(
+        signature_or_function=(nb.uint8[:, :], nb.uint8, nb.uint8, nb.uint16[:, :, :]),
+        nopython=True,
     )
     def __update_hist(padded, row_pad, col_pad, hist):
         """
@@ -803,8 +844,8 @@ class SwCLAHE:
                     hist[r_hst, c_hst, padded[nbh_r, c_next]] += 1
 
     @staticmethod
-    @jit(
-        signature_or_function=(double[:, :, ::1], double, uint8[:, :, ::1], double), nopython=True,
+    @nb.jit(
+        signature_or_function=(nb.double[:, :, ::1], nb.double, nb.uint8[:, :, ::1], nb.double), nopython=True,
     )
     def __clip_limit(hist, limit, lut, scaler):
         """
@@ -838,8 +879,9 @@ class SwCLAHE:
                     lut[r, c, h] = round(cumsum * scaler)
 
     @staticmethod
-    @jit(
-        signature_or_function=(uint8[:, :, ::1], uint8[:, ::1], uint8[:, ::1]), nopython=True,
+    @nb.jit(
+        signature_or_function=(nb.uint8[:, :, ::1], nb.uint8[:, ::1], nb.uint8[:, ::1]),
+        nopython=True,
     )
     def __transform(lut, img, out):
         """
