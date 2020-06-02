@@ -228,6 +228,32 @@ def time_list(_list, fmt="%H:%M:%S"):
     return s_l
 
 
+def int_list(_list, _sort=True):
+    """
+    Formats a list of unique integers, summarising ranges
+    :param _list: List to display
+    :param _sort: If True, sort the elements
+    :return:
+    """
+    _list = np.sort(_list).astype(int) if _sort else np.asarray(_list, dtype=int)
+    _diff = [*(np.diff(_list) > 1), True]
+
+    st = _list[0]
+    ranges = []
+    for el in np.argwhere(_diff):
+        nd = _list[el][0]
+        if st == nd:
+            ranges.append(f'{st}')
+        elif nd == st + 1:
+            ranges.append(f'{st}')
+            ranges.append(f'{nd}')
+        else:
+            ranges.append(f'{st}-{nd}')
+        st = _list[el + 1][0] if el < len(_list)-1 else None
+
+    return ','.join(ranges)
+
+
 def str_width(_iterable):
     """
     Returns the maximum width of all strings in iterable
