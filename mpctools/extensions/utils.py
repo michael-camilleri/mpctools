@@ -293,7 +293,7 @@ def short_int(_int):
 
 
 ################################################
-#                OS Manipulation               #
+#            OS & Python Manipulation          #
 ################################################
 
 
@@ -320,3 +320,25 @@ def make_dir(_path, _clear=False):
     except OSError:
         if not os.path.isdir(_path):
             raise
+
+
+def default(var, val):
+    """
+    Replaces var with val if var is None:
+
+    :param var: The variable to handle
+    :param val: The value to use if var is None
+    :return: var if var is not None, else val
+    """
+    return var if var is not None else val
+
+
+# def equal_methods(func1, func2):
+#     """
+#     Checks if two methods are equal based on bytecode
+#
+#     :param func1:
+#     :param func2:
+#     :return: True if equal, false otherwise
+#     """
+#     return func1.__code__.co_code == func2.__code__.co_code
