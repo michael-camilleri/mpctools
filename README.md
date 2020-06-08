@@ -19,6 +19,7 @@ More details for each library are provided as doxygen-style comments in the modu
 ### Requirements
 
 This Library has the following dependencies:
+  * opencv-python
   * scikit-learn
   * matplotlib
   * seaborn
@@ -26,32 +27,27 @@ This Library has the following dependencies:
   * pathos
   * scipy
   * numpy
+  * numba
   
-In most cases, the above can be automatically installed through the library itself (i.e. pip will attempt to download 
-them). If this causes issues, just install them manually.
-
-There is an additional requirement for opencv: however, this is not included in the list of requirements for the reason that
-some people may wish to build it from source. This is required for example if one wishes to use non open-source encoders: in this
-case, I have provided a blog-post about how to do this on my 
-[webpage](https://michaelpjcamilleri.wordpress.com/2019/03/21/installing-opencv-with-all-the-bells-and-whistles/).
-Otherwise, you can either chose to ignore it if you are not going to use the CV extensions module (cvext),
-or install the stock open-cv wrapper for python:
-```bash
-pip install opencv-python
-```
+In most cases, the above can be automatically installed through the library itself (i.e. pip will 
+attempt to download them). If this causes issues, or you wish to install specific versions (such
+as building `opencv` from source), you can prevent dependency checking by passing the `--no-deps`
+flag.
 
 ### Installing
 
 The project is available on [PyPi](https://pypi.org/project/mpctools/), and hence the latest
  (stable) release can be installed simply:
   ```shell script
-  pip install mpctools
+  pip install mpctools [--no-deps]
   ```
+Note that the `--no-deps` flag is optional (as described [above](#requirements)).
+
 Alternatively, you may choose to install directly from source. This has the added advantage that if 
 you change any of the implementations, the changes will be reflected without having to rebuild. 
 However, you will have to manually download the source (via git or just zipped and then extracted):
   ```shell script
-  python setup.py build develop --no-deps
+  python setup.py build develop [--no-deps]
   ```
 
 ### Known Issues

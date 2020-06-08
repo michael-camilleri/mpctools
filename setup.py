@@ -15,14 +15,14 @@ setup(
     packages=["mpctools", "mpctools.extensions", "mpctools.parallel"],
     # Requirements
     install_requires=[
-        "numpy",
-        "scipy",
-        "pathos",
+        "opencv-python",
         "scikit-learn",
         "matplotlib",
         "seaborn",
         "pandas",
-        "scikit-multilearn",
+        "pathos",
+        "scipy",
+        "numpy",
         "numba",
     ],
     # Meta-Data
