@@ -322,10 +322,19 @@ def rectangle(img, pt1, pt2, color, thickness=1, lineType=8, shift=0, linestyle=
     Draws a Rectangle at the specified position
 
     Args:
+        img: OpenCV Image to draw on
+        pt1: Can be either the top-left or a cvext.BoundingBox instance
+        pt2: Bottom right (ignored and can be none) if pt1 is a bounding box.
+        color: Color to draw with (3-tuple)
+        thickness: Line Thickness. See cv.rectangle
+        lineType: See cv.rectangle
+        shift: See cv.rectangle
         linestyle: specifies the line-style (see cvext.line())
-        For other arguments see cv2.rectangle()
-
     """
+    if type(pt1) is BoundingBox:
+        pt2 = pt1['BR']
+        pt1 = pt1['TL']
+
     if linestyle == "-":
         cv2.rectangle(
             img,

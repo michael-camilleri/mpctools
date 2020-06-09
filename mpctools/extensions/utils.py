@@ -251,7 +251,7 @@ def int_list(_list, _sort=True):
             ranges.append(f'{st}-{nd}')
         st = _list[el + 1][0] if el < len(_list)-1 else None
 
-    return ','.join(ranges)
+    return ', '.join(ranges)
 
 
 def str_width(_iterable):
