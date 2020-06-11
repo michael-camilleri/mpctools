@@ -14,7 +14,7 @@ see http://www.gnu.org/licenses/.
 
 Author: Michael P. J. Camilleri
 """
-
+from mpctools.extensions import utils
 import time as tm
 import sys
 
@@ -25,7 +25,7 @@ class ProgressBar:
         https://gist.github.com/aubricus/f91fb55dc6ba5557fbab06119420dd6a
     """
 
-    def __init__(self, total, width=100, sink=sys.stdout, prec=1):
+    def __init__(self, total, width=100, sink=sys.stdout, prec=1, verbose=True):
         """
         Initialiser
 
@@ -40,6 +40,7 @@ class ProgressBar:
         self.__sink = sink
         self.__prec = prec
         self.__strt = None
+        self.__verb = verbose
 
         # State Control
         self.__count = int(0)
@@ -89,19 +90,43 @@ class ProgressBar:
 
             # Write Out
             _progress = self.__width * self.__count / self.__total
-            self.__sink.write(
-                "\r{0} |{1}{2}| {3:.{4}f}% ({5:.{4}f} it/s) {6}".format(
-                    self.__prefix,
-                    "\u2588" * int(_progress),
-                    "-" * (self.__width - int(_progress)),
-                    _progress,
-                    self.__prec,
-                    self.__count/(tm.time() - self.__strt),
-                    suffix,
+            if self.__verb:
+                _rate = self.__count / (tm.time() - self.__strt)
+                _rem = (
+                    utils.show_time(int((self.__total - self.__count) / _rate))
+                    if _rate > 0
+                    else "--:--"
                 )
-            )
+                self.__sink.write(
+                    "\r{0} |{1}{2}| {3:.{4}f}% {5:.{4}f} it/s ({6}) {7}       ".format(
+                        self.__prefix,
+                        "\u2588" * int(_progress),
+                        "-" * (self.__width - int(_progress)),
+                        _progress,
+                        self.__prec,
+                        _rate,
+                        _rem,
+                        suffix,
+                    )
+                )
+            else:
+                self.__sink.write(
+                    "\r{0} |{1}{2}| {3:.{4}f}% {5}".format(
+                        self.__prefix,
+                        "\u2588" * int(_progress),
+                        "-" * (self.__width - int(_progress)),
+                        _progress,
+                        self.__prec,
+                        suffix,
+                    )
+                )
             if int(_progress) == int(self.__width):
-                self.__sink.write(" [DONE]\n")
+                if self.__verb:
+                    self.__sink.write(
+                        f" [DONE ({utils.show_time(int(tm.time() - self.__strt))})]\n"
+                    )
+                else:
+                    self.__sink.write(" [DONE]\n")
             self.__sink.flush()
 
         return self

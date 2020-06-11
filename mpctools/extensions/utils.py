@@ -228,6 +228,25 @@ def time_list(_list, fmt="%H:%M:%S"):
     return s_l
 
 
+def show_time(_time):
+    """
+    Shows a time-point in the most appropriate manner (Days/Hours/Minutes/Seconds)
+
+    :param _time: Time (in seconds)
+    :return: String representation
+    """
+    if _time < 60:
+        return f"{_time}s"
+    else:
+        _time_str = (datetime(1970, 1, 1) + timedelta(seconds=_time))
+        if _time < 3600:
+            return _time_str.strftime('%M:%S')
+        elif _time < 86400:
+            return _time_str.strftime('%H:%M:%S')
+        else:
+            return _time_str.strftime('%-jD+%H:%M:%S')
+
+
 def int_list(_list, _sort=True):
     """
     Formats a list of unique integers, summarising ranges
