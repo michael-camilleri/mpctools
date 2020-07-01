@@ -126,7 +126,7 @@ def pad(a, length, value):
     """
     Pad a list (not tuple). Note that if length is less than the len(a) then this has no effect.
 
-    :param a:       The original List
+    :param a:       The original List. Must be a list and NOT a numpy array!
     :param length:  The desired length
     :param value:   The Value to fill with
     :return:        Padded List. A copy is always returned!

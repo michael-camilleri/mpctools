@@ -332,8 +332,8 @@ def rectangle(img, pt1, pt2, color, thickness=1, lineType=8, shift=0, linestyle=
         linestyle: specifies the line-style (see cvext.line())
     """
     if type(pt1) is BoundingBox:
-        pt2 = pt1['BR']
-        pt1 = pt1['TL']
+        pt2 = pt1["BR"]
+        pt1 = pt1["TL"]
 
     if linestyle == "-":
         cv2.rectangle(
@@ -424,6 +424,14 @@ class VideoParser:
             cv2.CAP_PROP_FRAME_COUNT: -1,
             cv2.CAP_PROP_FOURCC: None,
         }
+
+    @property
+    def Size(self):
+        return (
+            (int(self.get(cv2.CAP_PROP_FRAME_WIDTH)), int(self.get(cv2.CAP_PROP_FRAME_HEIGHT)))
+            if self.thread is not None
+            else None
+        )
 
     def start(self, start=None, stride=1):
         """
@@ -598,6 +606,8 @@ class VideoParser:
 class FrameGetter:
     """
     Wrapper for reading successive frames from disk.
+
+    Note that as per OpenCV defaults, the returned images are always in BGR
     """
 
     def __init__(self, path, fmt="{:06d}.jpg"):
