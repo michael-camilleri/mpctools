@@ -411,7 +411,12 @@ class Dirichlet:
         #      we are taking product this does not matter
         #   b) If we are ignoring zeros, this is masked by definition, which means that the result
         #      of the power is masked and so is the product!
-        return np.prod(np.power(x, self._alpha_m1), axis=-1) / self.norm
+        # However, just in case in the future we decide to support all ones when ignoring,
+        # then we check for all zeros:
+        if self.__zeros.all():
+            return 1 / self.norm
+        else:
+            return np.prod(np.power(x, self._alpha_m1), axis=-1) / self.norm
 
     def logpdf(self, x):
         """
@@ -424,13 +429,15 @@ class Dirichlet:
         # Ensure that it is non-zero where zeros are not allowed
         if np.any(x[~self.__zeros] <= 0):
             raise ValueError("0-valued probabilities are only allowed where alpha=1")
-        # In this case, we must mask to avoid the issues with log since -inf * 0 = NaN... however,
-        #   we also set the error state appropriately since the mask does not appear to work on
-        #   log...
-        # Note that while we may wish to support alpha=1 even when non-zero, in any case,
-        #   this will not have any effect since for alpha=1, _alpha=0 and hence,
-        #   the multiplication below will be with 0!
-        with np.errstate(divide="ignore"):
+        # In this case, we must mask to avoid the issues with log since -inf * mask = NaN and not 0
+        #   as we would expect. Since we are enforcing that 0-valued probabilities are only
+        #   allowed when alpha=1, then we can mask out all such values, because in any case,
+        #   _alpha_m1=0 (for all self.__zeros) and hence, the multiplication will be 0 in any case.
+        # We do have to handle the case where all of _alpha_m1 is 0, in which case,
+        #    the sum should be just 0
+        if self.__zeros.all():
+            return -self.lognorm
+        else:
             x = np.ma.array(x, mask=self.__zeros)
             return np.sum(np.multiply(np.log(x), self._alpha_m1), axis=-1) - self.lognorm
 
