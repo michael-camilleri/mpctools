@@ -362,6 +362,7 @@ class Dirichlet:
     An alternative Dirichlet Class which
         a) Precomputes the normalisation parameters for efficiency
         b) can vectorise over matrices, where the last-dimension is the probability distribution.
+        c) Handles 0's in the x's
     """
 
     def __init__(self, alpha, ignore_zeros=False):
@@ -375,15 +376,19 @@ class Dirichlet:
                              which are 1. This is based on the assumption that such dimensions
                              will always be zero and will be known in advance.
         """
-        alpha = np.asarray(alpha)  # K   Dimensional
+        alpha = np.asarray(alpha)  # K-Dimensional
         # Do some Checks
         if np.any(alpha <= 0):
             raise ValueError("All dimensions of Alpha must be greater than 0.")
-        self._alpha = alpha - 1.0  # K Dimensional
-        self.__zeros = alpha == 1
+        self._alpha_m1 = alpha - 1.0  # K Dimensional
+        self.__zeros = alpha == 1     # Find location of zeros
         if ignore_zeros:
-            self._alpha = np.ma.array(self._alpha, mask=self.__zeros)
+            # Check that not all masked:
+            if self.__zeros.all():
+                raise ValueError('If ignoring zeros, you cannot have all of Alpha = 1!')
+            # We need to mask both alpha and alpha-1:
             alpha = np.ma.array(alpha, mask=self.__zeros)
+            self._alpha_m1 = np.ma.array(self._alpha_m1, mask=self.__zeros)
         self.norm = np.prod(gamma(alpha), axis=-1) / gamma(
             np.sum(alpha, axis=-1)
         )  # K-1 Dimensional
@@ -406,7 +411,7 @@ class Dirichlet:
         #      we are taking product this does not matter
         #   b) If we are ignoring zeros, this is masked by definition, which means that the result
         #      of the power is masked and so is the product!
-        return np.prod(np.power(x, self._alpha), axis=-1) / self.norm
+        return np.prod(np.power(x, self._alpha_m1), axis=-1) / self.norm
 
     def logpdf(self, x):
         """
@@ -427,7 +432,7 @@ class Dirichlet:
         #   the multiplication below will be with 0!
         with np.errstate(divide="ignore"):
             x = np.ma.array(x, mask=self.__zeros)
-            return np.sum(np.multiply(np.log(x), self._alpha), axis=-1) - self.lognorm
+            return np.sum(np.multiply(np.log(x), self._alpha_m1), axis=-1) - self.lognorm
 
     def logsumpdf(self, x):
         """
@@ -445,7 +450,7 @@ class Dirichlet:
 
         :return:    A single sample
         """
-        return self._recursive_sample(self._alpha + 1)
+        return self._recursive_sample(self._alpha_m1 + 1)
 
     @staticmethod
     def _recursive_sample(alpha):
