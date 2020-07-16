@@ -239,6 +239,22 @@ class BoundingBox:
         # Return Intersection over Union
         return intersection / union
 
+    def overlap(self, other):
+        """
+        Returns the overlapping rectangle (if any)
+
+        :param other: Another Bounding Box
+        :return: Intersecting rectangle if there is any overlap, otherwise None
+        """
+        x_tl = max(self.top_left[0], other.top_left[0])
+        y_tl = max(self.top_left[1], other.top_left[1])
+        x_br = min(self.bottom_right[0], other.bottom_right[0])
+        y_br = min(self.bottom_right[1], other.bottom_right[1])
+
+        return (
+            BoundingBox(tl=(x_tl, y_tl), br=(x_br, y_br)) if (x_br > x_tl and y_br > y_tl) else None
+        )
+
     def __contains__(self, item):
         """
         Returns true if the item is entirely enclosed by the bounding box
