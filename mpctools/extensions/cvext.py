@@ -76,11 +76,15 @@ class Homography:
                        will be automatically promoted to 2D
         :return:    Image Coordinates
         """
-        return np.squeeze(
+        points2d = npext.ensure2d(points, axis=0)
+        valid = np.isfinite(points2d).all(axis=1)
+        img_coords = np.full_like(points2d, fill_value=np.NaN)
+        img_coords[valid, :] = np.squeeze(
             cv2.perspectiveTransform(
-                np.expand_dims(npext.ensure2d(points, axis=0), axis=0), self.toImg
+                np.expand_dims(points2d[valid, :], axis=0), self.toImg
             )
         )
+        return img_coords
 
     def to_world(self, points):
         """
@@ -90,9 +94,12 @@ class Homography:
                        will be automatically promoted to 2D
         :return:    World Coordinates
         """
-        return np.squeeze(
+        points2d = npext.ensure2d(points, axis=0)
+        valid = np.isfinite(points2d).all(axis=1)
+        wd_coords = np.full_like(points2d, fill_value=np.NaN)
+        wd_coords[valid, :] = np.squeeze(
             cv2.perspectiveTransform(
-                np.expand_dims(npext.ensure2d(points, axis=0), axis=0), self.toWrld
+                np.expand_dims(points2d[valid, :], axis=0), self.toWrld
             )
         )
 
