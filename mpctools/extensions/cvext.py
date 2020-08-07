@@ -196,6 +196,14 @@ class BoundingBox:
                 self.C = self.BR - self.SZ / 2
         return self.C
 
+    @property
+    def bottom_left(self):
+        return np.asarray([self.top_left[0], self.bottom_right[1]])
+
+    @property
+    def top_right(self):
+        return np.asarray([self.bottom_right[0], self.top_left[1]])
+
     def __getitem__(self, item):
         item = item.lower()
         if item == "tl":
@@ -218,7 +226,7 @@ class BoundingBox:
         :return:
         """
         x, y = self.size / 2
-        c = self.C
+        c = self.center
         return np.asarray(((c - (x, y)), (c + (x, -y)), (c + (x, y)), (c + (-x, y))))
 
     def iou(self, other):

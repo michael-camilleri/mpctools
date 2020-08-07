@@ -228,14 +228,16 @@ def time_list(_list, fmt="%H:%M:%S"):
     return s_l
 
 
-def show_time(_time):
+def show_time(_time, minimal=True):
     """
     Shows a time-point in the most appropriate manner (Days/Hours/Minutes/Seconds)
 
     :param _time: Time (in seconds)
+    :param minimal: If True, and less than 60, show in minimal view (s.ms). Does not effect if
+                    more than 1 minute.
     :return: String representation
     """
-    if _time < 60:
+    if _time < 60 and minimal:
         return f"{_time}s"
     else:
         _time_str = (datetime(1970, 1, 1) + timedelta(seconds=_time))
