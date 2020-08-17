@@ -91,7 +91,8 @@ class ProgressBar:
             # Write Out
             _progress = self.__width * self.__count / self.__total
             if self.__verb:
-                _rate = self.__count / (tm.time() - self.__strt)
+                _elapsed = tm.time() - self.__strt
+                _rate = self.__count / _elapsed if _elapsed > 0 else -1
                 _rem = (
                     utils.show_time(int((self.__total - self.__count) / _rate))
                     if _rate > 0

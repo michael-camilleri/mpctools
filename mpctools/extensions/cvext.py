@@ -464,6 +464,9 @@ class VideoParser:
             else None
         )
 
+    def __len__(self):
+        return int(self.get(cv2.CAP_PROP_FRAME_COUNT)) if self.thread is not None else -1
+
     def start(self, start=None, stride=1):
         """
         Start the Parsing Loop

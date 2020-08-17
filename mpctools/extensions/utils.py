@@ -240,13 +240,13 @@ def show_time(_time, minimal=True):
     if _time < 60 and minimal:
         return f"{_time}s"
     else:
-        _time_str = (datetime(1970, 1, 1) + timedelta(seconds=_time))
+        _time_str = (datetime(1970, 1, 1) + timedelta(seconds=float(_time)))
         if _time < 3600:
             return _time_str.strftime('%M:%S')
         elif _time < 86400:
             return _time_str.strftime('%H:%M:%S')
         else:
-            return _time_str.strftime('%-jD+%H:%M:%S')
+            return _time_str.strftime('%jD+%H:%M:%S')
 
 
 def int_list(_list, _sort=True):
