@@ -220,6 +220,7 @@ class BoundingBox:
     def area(self):
         return np.prod(self.size)
 
+    @property
     def corners(self):
         """
         Returns all corners, in a clockwise fashion, starting from top-left
@@ -228,6 +229,13 @@ class BoundingBox:
         x, y = self.size / 2
         c = self.center
         return np.asarray(((c - (x, y)), (c + (x, -y)), (c + (x, y)), (c + (-x, y))))
+
+    @property
+    def extrema(self):
+        """
+        Returns the Top-Left/Bottom-Right Extrema
+        """
+        return np.append(self.top_left, self.bottom_right)
 
     def iou(self, other):
         """
