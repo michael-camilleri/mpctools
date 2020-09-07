@@ -237,6 +237,10 @@ class BoundingBox:
         """
         return np.append(self.top_left, self.bottom_right)
 
+    @property
+    def mot_format(self):
+        return np.append(self.top_left, self.size)
+
     def iou(self, other):
         """
             Computes the Intersection over Union.
