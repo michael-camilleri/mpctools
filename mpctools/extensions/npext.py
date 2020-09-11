@@ -203,7 +203,7 @@ def run_lengths(a, how="I", return_values=False, return_positions=False):
     """
     # Prepare
     #  We fist compute assuming that we are going to use everything! This allows us to have correct
-    #  position information We also need to convert arrays of NaN to lists so that NaN works.
+    #  position information. We also need to convert arrays of NaN to lists so that NaN works.
     #  This will slow down but cannot be helped.
     if type(a) == np.ndarray:
         a = [i if not np.isnan(i) else np.nan for i in a.flatten()]
