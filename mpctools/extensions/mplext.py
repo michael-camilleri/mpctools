@@ -293,7 +293,15 @@ def plot_categorical(
     return plot, colorbar
 
 
-def plot_lifespans(time_series, cmap="tab20", ax=None, y_labels=None, x_labels=None, fnt_size=15):
+def plot_lifespans(
+        time_series,
+        cmap="tab20",
+        ax=None,
+        y_labels=None,
+        x_labels=None,
+        show_simultaneous=None,
+        fnt_size=15,
+):
     """
     Plot life-spans of time-series in the format of a gant-chart.
 
@@ -303,7 +311,10 @@ def plot_lifespans(time_series, cmap="tab20", ax=None, y_labels=None, x_labels=N
     :param ax:          If provided, uses this axes
     :param y_labels:    Labels to use for the y-value
     :param x_labels:    Labels to use for the x-axis
+    :param show_simultaneous: If not None, shows the number of simultaneous life-times, excluding
+                        the default expected as specified.
     :param fnt_size:    Font-Size
+    discarding those which do not fit
     :return:
     """
     # Evaluate Parameters
@@ -332,8 +343,18 @@ def plot_lifespans(time_series, cmap="tab20", ax=None, y_labels=None, x_labels=N
     ax.grid(True, axis='x')
     ax.invert_yaxis()
 
+    # If need be, show simultaneous life-spans:
+    if show_simultaneous is not None:
+        ax2 = ax.twinx()
+        _sums = time_series.sum(axis=0)
+        _sumf = _sums != show_simultaneous
+        ax2.plot(np.arange(n_cols)[_sumf], _sums[_sumf], 'x', color='k')
+        ax2.set_yticks(np.unique(_sums[_sumf]))
+        ax2.tick_params(labelsize=fnt_size)
+        ax2.set_ylabel('Number of Simultaneous Tracklets', fontsize=fnt_size)
+
     # Return the Axes
-    return ax
+    return (ax, ax2) if show_simultaneous is not None else ax
 
 
 def plot_contour(axs=None, x=None, y=None, kind="G", params=(np.zeros(2), np.eye(2)), res=100):
