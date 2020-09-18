@@ -293,6 +293,49 @@ def plot_categorical(
     return plot, colorbar
 
 
+def plot_lifespans(time_series, cmap="tab20", ax=None, y_labels=None, x_labels=None, fnt_size=15):
+    """
+    Plot life-spans of time-series in the format of a gant-chart.
+
+    :param time_series: A 2D array, with True/False runs along each row (i.e. each row is one
+                        time-series.
+    :param cmap:        If provided, uses this colour map.
+    :param ax:          If provided, uses this axes
+    :param y_labels:    Labels to use for the y-value
+    :param x_labels:    Labels to use for the x-axis
+    :param fnt_size:    Font-Size
+    :return:
+    """
+    # Evaluate Parameters
+    n_rows, n_cols = time_series.shape
+    ax = plt.gca() if ax is None else ax
+
+    # Generate Discrete Colour Map
+    color_list = plt.cm.get_cmap(cmap)(np.linspace(0, 1, n_rows))
+
+    # Iterate over plots:
+    for i, ts in enumerate(time_series):
+        l, v, p = npext.run_lengths(ts, return_values=True, return_positions=True)
+        runs = [z for z in zip(p[v == 1], l[v == 1])]
+        ax.broken_barh(runs, (i + 0.1, 0.8), facecolors=color_list[i])
+
+    # Set Labelling
+    ax.set_yticks(np.arange(0.5, n_rows, 1.0))
+    if y_labels is not None:
+        ax.set_yticklabels(y_labels)
+    if x_labels is not None:
+        x_ticks = ax.get_xticks().astype(int)
+        x_ticks = x_ticks[np.logical_and(x_ticks < n_cols, x_ticks > -1)]
+        ax.set_xticks(x_ticks)
+        ax.set_xticklabels(x_labels[x_ticks])
+    ax.tick_params(labelsize=fnt_size)
+    ax.grid(True, axis='x')
+    ax.invert_yaxis()
+
+    # Return the Axes
+    return ax
+
+
 def plot_contour(axs=None, x=None, y=None, kind="G", params=(np.zeros(2), np.eye(2)), res=100):
     """
     Generate a contour plot
