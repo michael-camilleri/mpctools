@@ -14,6 +14,7 @@ Author: Michael P. J. Camilleri
 """
 
 from datetime import timedelta, datetime
+from itertools import tee, islice
 import numpy as np
 import shutil
 import copy
@@ -23,6 +24,72 @@ import os
 ################################################
 #            Collections Processing            #
 ################################################
+
+
+class Pool:
+    """
+    Defines a pool of object assignments. By this we mean that it keeps track of a property for a
+    set of indices (hashables), and when indices die, can assign to new ones.
+    """
+    def __init__(self, values):
+        """
+        Creates the Pool object
+
+        :param values: The allowable values that can be returned. Must be an indexable iterable.
+        """
+        self.__values = values
+        self.__val_map = {}
+        self.__unused_val = {*range(len(values))}
+
+    def update(self, indices):
+        """
+        Updates the state with the new index-set
+
+        :param indices: New set of indices. This can be anything that is hashable.
+        :return: self, for chaining.
+        """
+        for _t_id in set(self.__val_map.keys()).difference(set(indices)):
+            self.__unused_val.add(self.__val_map.pop(_t_id))
+        for _t_id in set(indices).difference(set(self.__val_map.keys())):
+            self.__val_map[_t_id] = self.__unused_val.pop()
+        return self
+
+    def __getitem__(self, item):
+        return self.__values[self.__val_map[item]]
+
+    @property
+    def capacity(self):
+        return len(self.__values)
+
+    @property
+    def values(self):
+        return self.__values
+
+    def assigned(self):
+        """
+        Returns the assignment status of each value (much like a reverse dict).
+        :return: A Dictionary showing for each value the assigned index or None As per Python
+        Standard, the returned order follows the set of values as passed to the Initialiser.
+        """
+        reverse_dict = {v: None for v in self.__values}
+        for index, val_idx in self.__val_map.items():
+            reverse_dict[self.__values[val_idx]] = index
+        return reverse_dict
+
+
+def window(iterable, size):
+    """
+    Return a sliding window iterator over elements.
+
+    From https://stackoverflow.com/questions/6822725/rolling-or-sliding-window-iterator
+
+    :param iterable: An iterable
+    :param size:     Size of the sliding window
+    :return:         Iterator
+    """
+    itrs = tee(iterable, size)
+    shiftedStarts = [islice(anItr, s, None) for s, anItr in enumerate(itrs)]
+    return zip(*shiftedStarts)
 
 
 def to_tuple(value):
