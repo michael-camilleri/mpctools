@@ -13,9 +13,9 @@ see http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 
-import pandas
-import numpy as np
 from mpctools.extensions.utils import dict_width
+import numpy as np
+import pandas
 
 
 def DataFrame(data):
@@ -121,3 +121,14 @@ def time_overlap(tr1, tr2, time_only=False):
         return (tr1[0].time() <= tr2[1].time()) and (tr1[1].time() >= tr2[0].time())
     else:
         return (tr1[0] <= tr2[1]) and (tr1[1] >= tr2[0])
+
+
+def segment_periods(df):
+    """
+    Segment the Dataframe Rows into periods where the rows are identical. Currently, identical is
+      defined in terms of missing data.
+
+    :param df: Dataframe, where time flows along the rows.
+    :return:  A Series with segment names.
+    """
+    return df.notnull().diff(axis=0).any(axis=1).cumsum()
