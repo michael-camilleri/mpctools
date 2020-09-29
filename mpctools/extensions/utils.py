@@ -31,6 +31,7 @@ class Pool:
     Defines a pool of object assignments. By this we mean that it keeps track of a property for a
     set of indices (hashables), and when indices die, can assign to new ones.
     """
+
     def __init__(self, values):
         """
         Creates the Pool object
@@ -295,25 +296,30 @@ def time_list(_list, fmt="%H:%M:%S"):
     return s_l
 
 
-def show_time(_time, minimal=True):
+def show_time(_time, minimal=True, ms=False):
     """
     Shows a time-point in the most appropriate manner (Days/Hours/Minutes/Seconds)
 
     :param _time: Time (in seconds)
     :param minimal: If True, and less than 60, show in minimal view (s.ms). Does not effect if
                     more than 1 minute.
+    :parm ms: If True, show millisecond precision
     :return: String representation
     """
     if _time < 60 and minimal:
-        return f"{_time}s"
+        return f"{_time:.3f}s" if ms else f"{_time:d}s"
     else:
-        _time_str = (datetime(1970, 1, 1) + timedelta(seconds=float(_time)))
+        _time_str = datetime(1970, 1, 1) + timedelta(seconds=float(_time))
         if _time < 3600:
-            return _time_str.strftime('%M:%S')
+            return _time_str.strftime("%M:%S.%f")[:-3] if ms else _time_str.strftime("%M:%S")
         elif _time < 86400:
-            return _time_str.strftime('%H:%M:%S')
+            return _time_str.strftime("%H:%M:%S.%f")[:-3] if ms else _time_str.strftime("%H:%M:%S")
         else:
-            return _time_str.strftime('%jD+%H:%M:%S')
+            return (
+                _time_str.strftime("%jD+%H:%M:%S.%f")[:-3]
+                if ms
+                else _time_str.strftime("%jD+%H:%M:%S")
+            )
 
 
 def int_list(_list, _sort=True):
@@ -331,15 +337,15 @@ def int_list(_list, _sort=True):
     for el in np.argwhere(_diff):
         nd = _list[el][0]
         if st == nd:
-            ranges.append(f'{st}')
+            ranges.append(f"{st}")
         elif nd == st + 1:
-            ranges.append(f'{st}')
-            ranges.append(f'{nd}')
+            ranges.append(f"{st}")
+            ranges.append(f"{nd}")
         else:
-            ranges.append(f'{st}-{nd}')
-        st = _list[el + 1][0] if el < len(_list)-1 else None
+            ranges.append(f"{st}-{nd}")
+        st = _list[el + 1][0] if el < len(_list) - 1 else None
 
-    return ', '.join(ranges)
+    return ", ".join(ranges)
 
 
 def str_width(_iterable):
