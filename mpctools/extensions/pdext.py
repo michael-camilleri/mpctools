@@ -123,12 +123,18 @@ def time_overlap(tr1, tr2, time_only=False):
         return (tr1[0] <= tr2[1]) and (tr1[1] >= tr2[0])
 
 
-def segment_periods(df):
+def segment_periods(df, fill_holes=False):
     """
     Segment the Dataframe Rows into periods where the rows are identical. Currently, identical is
       defined in terms of missing data.
 
     :param df: Dataframe, where time flows along the rows.
+    :param fill_holes: If true, consider the first/last valid indices as the change-points.
     :return:  A Series with segment names.
     """
+    if fill_holes:
+        df = df.notnull()
+        df[~df] = np.NaN
+        for c in df.columns:
+            df.loc[df[c].first_valid_index():df[c].last_valid_index(), c] = 1.0
     return df.notnull().diff(axis=0).any(axis=1).cumsum()

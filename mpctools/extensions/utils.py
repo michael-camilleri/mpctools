@@ -307,7 +307,7 @@ def show_time(_time, minimal=True, ms=False):
     :return: String representation
     """
     if _time < 60 and minimal:
-        return f"{_time:.3f}s" if ms else f"{_time:d}s"
+        return f"{_time:.3f}s" if ms else f"{int(_time)}s"
     else:
         _time_str = datetime(1970, 1, 1) + timedelta(seconds=float(_time))
         if _time < 3600:
