@@ -313,7 +313,7 @@ def show_time(_time, minimal=True):
         elif _time < 86400:
             return _time_str.strftime('%H:%M:%S')
         else:
-            return _time_str.strftime('%jD+%H:%M:%S')
+            return (_time_str - timedelta(hours=24)).strftime('%jD+%H:%M:%S')
 
 
 def int_list(_list, _sort=True):
