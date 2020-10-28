@@ -315,7 +315,7 @@ def show_time(_time, minimal=True, ms=False):
         elif _time < 86400:
             return _time_str.strftime("%H:%M:%S.%f")[:-3] if ms else _time_str.strftime("%H:%M:%S")
         else:
-            return (_time_str - timedelta(hours=24)).strftime('%jD+%H:%M:%S')
+            _time_str -= timedelta(hours=24)
             return (
                 _time_str.strftime("%jD+%H:%M:%S.%f")[:-3]
                 if ms
