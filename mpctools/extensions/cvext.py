@@ -113,6 +113,8 @@ class BoundingBox:
     center coordinates to convert to correct pixel indices.  Note also that it assumes that image
     coordinates grow downwards and to the right, meaning that BR > TL always. No checks are done
     for this.
+
+    In addition, the class is generally immutable, and hence can be hashable.
     """
 
     def __init__(self, tl=None, br=None, sz=None, c=None):
@@ -141,12 +143,20 @@ class BoundingBox:
 
     def __eq__(self, other):
         """
-        Equality is defined in terms of top-left and bottom-right values. Note that this is
-        susceptible to the usual issue in comparing equality of floating point values!
+        Equality is defined in terms of top-left and bottom-right values, and specifically,
+        it is considered equal, if rounding to 1d.p. yields the same value. (In fact, it uses the
+        string representation).
+
+        Note that `other` must be a BoundingBox
         """
-        return np.array_equal(self.top_left, other.top_left) and np.array_equal(
-            self.bottom_right, other.bottom_right
-        )
+        return type(other) == BoundingBox and str(self) == str(other)
+
+    def __hash__(self):
+        """
+        Since we do not expect to mutate the object, we can hash it. Hashing is based on the
+        string representation of the array, and hence, is only accurate up to differences in 1 dp.
+        """
+        return hash(str(self))
 
     @property
     def top_left(self):
@@ -217,6 +227,19 @@ class BoundingBox:
         else:
             raise ValueError("Invalid Attribute")
 
+    def __contains__(self, item):
+        """
+        Returns true if the item is entirely enclosed by the bounding box
+
+        :param item: Currently a 2D point (tuple, list or array)
+        :return: True if the point item is within the Bounding Box, false otherwise
+        """
+        if item[0] < self.top_left[0] or item[0] > self.bottom_right[0]:
+            return False
+        if item[1] < self.top_left[1] or item[1] > self.bottom_right[1]:
+            return False
+        return True
+
     def area(self):
         return np.prod(self.size)
 
@@ -281,19 +304,6 @@ class BoundingBox:
         return (
             BoundingBox(tl=(x_tl, y_tl), br=(x_br, y_br)) if (x_br > x_tl and y_br > y_tl) else None
         )
-
-    def __contains__(self, item):
-        """
-        Returns true if the item is entirely enclosed by the bounding box
-
-        :param item: Currently a 2D point (tuple, list or array)
-        :return: True if the point item is within the Bounding Box, false otherwise
-        """
-        if item[0] < self.top_left[0] or item[0] > self.bottom_right[0]:
-            return False
-        if item[1] < self.top_left[1] or item[1] > self.bottom_right[1]:
-            return False
-        return True
 
 
 def line(img, pt1, pt2, color, thickness=1, lineType=8, shift=0, linestyle="-"):
