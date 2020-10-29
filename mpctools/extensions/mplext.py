@@ -322,13 +322,17 @@ def plot_lifespans(
     ax = plt.gca() if ax is None else ax
 
     # Generate Discrete Colour Map
-    color_list = plt.cm.get_cmap(cmap)(np.linspace(0, 1, n_rows))
+    if type(cmap) in (list, tuple):
+        color_list = cmap
+    else:
+        clrmap = plt.cm.get_cmap(cmap)
+        color_list = clrmap(np.linspace(0, 1, min(n_rows, clrmap.N)))
 
     # Iterate over plots:
     for i, ts in enumerate(time_series):
         l, v, p = npext.run_lengths(ts, return_values=True, return_positions=True)
         runs = [z for z in zip(p[v == 1], l[v == 1])]
-        ax.broken_barh(runs, (i + 0.1, 0.8), facecolors=color_list[i])
+        ax.broken_barh(runs, (i + 0.1, 0.8), facecolors=color_list[i % len(color_list)])
 
     # Set Labelling
     ax.set_yticks(np.arange(0.5, n_rows, 1.0))
