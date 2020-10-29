@@ -25,6 +25,33 @@ import os
 #            Collections Processing            #
 ################################################
 
+class BitField:
+    """
+    A Class to define a bit-field
+    """
+    def __init__(self, width, vals=()):
+        """
+        Initialise with the list of values set to True and a specified width.
+        :param width: The size of the flag
+        :param vals: The set of 'on' values
+        """
+        if len(vals) > 0:
+            self.__flag = f"{(10 ** (width - 1 - np.asarray(vals))).sum():0{width}d}"
+        else:
+            self.__flag = "0" * width
+
+    def __repr__(self):
+        return self.__flag
+
+    def ison(self, item):
+        return self.__flag[item] == '1'
+
+    def __contains__(self, item):
+        return self.ison(item)
+
+    def __len__(self):
+        return len(self.__flag)
+
 
 class Pool:
     """
