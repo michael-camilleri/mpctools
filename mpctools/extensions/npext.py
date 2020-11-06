@@ -14,9 +14,11 @@ Author: Michael P. J. Camilleri
 """
 
 from scipy.optimize import linear_sum_assignment as hungarian
+from deprecated import deprecated
 from scipy.special import gamma
 from scipy.stats import entropy
 from functools import reduce
+import pandas as pd
 import numpy as np
 import itertools
 
@@ -206,23 +208,23 @@ def run_lengths(a, how="I", return_values=False, return_positions=False):
     #  position information. We also need to convert arrays of NaN to lists so that NaN works.
     #  This will slow down but cannot be helped.
     if type(a) == np.ndarray:
-        a = [i if not np.isnan(i) else np.nan for i in a.flatten()]
+        a = [i if pd.notnull(i) else np.NaN for i in a.flatten()]
     rls = np.asarray(
-        [(sum(1 for _ in l), n) for n, l in itertools.groupby(a)]
+        [(sum(1 for _ in l), n) for n, l in itertools.groupby(a)], dtype="object",
     )  # Now, compute run-lengths and types.
     pos = (
-        np.asarray([0, *np.cumsum(rls[:, 0])[:-1]], dtype=int) if len(rls) > 0 else []
+        np.asarray([0, *np.cumsum(rls[:, 0].astype(int))[:-1]], dtype=int) if len(rls) > 0 else []
     )  # Compute positions just in case.
     # Compute: Branch on Format
     if how.lower() == "a":
         lens, vals = (rls[:, 0], rls[:, 1]) if len(rls) > 0 else ([], [])
     elif how.lower() == "i":
-        n_nan = ~np.isnan(rls[:, 1])
+        n_nan = pd.notnull(rls[:, 1])
         lens, vals, pos = (
             (rls[n_nan, 0], rls[n_nan, 1], pos[n_nan]) if len(n_nan) > 0 else ([], [], [])
         )
     elif how.lower() == "o":
-        nan = np.isnan(rls[:, 1])
+        nan = pd.isna(rls[:, 1])
         lens, vals, pos = (rls[nan, 0], rls[nan, 1], pos[nan]) if len(nan) > 0 else ([], [], [])
     else:
         raise ValueError('Incorrect format for "how" parameter.')
@@ -309,6 +311,7 @@ def make_diagonal(on_diag, off_diag, size):
     return np.eye(size) * on_diag + non_diag(np.full(shape=[size, size], fill_value=off_diag))
 
 
+@deprecated("Use scipy.optimize.linear_sum_assignment directly")
 def maximise_trace(x):
     """
     Maximise the Trace of a SQUARE Matrix X using the Hungarian Algorithm
@@ -381,11 +384,11 @@ class Dirichlet:
         if np.any(alpha <= 0):
             raise ValueError("All dimensions of Alpha must be greater than 0.")
         self._alpha_m1 = alpha - 1.0  # K Dimensional
-        self.__zeros = alpha == 1     # Find location of zeros
+        self.__zeros = alpha == 1  # Find location of zeros
         if ignore_zeros:
             # Check that not all masked:
             if self.__zeros.all():
-                raise ValueError('If ignoring zeros, you cannot have all of Alpha = 1!')
+                raise ValueError("If ignoring zeros, you cannot have all of Alpha = 1!")
             # We need to mask both alpha and alpha-1:
             alpha = np.ma.array(alpha, mask=self.__zeros)
             self._alpha_m1 = np.ma.array(self._alpha_m1, mask=self.__zeros)

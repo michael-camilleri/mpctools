@@ -25,10 +25,12 @@ import os
 #            Collections Processing            #
 ################################################
 
+
 class BitField:
     """
     A Class to define a bit-field
     """
+
     def __init__(self, width, vals=()):
         """
         Initialise with the list of values set to True and a specified width.
@@ -36,7 +38,7 @@ class BitField:
         :param vals: The set of 'on' values
         """
         if len(vals) > 0:
-            self.__flag = f"{(10 ** (width - 1 - np.asarray(vals))).sum():0{width}d}"
+            self.__flag = f"{(10 ** (width - 1 - np.asarray(vals, dtype=int))).sum():0{width}d}"
         else:
             self.__flag = "0" * width
 
@@ -44,7 +46,7 @@ class BitField:
         return self.__flag
 
     def ison(self, item):
-        return self.__flag[item] == '1'
+        return self.__flag[item] == "1"
 
     def __contains__(self, item):
         return self.ison(item)
@@ -330,7 +332,7 @@ def show_time(_time, minimal=True, ms=False):
     :param _time: Time (in seconds)
     :param minimal: If True, and less than 60, show in minimal view (s.ms). Does not effect if
                     more than 1 minute.
-    :parm ms: If True, show millisecond precision
+    :param ms: If True, show millisecond precision
     :return: String representation
     """
     if _time < 60 and minimal:

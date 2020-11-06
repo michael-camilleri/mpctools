@@ -21,7 +21,7 @@ Author: Michael P. J. Camilleri
 """
 
 from numba import jit, uint8, uint16, double
-from mpctools.extensions import npext
+from mpctools.extensions import npext, utils
 from queue import Queue, Empty, Full
 from threading import Thread
 import numpy as np
@@ -80,9 +80,7 @@ class Homography:
         valid = np.isfinite(points2d).all(axis=1)
         img_coords = np.full_like(points2d, fill_value=np.NaN)
         img_coords[valid, :] = np.squeeze(
-            cv2.perspectiveTransform(
-                np.expand_dims(points2d[valid, :], axis=0), self.toImg
-            )
+            cv2.perspectiveTransform(np.expand_dims(points2d[valid, :], axis=0), self.toImg)
         )
         return img_coords
 
@@ -98,10 +96,27 @@ class Homography:
         valid = np.isfinite(points2d).all(axis=1)
         wd_coords = np.full_like(points2d, fill_value=np.NaN)
         wd_coords[valid, :] = np.squeeze(
-            cv2.perspectiveTransform(
-                np.expand_dims(points2d[valid, :], axis=0), self.toWrld
-            )
+            cv2.perspectiveTransform(np.expand_dims(points2d[valid, :], axis=0), self.toWrld)
         )
+
+
+def pairwise_iou(a, b, cutoff=0, distance=False):
+    """
+    Computes the Pair-wise IoU between two lists of BBs
+
+    :param a: First List
+    :param b: Second List
+    :param cutoff: A cutoff - if IoU is below this, then it is converted to np.Inf.
+                   Default 0 (i.e. all are valid)
+    :param distance: If True, returns a distance measure (1-IoU) instead
+    :return: A Matrix of size N_a by N_b
+    """
+    dists = np.empty([len(a), len(b)], dtype=float)
+    for a_i, a_bb in enumerate(a):
+        for b_i, b_bb in enumerate(b):
+            iou = a_bb.iou(b_bb)
+            dists[a_i, b_i] = np.Inf if (iou < cutoff) else (1 - iou if distance else iou)
+    return dists
 
 
 class BoundingBox:
