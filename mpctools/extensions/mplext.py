@@ -18,6 +18,7 @@ from scipy.stats import multivariate_normal as mv_norm
 from matplotlib import pyplot as plt, axes
 from mpctools.extensions import npext
 import seaborn as sns
+import pandas as pd
 import numpy as np
 import warnings
 
@@ -294,71 +295,70 @@ def plot_categorical(
 
 
 def plot_lifespans(
-        time_series,
-        cmap="tab20",
-        ax=None,
-        y_labels=None,
-        x_labels=None,
-        show_simultaneous=None,
-        fnt_size=15,
+    ts: np.ndarray, colors=False, ax=None, y_labels=None, x_labels=None, fs=15, invert_y=True,
 ):
     """
-    Plot life-spans of time-series in the format of a gant-chart.
+    Plot life-spans of time-series in the format of a gantt-chart.
 
-    :param time_series: A 2D array, with True/False runs along each row (i.e. each row is one
-                        time-series.
-    :param cmap:        If provided, uses this colour map.
+    :param ts: A 2D array to plot, where time is along the rows (to follow from Pandas
+                        DataFrames). The values themselves are generally ignored (although see
+                        cmap), and visibility is governed by it being a finite number.
+    :param colors:      Colours to use for the bars. Can be:
+                          False: Default - Do not colour (all gray)
+                          True: Interpret the values in time_series as colours
+                          List/Tuple: List of colours to iterate over different series
+                          str: Named colour map
     :param ax:          If provided, uses this axes
     :param y_labels:    Labels to use for the y-value
     :param x_labels:    Labels to use for the x-axis
-    :param show_simultaneous: If not None, shows the number of simultaneous life-times, excluding
-                        the default expected as specified.
-    :param fnt_size:    Font-Size
+    :param fs:          Font-Size
+    :param invert_y: If True (default) invert y-axis
     discarding those which do not fit
     :return:
     """
     # Evaluate Parameters
-    n_rows, n_cols = time_series.shape
+    n_time, n_series = ts.shape
     ax = plt.gca() if ax is None else ax
 
     # Generate Discrete Colour Map
-    if type(cmap) in (list, tuple):
-        color_list = cmap
+    if type(colors) in (list, tuple):
+        color_list = colors
+    elif type(colors) is str:
+        clrmap = plt.cm.get_cmap(colors)
+        color_list = clrmap(np.linspace(0, 1, min(n_series, clrmap.N)))
+    elif colors is False:
+        color_list = [(0.75, 0.75, 0.75, 1.0)] # Gray Colour
     else:
-        clrmap = plt.cm.get_cmap(cmap)
-        color_list = clrmap(np.linspace(0, 1, min(n_rows, clrmap.N)))
+        color_list = None
 
-    # Iterate over plots:
-    for i, ts in enumerate(time_series):
-        l, v, p = npext.run_lengths(ts, return_values=True, return_positions=True)
-        runs = [z for z in zip(p[v == 1], l[v == 1])]
-        ax.broken_barh(runs, (i + 0.1, 0.8), facecolors=color_list[i % len(color_list)])
+    # To simplify computation load
+    if color_list is not None:
+        ts = pd.notnull(ts).astype(float)
+        ts[ts == 0] = np.NaN
+
+    # Iterate over time-series (columns):
+    for i in range(n_series):
+        l, v, p = npext.run_lengths(ts[:, i], how='I', return_values=True, return_positions=True)
+        runs = [z for z in zip(p, l)]
+        cols = v if color_list is None else color_list[i % len(color_list)]
+        ax.broken_barh(runs, (i + 0.1, 0.8), facecolors=cols)
 
     # Set Labelling
-    ax.set_yticks(np.arange(0.5, n_rows, 1.0))
+    ax.set_yticks(np.arange(0.5, n_series, 1.0))
     if y_labels is not None:
         ax.set_yticklabels(y_labels)
     if x_labels is not None:
         x_ticks = ax.get_xticks().astype(int)
-        x_ticks = x_ticks[np.logical_and(x_ticks < n_cols, x_ticks > -1)]
+        x_ticks = x_ticks[np.logical_and(x_ticks < n_time, x_ticks > -1)]
         ax.set_xticks(x_ticks)
-        ax.set_xticklabels(x_labels[x_ticks])
-    ax.tick_params(labelsize=fnt_size)
-    ax.grid(True, axis='x')
-    ax.invert_yaxis()
-
-    # If need be, show simultaneous life-spans:
-    if show_simultaneous is not None:
-        ax2 = ax.twinx()
-        _sums = time_series.sum(axis=0)
-        _sumf = _sums != show_simultaneous
-        ax2.plot(np.arange(n_cols)[_sumf], _sums[_sumf], 'x', color='k')
-        ax2.set_yticks(np.unique(_sums[_sumf]))
-        ax2.tick_params(labelsize=fnt_size)
-        ax2.set_ylabel('Number of Simultaneous Tracklets', fontsize=fnt_size)
+        ax.set_xticklabels(np.asarray(x_labels)[x_ticks])
+    ax.tick_params(labelsize=fs)
+    ax.grid(True, axis="x")
+    if invert_y:
+        ax.invert_yaxis()
 
     # Return the Axes
-    return (ax, ax2) if show_simultaneous is not None else ax
+    return ax
 
 
 def plot_contour(axs=None, x=None, y=None, kind="G", params=(np.zeros(2), np.eye(2)), res=100):

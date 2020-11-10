@@ -102,12 +102,12 @@ class Homography:
 
 def pairwise_iou(a, b, cutoff=0, distance=False):
     """
-    Computes the Pair-wise IoU between two lists of BBs
+    Computes the Pair-wise IoU (or distance) between two lists of BBs
 
     :param a: First List
     :param b: Second List
-    :param cutoff: A cutoff - if IoU is below this, then it is converted to np.Inf.
-                   Default 0 (i.e. all are valid)
+    :param cutoff: A cutoff - if IoU is below this, then it is converted to +/- np.Inf (depending on
+                   distance). Default 0 (i.e. all are valid)
     :param distance: If True, returns a distance measure (1-IoU) instead
     :return: A Matrix of size N_a by N_b
     """
@@ -115,7 +115,7 @@ def pairwise_iou(a, b, cutoff=0, distance=False):
     for a_i, a_bb in enumerate(a):
         for b_i, b_bb in enumerate(b):
             iou = a_bb.iou(b_bb)
-            dists[a_i, b_i] = np.Inf if (iou < cutoff) else (1 - iou if distance else iou)
+            dists[a_i, b_i] = (np.PINF if distance else np.NINF) if (iou < cutoff) else (1 - iou if distance else iou)
     return dists
 
 
