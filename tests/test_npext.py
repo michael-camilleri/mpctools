@@ -85,6 +85,7 @@ class TestInvertSoftmax(unittest.TestCase):
 
 
 class TestRunLengths(unittest.TestCase):
+
     def test_standard(self):
         a = np.array(
             [0, 0, 0, 1, 1, np.NaN, 1, 1, 1, 1, 1, -1, 1, 1, 1, 1, 2, 3, 0.56, 0.56, 0.56]
@@ -171,3 +172,69 @@ class TestRunLengths(unittest.TestCase):
                 npext.run_lengths(a, how="o", return_values=True)[1], [np.NaN]
             )
         )
+
+
+class TestHungarian(unittest.TestCase):
+
+    def setUp(self):
+        np.random.seed(100)
+
+    def test_basecases(self):
+        r, c = npext.hungarian(1-np.eye(7), maximise=False)
+        self.assertTrue(np.array_equal(r, np.arange(7)))
+        self.assertTrue(np.array_equal(c, np.arange(7)))
+
+        r, c = npext.hungarian(np.eye(7), maximise=True)
+        self.assertTrue(np.array_equal(r, np.arange(7)))
+        self.assertTrue(np.array_equal(c, np.arange(7)))
+
+        r, c = npext.hungarian(1-np.eye(5, 7), maximise=False)
+        self.assertTrue(np.array_equal(r, np.arange(5)))
+        self.assertTrue(np.array_equal(c, np.arange(5)))
+
+        r, c = npext.hungarian(np.eye(5, 7), maximise=True)
+        self.assertTrue(np.array_equal(r, np.arange(5)))
+        self.assertTrue(np.array_equal(c, np.arange(5)))
+
+    def test_inadmissables(self):
+        _cost = 1-np.eye(7)
+        _cost[5, :] = np.NaN
+        r, c = npext.hungarian(_cost)
+        self.assertTrue(np.array_equal(r, [0, 1, 2, 3, 4, 6]))
+        self.assertTrue(np.array_equal(c, [0, 1, 2, 3, 4, 6]))
+        r, c = npext.hungarian(_cost, row_labels=["A","B","C","D","E","F","G"])
+        self.assertTrue(np.array_equal(r, ["A","B","C","D","E","G"]))
+        self.assertTrue(np.array_equal(c, [0, 1, 2, 3, 4, 6]))
+        r, c = npext.hungarian(_cost, col_labels=["A","B","C","D","E","F","G"])
+        self.assertTrue(np.array_equal(r, [0, 1, 2, 3, 4, 6]))
+        self.assertTrue(np.array_equal(c, ["A","B","C","D","E","G"]))
+
+        _cost = np.eye(7)
+        _cost[5, :] = np.NaN
+        r, c = npext.hungarian(_cost, maximise=True)
+        self.assertTrue(np.array_equal(r, [0, 1, 2, 3, 4, 6]))
+        self.assertTrue(np.array_equal(c, [0, 1, 2, 3, 4, 6]))
+
+    def test_symmetry(self):
+        for _ in range(10):
+            _sz = np.random.randint(3, 10, size=2)
+            _cost = np.random.randint(2, 100, _sz)
+            # Minimum
+            r1, c1 = npext.hungarian(_cost)
+            c2, r2 = npext.hungarian(_cost.T)
+            self.assertTrue(np.array_equal(r1, np.sort(r2)))
+            self.assertTrue(np.array_equal(c1, c2[np.argsort(r2)]))
+            # Maximum
+            r1, c1 = npext.hungarian(_cost, maximise=True)
+            c2, r2 = npext.hungarian(_cost.T, maximise=True)
+            self.assertTrue(np.array_equal(r1, np.sort(r2)))
+            self.assertTrue(np.array_equal(c1, c2[np.argsort(r2)]))
+
+    def test_degenerates(self):
+        for _ in range(10):
+            _sz = np.random.randint(3, 10, size=2)
+            self.assertEqual(npext.hungarian(np.full(_sz, np.NaN)), ([], []))
+            self.assertEqual(npext.hungarian(np.full(_sz, np.NaN), False), ([], []))
+            self.assertEqual(npext.hungarian(np.ones(_sz), cutoff=0.5), ([], []))
+            self.assertEqual(npext.hungarian(np.ones(_sz), True, cutoff=2), ([], []))
+

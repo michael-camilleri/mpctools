@@ -13,7 +13,7 @@ see http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 
-from scipy.optimize import linear_sum_assignment as hungarian
+from scipy.optimize import linear_sum_assignment
 from deprecated import deprecated
 from scipy.special import gamma
 from scipy.stats import entropy
@@ -21,6 +21,7 @@ from functools import reduce
 import pandas as pd
 import numpy as np
 import itertools
+import copy
 
 
 ################################################################
@@ -311,18 +312,56 @@ def make_diagonal(on_diag, off_diag, size):
     return np.eye(size) * on_diag + non_diag(np.full(shape=[size, size], fill_value=off_diag))
 
 
-@deprecated("Use scipy.optimize.linear_sum_assignment directly")
-def maximise_trace(x):
+def hungarian(costs: np.ndarray, maximise=False, cutoff=None, row_labels=None, col_labels=None):
     """
-    Maximise the Trace of a SQUARE Matrix X using the Hungarian Algorithm
+    Solves the Assignment problem.
 
-    :param x: Numpy 2D SQUARE Array
-    :return: Tuple containing (in order):
-                * optimal permutation of columns to achieve a maximal trace
-                * size of this trace
+    This method is a wrapper around scipy's linear_sum_assignment that:
+     1. Can Threshold certain costs,
+     2. Can Handle np.NaN (as np.Inf)
+     3. Can deal with rows/columns of NaN
+     4. Can keep track of labels, rather than just indices
+
+    :param costs:      Cost Matrix to optimise
+    :param maximise:   (default: False) - Calculates a maximum weight matching if true.
+    :param cutoff:     If set, use this as a threshold. The cutoff range depends on whether
+                       maximising (in which case lower-values are invalidated) or minimising
+                       (higher values inadmissable).
+    :param row_labels: Row-Labels (optional) - If None, using 0-based indices
+    :param col_labels: Column-Labels (optional) - If None, using 0-based indices
+    :return:
     """
-    _rows, _cols = hungarian(np.full(len(x), np.max(x)) - x)
-    return _cols, x[_rows, _cols].sum()
+    # Prepare
+    _cost = costs.astype(float)
+
+    # Handle Edge Cases
+    _cost[~np.isfinite(_cost)] = np.NINF if maximise else np.PINF
+    if cutoff is not None:
+        if maximise:
+            _cost[_cost < cutoff] = np.NINF
+        else:
+            _cost[_cost > cutoff] = np.PINF
+
+    # Extract only valid columns
+    valid = np.isfinite(_cost)
+    if ~valid.any():  # Guard against having no valid assignments
+        return [], []
+    val_r, val_c = valid.any(axis=1), valid.any(axis=0)
+    _cost = _cost[val_r, :]
+    _cost = _cost[:, val_c]
+
+    # Perform Hungarian
+    r, c = linear_sum_assignment(_cost, maximise)
+
+    # Map to original Indices
+    r_ids, c_ids = np.where(val_r)[0][r], np.where(val_c)[0][c]
+    if row_labels is not None:
+        r_ids = np.asarray(row_labels)[r_ids]
+    if col_labels is not None:
+        c_ids = np.asarray(col_labels)[c_ids]
+
+    # Return
+    return r_ids, c_ids
 
 
 def swap_columns(x, cols):
