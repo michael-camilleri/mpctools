@@ -14,14 +14,13 @@ Author: Michael P. J. Camilleri
 """
 
 from scipy.optimize import linear_sum_assignment
-from deprecated import deprecated
+# from deprecated import deprecated
 from scipy.special import gamma
 from scipy.stats import entropy
 from functools import reduce
 import pandas as pd
 import numpy as np
 import itertools
-import copy
 
 
 ################################################################
@@ -238,12 +237,16 @@ def run_lengths(a, how="I", return_values=False, return_positions=False):
     return tuple(to_return) if len(to_return) > 1 else to_return[0]
 
 
-def array_nan_equal(left, right):
+def array_nan_equal(left, right, axis=None):
     """
     Compares two numpy arrays to test for equality, but considers np.nan values to be equal to each
     other
+
     :param left: The Left array to consider
     :param right: The Right array to consider
+    :param axis: Optional: Dimension along which to compare - note this only affects the equality in
+                 terms of values: i.e. if arrays are not the same shape, then only a single value is
+                 returned nonetheless.
     :return: True if left is the same shape as right, and all elements are equal (including nan's at
              same positions)
     """
@@ -258,11 +261,7 @@ def array_nan_equal(left, right):
         return False
 
     # Return
-    return bool(
-        np.logical_or(
-            np.asarray(left == right), np.logical_and(np.isnan(left), np.isnan(right))
-        ).all()
-    )
+    return np.logical_or(np.asarray(left == right), np.logical_and(pd.isnull(left), pd.isnull(right))).all(axis=axis).astype(bool)
 
 
 def round_to_multiple(x, base, how="r"):
