@@ -385,7 +385,7 @@ def line(img, pt1, pt2, color, thickness=1, lineType=8, shift=0, linestyle="-"):
         cv2.circle(img, (int(pt2[0]), int(pt2[1])), thickness, color, -1, cv2.LINE_AA)
 
 
-def rectangle(img, pt1, pt2, color, thickness=1, lineType=8, shift=0, linestyle="-"):
+def rectangle(img, pt1, pt2, color, thickness=1, lineType=8, shift=0, linestyle=None):
     """
     Draws a Rectangle at the specified position
 
@@ -397,27 +397,39 @@ def rectangle(img, pt1, pt2, color, thickness=1, lineType=8, shift=0, linestyle=
         thickness: Line Thickness. See cv.rectangle
         lineType: See cv.rectangle
         shift: See cv.rectangle
-        linestyle: specifies the line-style (see cvext.line())
+        linestyle: specifies the line-style (see cvext.line()) or the real-valued alpha parameter if
+                 thickness is negative.
     """
     if type(pt1) is BoundingBox:
         pt2 = pt1["BR"]
         pt1 = pt1["TL"]
 
-    if linestyle == "-":
-        cv2.rectangle(
-            img,
-            (int(pt1[0]), int(pt1[1])),
+    if thickness < 0:
+        alpha = float(linestyle) if linestyle is not None else 1
+        overlay = img.copy()
+        cv2.rectangle(overlay, (int(pt1[0]), int(pt1[1])),
             (int(pt2[0]), int(pt2[1])),
             color,
-            thickness,
+            -1,
             lineType,
-            shift,
-        )
+            shift,)
+        np.copyto(img, cv2.addWeighted(overlay, alpha, img, 1-alpha, 0))
     else:
-        line(img, pt1, (pt2[0], pt1[1]), color, thickness, lineType, shift, linestyle)
-        line(img, (pt2[0], pt1[1]), pt2, color, thickness, lineType, shift, linestyle)
-        line(img, pt1, (pt1[0], pt2[1]), color, thickness, lineType, shift, linestyle)
-        line(img, (pt1[0], pt2[1]), pt2, color, thickness, lineType, shift, linestyle)
+        if linestyle is None or linestyle == "-":
+            cv2.rectangle(
+                img,
+                (int(pt1[0]), int(pt1[1])),
+                (int(pt2[0]), int(pt2[1])),
+                color,
+                thickness,
+                lineType,
+                shift,
+            )
+        else:
+            line(img, pt1, (pt2[0], pt1[1]), color, thickness, lineType, shift, linestyle)
+            line(img, (pt2[0], pt1[1]), pt2, color, thickness, lineType, shift, linestyle)
+            line(img, pt1, (pt1[0], pt2[1]), color, thickness, lineType, shift, linestyle)
+            line(img, (pt1[0], pt2[1]), pt2, color, thickness, lineType, shift, linestyle)
 
 
 def point(img, center, color, size=1, style="."):
