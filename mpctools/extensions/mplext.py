@@ -29,8 +29,8 @@ def plot_matrix(
     min_max=None,
     show_val=False,
     ax=None,
-    cbar=None,
-    labels=None,
+    cax=None,
+    x_labels=None,
     y_labels=None,
     x_rot=0,
     y_rot=0,
@@ -46,6 +46,8 @@ def plot_matrix(
     Rows (first-dimension) of the matrix are printed along the y-axis, with columns (2nd dimension) along the X-axis.
     Note that by default, the y-axes is inverted.
 
+    TODO: Support NaN plotting
+
     Inspired by [Hinton Demo](https://matplotlib.org/examples/specialty_plots/hinton_demo.html). The heatmap makes
     use of seaborn functionality, with some pre/post processing.
 
@@ -60,10 +62,10 @@ def plot_matrix(
                             Tuple/List: (minimum, maximum). Only for Heatmaps.
     :param show_val:    If True, then show the numerical value on the heatmap/hinton
     :param ax:          Axes to plot on
-    :param cbar:        Only relevant when mode is 'heatmap': if not None, specifies a seperate axes for the colour bar.
-                        If False, then do not plot a heatmap.
-    :param labels:      Labels for the axes.
-    :param y_labels:    If not None, then use separate labels for the y-axis.
+    :param cax: Only relevant when mode is 'heatmap': if not None, specifies a seperate  axes for the colour bar.
+                If False, then do not plot a heatmap colour-bar.
+    :param x_labels:    Labels for the x-axes.
+    :param y_labels:    Labels for the y-axes - if None, use same as x
     :param x_rot:       Rotation for the X-Axis Labels
     :param y_rot:       Rotation for the Y-Axis Labels
     :param fmt:         Formatting String for Value labels (if any)
@@ -140,19 +142,19 @@ def plot_matrix(
             annot=show_val,
             fmt=fmt,
             ax=ax,
-            cbar=cbar is not False,
-            cbar_ax=cbar if isinstance(cbar, axes.Axes) else None,
+            cbar=cax is not False,
+            cbar_ax=cax if isinstance(cax, axes.Axes) else None,
         )
 
     # Add Ticks/Labels
-    if labels is not None:
-        y_labels = labels if y_labels is None else y_labels
+    if x_labels is not None:
+        y_labels = x_labels if y_labels is None else y_labels
         if mode:
-            ax.set_xticks(np.arange(len(labels)))
+            ax.set_xticks(np.arange(len(x_labels)))
         else:
-            ax.set_xticks(np.arange(0.5, len(labels) + 0.5))
+            ax.set_xticks(np.arange(0.5, len(x_labels) + 0.5))
         ax.set_xticklabels(
-            labels, rotation=x_rot, horizontalalignment="center" if x_rot == 0 else "right",
+            x_labels, rotation=x_rot, horizontalalignment="center" if x_rot == 0 else "right",
         )
         if mode:
             ax.set_yticks(np.arange(len(y_labels)))
