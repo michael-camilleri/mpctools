@@ -321,6 +321,9 @@ def hungarian(costs: np.ndarray, maximise=False, cutoff=None, row_labels=None, c
      3. Can deal with rows/columns of NaN
      4. Can keep track of labels, rather than just indices
 
+    @TODO: Note that it seems that if due to inadmissability two rows/columns are not linearly
+           dependent, then the cost-matrix is deemed infeasible.
+
     :param costs:      Cost Matrix to optimise
     :param maximise:   (default: False) - Calculates a maximum weight matching if true.
     :param cutoff:     If set, use this as a threshold. The cutoff range depends on whether

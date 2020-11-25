@@ -15,6 +15,7 @@ Author: Michael P. J. Camilleri
 
 import unittest
 import numpy as np
+import itertools as it
 from scipy.special import softmax
 
 from mpctools.extensions import npext
@@ -195,6 +196,16 @@ class TestHungarian(unittest.TestCase):
         r, c = npext.hungarian(np.eye(5, 7), maximise=True)
         self.assertTrue(np.array_equal(r, np.arange(5)))
         self.assertTrue(np.array_equal(c, np.arange(5)))
+
+    def test_general_case(self):
+        _cost = np.asarray([[5.9, 0.0, 2.3, 3.1, 3.5],
+                            [1.2,  10, 0.8, 6.3, 8.1],
+                            [11,  5.4, 20,  0.4, 9.1],
+                            [5.0, 3.8, 0.2, 6.1, 3.1]])
+        for _order in it.permutations([0, 1, 2, 3]):
+            r, c = npext.hungarian(_cost[_order, :], maximise=True)
+            self.assertTrue(np.array_equal(r, [0, 1, 2, 3]))
+            self.assertTrue(np.array_equal(c, _order))
 
     def test_inadmissables(self):
         _cost = 1-np.eye(7)
