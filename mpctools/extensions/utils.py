@@ -30,7 +30,6 @@ class BitField:
     """
     A Class to define a bit-field
     """
-
     def __init__(self, width, vals=()):
         """
         Initialise with the list of values set to True and a specified width.

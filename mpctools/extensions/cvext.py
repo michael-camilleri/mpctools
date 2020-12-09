@@ -688,7 +688,8 @@ class VideoParser:
 
 class FrameGetter:
     """
-    Wrapper for reading successive frames from disk.
+    Wrapper for reading successive frames from disk, or individual frames (note that this is only a
+    convenience, and is actually quite slow).
 
     Note that as per OpenCV defaults, the returned images are always in BGR
     """
@@ -697,11 +698,11 @@ class FrameGetter:
         """
         Initialiser
 
-        :param path: Path to the extracted frames
-        :param fmt:  The format mode for the name
+        :param path: Path to the extracted frames or the Video File
+        :param fmt:  The format mode for the name. If 'Video', then this is treated as a video
         """
-        if not os.path.isdir(path):
-            raise RuntimeError(f'Specified Directory "{path}" does not exist!')
+        if fmt.lower() != 'video' and not os.path.isdir(path):
+            raise RuntimeError('A Directory must be specified when fmt is not a video.')
         self.Path = path
         self.Fmt = fmt
 
@@ -709,14 +710,21 @@ class FrameGetter:
         """
         Retrieve a frame by Number
 
-        :param item: Frame Number. Note that this is translated directly to image name.
+        :param item: Frame Number. Note that this is translated directly to image name as per the
+               fmt if reading from folder.
         :return: OpenCV Image
-        :raises  ValueError if the frame does not exist
+        :raises  AssertionError if the frame does not exist
         """
-        _pth = os.path.join(self.Path, self.Fmt.format(item))
-        if os.path.exists(_pth):
+        if self.Fmt.lower() == 'video':
+            v = cv2.VideoCapture(self.Path)
+            v.set(cv2.CAP_PROP_POS_FRAMES, item)
+            assert v.get(cv2.CAP_PROP_POS_FRAMES) == item, f'Failed to Retrieve Image @ {item}'
+            return v.read()[1]
+
+        else:
+            _pth = os.path.join(self.Path, self.Fmt.format(item))
+            assert os.path.exists(_pth), f"Image {item} does not exist."
             return cv2.imread(_pth)
-        raise ValueError(f"Image {item} does not exist.")
 
 
 class SwCLAHE:
