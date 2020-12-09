@@ -227,9 +227,20 @@ class TestHungarian(unittest.TestCase):
             self.assertEqual(npext.hungarian(np.ones(_sz), cutoff=0.5), ([], []))
             self.assertEqual(npext.hungarian(np.ones(_sz), True, cutoff=2), ([], []))
 
-    def test_linearly_dependent(self):
-        r, c = npext.hungarian(
-            np.asarray([[np.NaN, 1.0, np.NaN], [np.NaN, 2.0, np.NaN], [1.0, 3.1, 2.1]])
-        )
+    def test_hard_cases(self):
+        _cost = np.asarray([[np.NaN, 1.0, np.NaN], [np.NaN, 2.0, np.NaN], [1.0, 3.1, 2.1]])
+        # Minimise
+        r, c = npext.hungarian(_cost, False)
         self.assertTrue(np.array_equal(r, [0, 2]))
         self.assertTrue(np.array_equal(c, [1, 0]))
+        r, c = npext.hungarian(_cost, False, cutoff=2.0)
+        self.assertTrue(np.array_equal(r, [0, 2]))
+        self.assertTrue(np.array_equal(c, [1, 0]))
+        # Maximise
+        r, c = npext.hungarian(_cost, True)
+        self.assertTrue(np.array_equal(r, [1, 2]))
+        self.assertTrue(np.array_equal(c, [1, 2]))
+        r, c = npext.hungarian(_cost, True, cutoff=2.05)
+        self.assertTrue(np.array_equal(r, [2]))
+        self.assertTrue(np.array_equal(c, [1]))
+

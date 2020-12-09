@@ -13,7 +13,8 @@ see http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 
-from scipy.optimize import linear_sum_assignment
+#from scipy.optimize import linear_sum_assignment
+from lapsolver import solve_dense
 # from deprecated import deprecated
 from scipy.special import gamma
 from scipy.stats import entropy
@@ -321,9 +322,6 @@ def hungarian(costs: np.ndarray, maximise=False, cutoff=None, row_labels=None, c
      3. Can deal with rows/columns of NaN
      4. Can keep track of labels, rather than just indices
 
-    @TODO: Note that it seems that if due to inadmissability two rows/columns are not linearly
-           dependent, then the cost-matrix is deemed infeasible.
-
     :param costs:      Cost Matrix to optimise
     :param maximise:   (default: False) - Calculates a maximum weight matching if true.
     :param cutoff:     If set, use this as a threshold. The cutoff range depends on whether
@@ -337,14 +335,14 @@ def hungarian(costs: np.ndarray, maximise=False, cutoff=None, row_labels=None, c
     _cost = costs.astype(float)
 
     # Handle Edge Cases
-    _cost[~np.isfinite(_cost)] = np.NINF if maximise else np.PINF
+    _cost[~np.isfinite(_cost)] = np.NaN
     if cutoff is not None:
         if maximise:
-            _cost[_cost < cutoff] = np.NINF
+            _cost[_cost < cutoff] = np.NaN
         else:
-            _cost[_cost > cutoff] = np.PINF
+            _cost[_cost > cutoff] = np.NaN
 
-    # Extract only valid columns
+    # Extract only valid rows/columns (i.e. where the is at least one element which is valid)
     valid = np.isfinite(_cost)
     if ~valid.any():  # Guard against having no valid assignments
         return [], []
@@ -352,8 +350,11 @@ def hungarian(costs: np.ndarray, maximise=False, cutoff=None, row_labels=None, c
     _cost = _cost[val_r, :]
     _cost = _cost[:, val_c]
 
-    # Perform Hungarian
-    r, c = linear_sum_assignment(_cost, maximise)
+    # Perform Hungarian (but handle Maximisation)
+    if maximise:
+        finite = np.isfinite(_cost)
+        _cost[finite] = np.max(_cost[finite]) - _cost[finite]
+    r, c = solve_dense(_cost)
 
     # Map to original Indices
     r_ids, c_ids = np.where(val_r)[0][r], np.where(val_c)[0][c]
