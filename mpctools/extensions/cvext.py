@@ -53,20 +53,31 @@ class FourCC:
 class Homography:
     """
     Class for fitting a Homography:
-        Based on code by Dr Rowland Sillito, ActualAnalytics
+        Based on code by Dr Rowland Sillito, ActualAnalytics and my own additions.
+
+    Note that when fitting, the class gives priority to the forward transformation (world to image).
     """
 
-    def __init__(self, image_coords, world_coords):
+    def __init__(self, image_coords, world_coords, ransac=None):
         """
         Initialiser
 
         :param image_coords: A 2D Numpy array of image coordinates, with x/y along the second axis.
                              Must be of length at least 4.
-        :param world_coords: A 2D Numpy arra of corresponding world-coordinates: must be same shape
+        :param world_coords: A 2D Numpy array of corresponding world-coordinates: must be same shape
                             as image_coords
+        :param ransac: If not None, then use RANSAC for fitting the forward matrix (world to
+                       image coordinates) with the specified inlier cutoff (in terms of pixel
+                       distance). At the same time the backwards transform uses only the inliers
+                       from the above transformation.
         """
-        self.toImg = cv2.findHomography(world_coords, image_coords)[0]
-        self.toWrld = cv2.findHomography(image_coords, world_coords)[0]
+        if ransac is None:
+            self.toImg = cv2.findHomography(world_coords, image_coords, method=0)[0]
+        else:
+            self.toImg, msk = cv2.findHomography(world_coords, image_coords, cv2.RANSAC, ransac)
+            image_coords = image_coords[np.squeeze(msk).astype(bool)]
+            world_coords = world_coords[np.squeeze(msk).astype(bool)]
+        self.toWrld = cv2.findHomography(image_coords, world_coords, 0)[0]
 
     def to_image(self, points):
         """
@@ -115,7 +126,11 @@ def pairwise_iou(a, b, cutoff=0, distance=False):
     for a_i, a_bb in enumerate(a):
         for b_i, b_bb in enumerate(b):
             iou = a_bb.iou(b_bb)
-            dists[a_i, b_i] = (np.PINF if distance else np.NINF) if (iou < cutoff) else (1 - iou if distance else iou)
+            dists[a_i, b_i] = (
+                (np.PINF if distance else np.NINF)
+                if (iou < cutoff)
+                else (1 - iou if distance else iou)
+            )
     return dists
 
 
@@ -407,13 +422,16 @@ def rectangle(img, pt1, pt2, color, thickness=1, lineType=8, shift=0, linestyle=
     if thickness < 0:
         alpha = float(linestyle) if linestyle is not None else 1
         overlay = img.copy()
-        cv2.rectangle(overlay, (int(pt1[0]), int(pt1[1])),
+        cv2.rectangle(
+            overlay,
+            (int(pt1[0]), int(pt1[1])),
             (int(pt2[0]), int(pt2[1])),
             color,
             -1,
             lineType,
-            shift,)
-        np.copyto(img, cv2.addWeighted(overlay, alpha, img, 1-alpha, 0))
+            shift,
+        )
+        np.copyto(img, cv2.addWeighted(overlay, alpha, img, 1 - alpha, 0))
     else:
         if linestyle is None or linestyle == "-":
             cv2.rectangle(
@@ -701,8 +719,8 @@ class FrameGetter:
         :param path: Path to the extracted frames or the Video File
         :param fmt:  The format mode for the name. If 'Video', then this is treated as a video
         """
-        if fmt.lower() != 'video' and not os.path.isdir(path):
-            raise RuntimeError('A Directory must be specified when fmt is not a video.')
+        if fmt.lower() != "video" and not os.path.isdir(path):
+            raise RuntimeError("A Directory must be specified when fmt is not a video.")
         self.Path = path
         self.Fmt = fmt
 
@@ -715,10 +733,10 @@ class FrameGetter:
         :return: OpenCV Image
         :raises  AssertionError if the frame does not exist
         """
-        if self.Fmt.lower() == 'video':
+        if self.Fmt.lower() == "video":
             v = cv2.VideoCapture(self.Path)
             v.set(cv2.CAP_PROP_POS_FRAMES, item)
-            assert v.get(cv2.CAP_PROP_POS_FRAMES) == item, f'Failed to Retrieve Image @ {item}'
+            assert v.get(cv2.CAP_PROP_POS_FRAMES) == item, f"Failed to Retrieve Image @ {item}"
             return v.read()[1]
 
         else:

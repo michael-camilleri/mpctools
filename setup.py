@@ -18,6 +18,7 @@ setup(
         "opencv-python",
         "scikit-learn",
         "matplotlib",
+        "lapsolver",
         "seaborn",
         "pandas",
         "pathos",

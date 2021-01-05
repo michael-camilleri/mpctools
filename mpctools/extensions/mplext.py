@@ -35,6 +35,7 @@ def plot_matrix(
     x_rot=0,
     y_rot=0,
     fmt=".2f",
+    fs=10,
 ):
     """
     Draw Hinton/Heatmap diagram for visualizing a weight matrix.
@@ -130,6 +131,7 @@ def plot_matrix(
                     horizontalalignment="center",
                     verticalalignment="center",
                     color="black" if w > 0 else "white",
+                    fontsize=fs,
                 )
         ax.set_ylim(-1, matrix.shape[0])
         ax.set_xlim(-1, matrix.shape[1])
@@ -363,7 +365,9 @@ def plot_lifespans(
     return ax
 
 
-def plot_contour(axs=None, x=None, y=None, kind="G", params=(np.zeros(2), np.eye(2)), res=100):
+def plot_contour(
+        axs=None, x=None, y=None, kind="G", params=(np.zeros(2), np.eye(2)), res=100, show_means=200
+):
     """
     Generate a contour plot
 
@@ -377,6 +381,7 @@ def plot_contour(axs=None, x=None, y=None, kind="G", params=(np.zeros(2), np.eye
                   the value at each pt
     :param params: Any additional parameters to use when using the Gaussian plot
     :param res:   The resolution along the X and Y.
+    :param show_means: If not None, display the Mean as a cross of specified size
     :return:      The plot parameters as returned by pyplot.contour()
     """
     # Handle specified options
@@ -395,5 +400,7 @@ def plot_contour(axs=None, x=None, y=None, kind="G", params=(np.zeros(2), np.eye
     # Handle Kind
     if type(kind) == str and kind.lower() == "g":
         axs.contour(X, Y, mv_norm.pdf(np.stack((X, Y), axis=-1), *params))
+        if show_means is not None:
+            axs.scatter([params[0][0]], [params[0][1]], s=show_means, marker='x')
     else:
         raise NotImplementedError("Executable Kind is not yet implemented")

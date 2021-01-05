@@ -13,7 +13,6 @@ see http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 
-#from scipy.optimize import linear_sum_assignment
 from lapsolver import solve_dense
 # from deprecated import deprecated
 from scipy.special import gamma
