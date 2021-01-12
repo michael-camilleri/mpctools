@@ -74,9 +74,9 @@ class Homography:
         if ransac is None:
             self.toImg = cv2.findHomography(world_coords, image_coords, method=0)[0]
         else:
-            self.toImg, msk = cv2.findHomography(world_coords, image_coords, cv2.RANSAC, ransac)
-            image_coords = image_coords[np.squeeze(msk).astype(bool)]
-            world_coords = world_coords[np.squeeze(msk).astype(bool)]
+            self.toImg, self._mask = cv2.findHomography(world_coords, image_coords, cv2.RANSAC, ransac)
+            image_coords = image_coords[np.squeeze(self._mask).astype(bool)]
+            world_coords = world_coords[np.squeeze(self._mask).astype(bool)]
         self.toWrld = cv2.findHomography(image_coords, world_coords, 0)[0]
 
     def to_image(self, points):

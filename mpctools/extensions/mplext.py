@@ -366,7 +366,8 @@ def plot_lifespans(
 
 
 def plot_contour(
-        axs=None, x=None, y=None, kind="G", params=(np.zeros(2), np.eye(2)), res=100, show_means=200
+        axs=None, x=None, y=None, kind="G", params=(np.zeros(2), np.eye(2)), res=100,
+        show_means=200, levels=None
 ):
     """
     Generate a contour plot
@@ -382,6 +383,7 @@ def plot_contour(
     :param params: Any additional parameters to use when using the Gaussian plot
     :param res:   The resolution along the X and Y.
     :param show_means: If not None, display the Mean as a cross of specified size
+    :param levels: Number of levels to show (in axes.contour())
     :return:      The plot parameters as returned by pyplot.contour()
     """
     # Handle specified options
@@ -399,7 +401,7 @@ def plot_contour(
 
     # Handle Kind
     if type(kind) == str and kind.lower() == "g":
-        axs.contour(X, Y, mv_norm.pdf(np.stack((X, Y), axis=-1), *params))
+        axs.contour(X, Y, mv_norm.pdf(np.stack((X, Y), axis=-1), *params), levels)
         if show_means is not None:
             axs.scatter([params[0][0]], [params[0][1]], s=show_means, marker='x')
     else:
