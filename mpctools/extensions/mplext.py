@@ -401,7 +401,10 @@ def plot_contour(
 
     # Handle Kind
     if type(kind) == str and kind.lower() == "g":
-        axs.contour(X, Y, mv_norm.pdf(np.stack((X, Y), axis=-1), *params), levels)
+        if levels is not None:
+            axs.contour(X, Y, mv_norm.pdf(np.stack((X, Y), axis=-1), *params), levels)
+        else:
+            axs.contour(X, Y, mv_norm.pdf(np.stack((X, Y), axis=-1), *params))
         if show_means is not None:
             axs.scatter([params[0][0]], [params[0][1]], s=show_means, marker='x')
     else:

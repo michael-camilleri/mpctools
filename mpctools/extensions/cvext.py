@@ -291,7 +291,10 @@ class BoundingBox:
         return np.append(self.top_left, self.bottom_right)
 
     @property
-    def mot_format(self):
+    def coco(self):
+        """
+        Return in CoCo Format [X, Y, W, H]
+        """
         return np.append(self.top_left, self.size)
 
     def iou(self, other):
