@@ -70,6 +70,7 @@ def plot_matrix(
     :param x_rot:       Rotation for the X-Axis Labels
     :param y_rot:       Rotation for the Y-Axis Labels
     :param fmt:         Formatting String for Value labels (if any)
+    :param fs: Font-Size
     :return:
     """
     # Sort out the mode
@@ -156,14 +157,14 @@ def plot_matrix(
         else:
             ax.set_xticks(np.arange(0.5, len(x_labels) + 0.5))
         ax.set_xticklabels(
-            x_labels, rotation=x_rot, horizontalalignment="center" if x_rot == 0 else "right",
+            x_labels, rotation=x_rot, horizontalalignment="center" if x_rot == 0 else "right", fontsize=fs
         )
         if mode:
             ax.set_yticks(np.arange(len(y_labels)))
         else:
             ax.set_yticks(np.arange(0.5, len(y_labels) + 0.5))
         ax.set_yticklabels(
-            y_labels, rotation=y_rot, verticalalignment="center" if y_rot == 0 else "bottom",
+            y_labels, rotation=y_rot, verticalalignment="center" if y_rot == 0 else "bottom", fontsize=fs
         )
 
 

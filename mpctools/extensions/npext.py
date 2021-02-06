@@ -616,28 +616,36 @@ def conditional_entropy_2D(emission, prior=None, base=None):
         )
 
 
-def mutual_information(prior, emission, base=None):
+def mutual_information(prior, emission, normalised=False, base=None):
     """
-    Compute the Mutual information between an input (Z) and set of output (X) variables, under the
+    Computes the Mutual information between an input (Z) and set of output (X) variables, under the
       assumption that when there is more than 1 X variable, they are conditionally independent of
-      each other given Z (i.e. the Naive Bayes assumption). Be careful however, that as the
-      number of X variables increases, the dimensionality of the problem explodes (since we need
-      to work with the full joint marginal)!
+      each other given Z (i.e. the Naive Bayes assumption). This allows the joint over the output
+      variables to be simply the outer product of their individual probabilities. Be careful
+      however, that as the number of X variables increases, the dimensionality of the problem
+      explodes (since we need to work with the full joint marginal)!
 
     Note (1) - This is NOT the Conditional Mutual Information, which is something different: this is
-      just the MI between a Z and a multi-dimensional X (taken as one variable).
+      just the MI between a Z and a (possibly multi-dimensional) output X (taken as one global
+      variable).
 
     Note (2) - This only supports a 1D latent variable (Z): i.e. there may be multiple (X) variables
       but only 1 (Z).
+
+    Note (3) - Normalisation happens according to the Entropy of the output X: this is because,
+      usually, we want to find out how well Y can explain X, and hence, it should reach 1 only
+      when it can fully explain it.
 
     :param prior:       Prior Distribution over Z [1D array]
     :param emission:    Conditional Distribution over X given Z. This can be either:
                             a) 2D Numpy array, with Z along the rows, for one conditional
                             b) List of 2D Numpy arrays, each constituting a 2D Numpy array (Z along
                                rows) showing the emission of a variable.
+    :param normalised: If True, normalise by the Entropy of X
     :param base:        The numeric base to operate with.
     :return:            Mutual Information
     """
+
     # First Collapse all emissions into 1 by computing outer product along X-axis (i.e. finding the
     #  cross-product) This is done by a smart use of the self-looping and the outer product
     #  function. Basically, we need to find the cross-combination of all emissions. To do this,
@@ -653,11 +661,12 @@ def mutual_information(prior, emission, base=None):
                 ).ravel()  # We are continuously increasing in size...
         emission = np.asarray(pXZ)  # Will be array of size |Z| by |X_1|*|X_2|*...|X_n|
 
-    # Compute Marginal X:
-    pX = np.matmul(prior, emission)
+    # Compute Marginal X and its entropy
+    hX = entropy(np.matmul(prior, emission), base=base)
 
     # Now Compute Entropies and return
-    return entropy(pX, base=base) - conditional_entropy(emission=emission, prior=prior, base=base)
+    mi = hX - conditional_entropy(emission=emission, prior=prior, base=base)
+    return mi/hX if normalised else mi
 
 
 def markov_stationary(transition):

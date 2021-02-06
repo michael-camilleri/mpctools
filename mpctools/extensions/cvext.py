@@ -111,6 +111,37 @@ class Homography:
         )
 
 
+def characterise_affine(a: np.ndarray):
+    """
+    Characterise an affine transform as consisting of a Rotation*Shear*Scale + Translation
+
+    This follows Stephan's Answer in:
+     https://math.stackexchange.com/questions/612006/decomposing-an-affine-transformation
+    :param a: The 2*3 Affine Transform
+    :return: The Parameters of the Affine Transform, in order:
+            * (Translation_x, Translation_y)
+            * (Scale_x, Scale_y)
+            * Shear
+            * Rotation
+    """
+    b = a[:2, -1]
+    s_x = np.linalg.norm(a[:2, 0])
+    theta = np.arctan2(a[1, 0], a[0, 0])
+
+    _sin = np.sin(theta)
+    _cos = np.cos(theta)
+
+    msy = a[0, 1] * _cos + a[1, 1] * _sin
+    if _sin != 0:
+        s_y = (msy * _cos - a[0, 1]) / _sin
+    else:
+        s_y = (a[1, 1] - msy * _sin)/_cos
+
+    m = msy/s_y
+
+    return b, np.asarray((s_x, s_y)), m, theta
+
+
 def pairwise_iou(a, b, cutoff=0, distance=False):
     """
     Computes the Pair-wise IoU (or distance) between two lists of BBs
@@ -160,10 +191,10 @@ class BoundingBox:
         if sum(1 for l in locals().values() if l is not None) != 3:
             raise ValueError("Exactly two of tl/br/c/sz must be specified!")
 
-        self.TL = np.asarray(tl, dtype=float) if tl is not None else None
-        self.BR = np.asarray(br, dtype=float) if br is not None else None
-        self.C = np.asarray(c, dtype=float) if c is not None else None
-        self.SZ = np.asarray(sz, dtype=float) if sz is not None else None
+        self.__tl = np.asarray(tl, dtype=float) if tl is not None else None
+        self.__br = np.asarray(br, dtype=float) if br is not None else None
+        self.__c = np.asarray(c, dtype=float) if c is not None else None
+        self.__sz = np.asarray(sz, dtype=float) if sz is not None else None
 
     def __repr__(self):
         return (
@@ -190,51 +221,51 @@ class BoundingBox:
 
     @property
     def top_left(self):
-        if self.TL is None:
-            if self.BR is not None:
-                if self.SZ is not None:
-                    self.TL = self.BR - self.SZ
+        if self.__tl is None:
+            if self.__br is not None:
+                if self.__sz is not None:
+                    self.__tl = self.__br - self.__sz
                 else:
-                    self.TL = self.C - (self.BR - self.C)
+                    self.__tl = self.__c - (self.__br - self.__c)
             else:
-                self.TL = self.C - self.SZ / 2
-        return self.TL
+                self.__tl = self.__c - self.__sz / 2
+        return self.__tl
 
     @property
     def bottom_right(self):
-        if self.BR is None:
-            if self.TL is not None:
-                if self.SZ is not None:
-                    self.BR = self.TL + self.SZ
+        if self.__br is None:
+            if self.__tl is not None:
+                if self.__sz is not None:
+                    self.__br = self.__tl + self.__sz
                 else:
-                    self.BR = self.C + (self.C - self.TL)
+                    self.__br = self.__c + (self.__c - self.__tl)
             else:
-                self.BR = self.C + self.SZ / 2
-        return self.BR
+                self.__br = self.__c + self.__sz / 2
+        return self.__br
 
     @property
     def size(self):
-        if self.SZ is None:
-            if self.TL is not None:
-                if self.BR is not None:
-                    self.SZ = self.BR - self.TL
+        if self.__sz is None:
+            if self.__tl is not None:
+                if self.__br is not None:
+                    self.__sz = self.__br - self.__tl
                 else:
-                    self.SZ = (self.C - self.TL) * 2
+                    self.__sz = (self.__c - self.__tl) * 2
             else:
-                self.SZ = (self.BR - self.C) * 2
-        return self.SZ
+                self.__sz = (self.__br - self.__c) * 2
+        return self.__sz
 
     @property
     def center(self):
-        if self.C is None:
-            if self.TL is not None:
-                if self.BR is not None:
-                    self.C = (self.TL + self.BR) / 2
+        if self.__c is None:
+            if self.__tl is not None:
+                if self.__br is not None:
+                    self.__c = (self.__tl + self.__br) / 2
                 else:
-                    self.C = self.TL + self.SZ / 2
+                    self.__c = self.__tl + self.__sz / 2
             else:
-                self.C = self.BR - self.SZ / 2
-        return self.C
+                self.__c = self.__br - self.__sz / 2
+        return self.__c
 
     @property
     def bottom_left(self):
@@ -279,9 +310,12 @@ class BoundingBox:
         Returns all corners, in a clockwise fashion, starting from top-left
         :return:
         """
-        x, y = self.size / 2
-        c = self.center
-        return np.asarray(((c - (x, y)), (c + (x, -y)), (c + (x, y)), (c + (-x, y))))
+        return np.vstack([
+            self['tl'],                         # Top-Left
+            (self['br'][0], self['tl'][1]),     # Top-Right
+            self['br'],                         # Bottom-Right
+            (self['tl'][0], self['br'][1])      # Bottom-Left
+        ])
 
     @property
     def extrema(self):
