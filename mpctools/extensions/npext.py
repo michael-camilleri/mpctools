@@ -13,10 +13,10 @@ see http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 
+from scipy.spatial.distance import pdist
+from scipy.stats import entropy, f
 from lapsolver import solve_dense
-# from deprecated import deprecated
 from scipy.special import gamma
-from scipy.stats import entropy
 from functools import reduce
 import pandas as pd
 import numpy as np
@@ -261,7 +261,11 @@ def array_nan_equal(left, right, axis=None):
         return False
 
     # Return
-    return np.logical_or(np.asarray(left == right), np.logical_and(pd.isnull(left), pd.isnull(right))).all(axis=axis).astype(bool)
+    return (
+        np.logical_or(np.asarray(left == right), np.logical_and(pd.isnull(left), pd.isnull(right)))
+        .all(axis=axis)
+        .astype(bool)
+    )
 
 
 def round_to_multiple(x, base, how="r"):
@@ -516,6 +520,67 @@ class Dirichlet:
             return sample
 
 
+def ttest_mult(a, b):
+    """
+    Calculates the Multivariate Welch T^2 Statistic for two independent multivariate samples
+
+    This is a two-sided test for the null hypothesis that 2 independent samples have identical
+    average (expected) values. The multivariate computation of the Welch T2 statistic follows the
+    distance formulation in [1], while the p-value computation then uses the method described in [2]
+    (based on the F-Distribution).
+
+    Parameters
+    -----------
+    a, b : array_like
+      These must be 2-Dimensional arrays, with sample index along the rows (first dimension).
+
+    Returns
+    --------
+    statistic: float
+       The calculated T2 statistic
+    pvalue: float
+       The two-tailed p-value
+    dof: int
+        Degrees of Freedom
+
+    References
+    ----------
+    .. [1] Alexander V. Alekseyenko, Multivariate Welch t-test on distances, Bioinformatics,
+           Volume 32, Issue 23, 1 December 2016, Pages 3552–3558,
+           https://doi.org/10.1093/bioinformatics/btw524
+    .. [2] https://stackoverflow.com/questions/25412954/hotellings-t2-scores-in-python/59152294#59152294
+    """
+    # Compute some Sizes
+    if np.ndim(a) != 2 or np.ndim(b) != 2:
+        raise ValueError("Parameters a/b must be 2D!")
+    if a.shape[1] != b.shape[-1]:
+        raise ValueError("Data (a/b) must have the same number of features")
+    na, p = a.shape
+    nb = b.shape[1]
+
+    # Compute Distances as per [1]
+    #  Note that my computation is not the most efficient (effectively, I am doing some
+    #  computations twice), but this ensures correctness.
+    da = np.square(pdist(a, "euclidean")).sum()
+    db = np.square(pdist(b, "euclidean")).sum()
+    dz = np.square(pdist(np.vstack([a, b]), "euclidean")).sum()
+
+    # Compute T2 Statistic as per [1] and [2]
+    t2 = (
+        ((na + nb) / (na * nb))
+        * (dz / (na + nb) - da / na - db / nb)
+        / (da / (na ** 2 * (na - 1)) + db / (nb ** 2 * (nb - 1)))
+    )
+
+    # Now compute p-Value as per [2]
+    dof = na + nb - p - 1
+    tstat = t2 * dof / (p * (na + nb - 2))
+    pvalue = 1 - f.cdf(tstat, p, dof)
+
+    # return
+    return t2, pvalue, dof
+
+
 def sum_to_one(x, axis=None, norm=False):
     """
     Ensure that the elements of x sum to 1 (normally for probabilities), by dividing by their sum.
@@ -666,7 +731,7 @@ def mutual_information(prior, emission, normalised=False, base=None):
 
     # Now Compute Entropies and return
     mi = hX - conditional_entropy(emission=emission, prior=prior, base=base)
-    return mi/hX if normalised else mi
+    return mi / hX if normalised else mi
 
 
 def markov_stationary(transition):

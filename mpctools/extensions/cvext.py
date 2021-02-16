@@ -20,9 +20,12 @@ see http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 
+from sklearn.linear_model import LinearRegression
+from skimage.transform import AffineTransform
 from numba import jit, uint8, uint16, double
-from mpctools.extensions import npext, utils
+from mpctools.extensions import npext
 from queue import Queue, Empty, Full
+from scipy import optimize as optim
 from threading import Thread
 import numpy as np
 import time as tm
@@ -53,12 +56,39 @@ class FourCC:
 class Homography:
     """
     Class for fitting a Homography:
-        Based on code by Dr Rowland Sillito, ActualAnalytics and my own additions.
 
-    Note that when fitting, the class gives priority to the forward transformation (world to image).
+    Note that when fitting, the class gives priority to the forward transformation (world to
+    image). The image to world mapping is simply the inverse of the forward mapping, normalised
+    such that the last entry, H_{3, 3} = 1
     """
 
-    def __init__(self, image_coords, world_coords, ransac=None):
+    MTHD_OPENCV_LS = 0
+    MTHD_OPENCV_RNSC = 1
+    MTHD_OWN = 10
+
+    @staticmethod
+    def __convert(points, homog):
+        points2d = npext.ensure2d(points, axis=0)
+        valid = np.isfinite(points2d).all(axis=1)
+        new_coords = np.full_like(points2d, fill_value=np.NaN)
+        new_coords[valid, :] = np.squeeze(
+            cv2.perspectiveTransform(np.expand_dims(points2d[valid, :], axis=0), homog)
+        )
+        return new_coords
+
+    @staticmethod
+    def __cost(h, w, i):
+        x_err = np.square(
+            i[:, 0]
+            - (w[:, 0] * h[0] + w[:, 1] * h[1] + h[2]) / (w[:, 0] * h[6] + w[:, 1] * h[7] + 1)
+        ).sum()
+        y_err = np.square(
+            i[:, 1]
+            - (w[:, 0] * h[3] + w[:, 1] * h[4] + h[5]) / (w[:, 0] * h[6] + w[:, 1] * h[7] + 1)
+        ).sum()
+        return x_err + y_err
+
+    def __init__(self, image_coords, world_coords, method=MTHD_OPENCV_LS, params=None):
         """
         Initialiser
 
@@ -66,18 +96,42 @@ class Homography:
                              Must be of length at least 4.
         :param world_coords: A 2D Numpy array of corresponding world-coordinates: must be same shape
                             as image_coords
-        :param ransac: If not None, then use RANSAC for fitting the forward matrix (world to
-                       image coordinates) with the specified inlier cutoff (in terms of pixel
-                       distance). At the same time the backwards transform uses only the inliers
-                       from the above transformation.
+        :param method: An indication of which method to use for fitting:
+                0: Use OpenCV's LeastSquares method
+                1: Use OpenCV's RANSAC: in this case, params MUST specify the inlier cutoff (in
+                terms of pixel distance) as a scalar.
+                10: Use my method based on BFGS and setting H_{3,3} = 1
+        :param params: Parameters needed for each of the methods
+                MTHD_OPENCV_LS: ignored
+                MTHD_OPENCV_RNSC: Inlier cutoff, scalar
+                MTHD_OWN: Starting Solution (initial Homography Matrix)
         """
-        if ransac is None:
+        # Forward Mapping
+        if method == self.MTHD_OPENCV_LS:
             self.toImg = cv2.findHomography(world_coords, image_coords, method=0)[0]
+            self.res = None
+        elif method == self.MTHD_OPENCV_RNSC:
+            if params is None:
+                raise ValueError("Method MTHD_OPENCV_RNSC must specify the Inlier Cutoff.")
+            self.toImg, self.res = cv2.findHomography(
+                world_coords, image_coords, cv2.RANSAC, params
+            )
+        elif method == self.MTHD_OWN:
+            if params is None:
+                raise ValueError("Method MTHD_OWN needs the starting point.")
+            self.res = optim.minimize(
+                self.__cost,
+                params.flatten()[:-1],
+                args=(world_coords, image_coords),
+                method="Nelder-Mead",
+                options={"maxiter": 10000},
+            )
+            self.toImg = np.append(self.res.x, 1).reshape(3, 3)
         else:
-            self.toImg, self._mask = cv2.findHomography(world_coords, image_coords, cv2.RANSAC, ransac)
-            image_coords = image_coords[np.squeeze(self._mask).astype(bool)]
-            world_coords = world_coords[np.squeeze(self._mask).astype(bool)]
-        self.toWrld = cv2.findHomography(image_coords, world_coords, 0)[0]
+            raise ValueError("Method must be one of MTHD_OPENCV_LS, MTHD_OPENCV_RNSC or MTHD_OWN")
+        # Reverse Mapping
+        self.toWrld = np.linalg.inv(self.toImg)
+        self.toWrld /= self.toWrld[2, 2]
 
     def to_image(self, points):
         """
@@ -87,13 +141,7 @@ class Homography:
                        will be automatically promoted to 2D
         :return:    Image Coordinates
         """
-        points2d = npext.ensure2d(points, axis=0)
-        valid = np.isfinite(points2d).all(axis=1)
-        img_coords = np.full_like(points2d, fill_value=np.NaN)
-        img_coords[valid, :] = np.squeeze(
-            cv2.perspectiveTransform(np.expand_dims(points2d[valid, :], axis=0), self.toImg)
-        )
-        return img_coords
+        return self.__convert(points, self.toImg)
 
     def to_world(self, points):
         """
@@ -103,12 +151,71 @@ class Homography:
                        will be automatically promoted to 2D
         :return:    World Coordinates
         """
-        points2d = npext.ensure2d(points, axis=0)
-        valid = np.isfinite(points2d).all(axis=1)
-        wd_coords = np.full_like(points2d, fill_value=np.NaN)
-        wd_coords[valid, :] = np.squeeze(
-            cv2.perspectiveTransform(np.expand_dims(points2d[valid, :], axis=0), self.toWrld)
-        )
+        return self.__convert(points, self.toWrld)
+
+
+class ScaleTranslation:
+    """
+    Defines an Affine Transform which is restricted to Scale/Translation, independently for X/Y.
+    """
+
+    def __init__(self, src, dest, scale_dof=1):
+        """
+        Initialise the Transform
+
+        :param src: Source set of points
+        :param dest: Destination set of points
+        """
+        # Solve
+        # --- Build X and Y
+        if scale_dof == 1:
+            _X = np.zeros([np.size(src), 3])
+            _X[::2, 0] = src[:, 0]
+            _X[::2, 1] = 1
+            _X[1::2, 0] = src[:, 1]
+            _X[1::2, 2] = 1
+        else:
+            _X = np.zeros([np.size(src), 4])
+            _X[::2, 0] = src[:, 0]
+            _X[::2, 2] = 1
+            _X[1::2, 1] = src[:, 1]
+            _X[1::2, 3] = 1
+        _Y = dest.flatten()
+        # --- Solve using Least-Squares
+        res = LinearRegression(fit_intercept=False).fit(_X, _Y).coef_
+        # Prepare
+        if scale_dof == 1:
+            self._forward = AffineTransform(
+                scale=res[0], rotation=0, shear=0, translation=res[1:3]
+            )
+        else:
+            self._forward = AffineTransform(
+                scale=res[0:2], rotation=0, shear=0, translation=res[2:4]
+            )
+
+    def forward(self, src):
+        """
+        Perform the Forward transform
+        :param src:
+        :return:
+        """
+        return self._forward(src)
+
+    def inverse(self, dest):
+        """
+        Perform inverse transform
+
+        :param dest:
+        :return:
+        """
+        return self._forward.inverse(dest)
+
+    @property
+    def matrix(self):
+        return self._forward.params[:2, :]
+
+    def __repr__(self):
+        return self.matrix
 
 
 def characterise_affine(a: np.ndarray):
@@ -135,9 +242,9 @@ def characterise_affine(a: np.ndarray):
     if _sin != 0:
         s_y = (msy * _cos - a[0, 1]) / _sin
     else:
-        s_y = (a[1, 1] - msy * _sin)/_cos
+        s_y = (a[1, 1] - msy * _sin) / _cos
 
-    m = msy/s_y
+    m = msy / s_y
 
     return b, np.asarray((s_x, s_y)), m, theta
 
@@ -310,12 +417,14 @@ class BoundingBox:
         Returns all corners, in a clockwise fashion, starting from top-left
         :return:
         """
-        return np.vstack([
-            self['tl'],                         # Top-Left
-            (self['br'][0], self['tl'][1]),     # Top-Right
-            self['br'],                         # Bottom-Right
-            (self['tl'][0], self['br'][1])      # Bottom-Left
-        ])
+        return np.vstack(
+            [
+                self["tl"],  # Top-Left
+                (self["br"][0], self["tl"][1]),  # Top-Right
+                self["br"],  # Bottom-Right
+                (self["tl"][0], self["br"][1]),  # Bottom-Left
+            ]
+        )
 
     @property
     def extrema(self):
