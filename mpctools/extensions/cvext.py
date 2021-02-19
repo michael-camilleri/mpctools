@@ -23,10 +23,10 @@ Author: Michael P. J. Camilleri
 from sklearn.linear_model import LinearRegression
 from skimage.transform import AffineTransform
 from numba import jit, uint8, uint16, double
-from mpctools.extensions import npext
 from queue import Queue, Empty, Full
 from scipy import optimize as optim
 from threading import Thread
+from scipy import linalg
 import numpy as np
 import time as tm
 import math
@@ -68,11 +68,11 @@ class Homography:
 
     @staticmethod
     def __convert(points, homog):
-        points2d = npext.ensure2d(points, axis=0)
-        valid = np.isfinite(points2d).all(axis=1)
-        new_coords = np.full_like(points2d, fill_value=np.NaN)
+        points = np.array(points, copy=False, ndmin=2)
+        valid = np.isfinite(points).all(axis=1)
+        new_coords = np.full_like(points, fill_value=np.NaN)
         new_coords[valid, :] = np.squeeze(
-            cv2.perspectiveTransform(np.expand_dims(points2d[valid, :], axis=0), homog)
+            cv2.perspectiveTransform(np.expand_dims(points[valid, :], axis=0), homog)
         )
         return new_coords
 
@@ -154,6 +154,157 @@ class Homography:
         return self.__convert(points, self.toWrld)
 
 
+class Affine:
+    """
+    Defines an Affine Transform.
+
+    This class is an extension to skimage's and opencv's affine transformation. It encapsulates the
+    definition of an affine, storing its parameters, and implements fitting the parameters in
+    such a way that one can use both points and line correspondences.
+
+    Note that as regards the individual components, we define an affine transformation by a
+    translation (t_x, t_y) plus a scale (s_x, s_y), shear (m) and rotation (θ), in that order, st:
+
+       | a  b  c |   | cos(θ)  -sin(θ)  0 | | 1  m  0 | | s_x  0  0 |     | 0  0  t_x |
+       | d  e  f | = | sin(θ)   cos(θ)  0 | | 0  1  0 | |  0  s_y 0 |  +  | 0  0  t_y |
+       | 0  0  1 |   |   0        0     0 | | 0  0  0 | |  0   0  0 |     | 0  0   1  |
+
+    This is different from how skimage defines the components, and has implications on how the
+    decomposition happens.
+    """
+
+    @staticmethod
+    def characterise(matrix):
+        """
+        Characterises the Transform, according to Stephan's Answer in:
+             https://math.stackexchange.com/questions/612006/decomposing-an-affine-transformation
+        :param matrix: The Affine Transform
+        :return: Translation, Scaling, Shear, Rotation
+        """
+        b = matrix[:2, -1]
+        s_x = np.linalg.norm(matrix[:2, 0])
+        theta = np.arctan2(matrix[1, 0], matrix[0, 0])
+
+        _sin = np.sin(theta)
+        _cos = np.cos(theta)
+
+        msy = matrix[0, 1] * _cos + matrix[1, 1] * _sin
+        if _sin != 0:
+            s_y = (msy * _cos - matrix[0, 1]) / _sin
+        else:
+            s_y = (matrix[1, 1] - msy * _sin) / _cos
+
+        m = msy / s_y
+
+        return b, np.asarray((s_x, s_y)), m, theta
+
+    @staticmethod
+    def __apply_transform(matrix: np.ndarray, points: np.ndarray):
+        """
+        Applies a Matrix Transformation on a set of points. Takes care of converting them to 2D
+        if need be and ignoring
+        :return:
+        """
+        # Ensure first that the coordinates are a 2D array
+        points = np.array(points, copy=False, ndmin=2)
+        # If need be, add 1 for homogeneous coordinate
+        if points.shape[1] < 3:
+            points = np.append(points, np.ones([points.shape[0], 1]), axis=1)
+        # Perform Multiplication (and squeeze out redundant dimensions)
+        return np.squeeze(points @ matrix.T)
+
+    def __init__(self, matrix=None, scale=(1, 1), rotation=0, shear=0, translation=(0, 0)):
+        """
+        Initialises the Model, using either the matrix or any of the other parameters.
+
+        :param matrix: Matrix description of the Affine Transform. If this is specified,
+        then it takes precedence in the specification of the transform. Note that it can be
+        specified in either augmented euclidean [2x3] or homogenous [3x3] form.
+        :param scale: Scale parameter. 2D (X/Y)
+        :param rotation: Rotation parameter (theta) in radians
+        :param shear: Shear parameter
+        :param translation: Translation. 2D (X/Y)
+        """
+        if matrix is not None:
+            # Handle Shape
+            if matrix.shape[0] == 3:
+                self._forward = matrix[:2, :]
+            else:
+                self._forward = matrix
+            # Characterise
+            self._params = self.characterise(self._forward)
+        else:
+            _s, _c = np.sin(rotation), np.cos(rotation)
+            self._forward = np.asarray(
+                [[scale[0] * _c, scale[1] * (shear * _c - _s), translation[0]],
+                 [scale[0] * _s, scale[1] * (shear * _s + _c), translation[1]]]
+            )
+            self._params = (translation, scale, shear, rotation)
+        # Compute Inverse once
+        self._inverse = np.linalg.inv(np.append(self._forward, [[0, 0, 1]], axis=0))[:2, :]
+
+    def estimate(self, src: tuple, dst: tuple):
+        """
+        Estimates the transform from point and/or line correspondences
+
+        The method can estimate the affine transformation from either point or line
+        correspondences (or both). Note that both Points/Lines may be specified as euclidean or
+        homogenous coordinates
+
+        :param src: Source Points and Lines. 2-Tuple of Arraylike
+        :param dst: Destination Points/Lines. 2-Tuple of Arraylike
+        :return: self, for chaining
+        """
+        # Prepare placeholders for target and design matrix (see eq. 11)
+        e, F = [], []
+
+        # If we have Points to match
+        if src[0] is not None:
+            if dst[0] is None or len(src[0]) != len(dst[0]):
+                raise ValueError('Destination and Source Points must be same size.')
+            rows = len(src[0])
+            # Define Target: X's, Y's, not interlaced
+            e = e.append(dst[0][:, :2].T.flatten())
+            # Define and build Design Matrix
+            A = np.zeros([rows*2, 6])
+            A[:rows, 0:2] = src[0][:, :2]
+            A[:rows, 2] = 1
+            A[rows:, 3:5] = src[0][:, :2]
+            A[rows:, 5] = 1
+            F = F.append(A)
+
+        # If we have Lines to match
+        if src[1] is not None:
+            if dst[1] is None or len(dst[1]) != len(dst[1]):
+                raise ValueError('Destination and Source Points must be same size.')
+            rows = len(src[1])
+            # Define Target - U's, V's, 0's
+            e = e.append(np.append(src[1][:, :2].T, np.zeros(rows)))
+            # Define Design Matrix
+            C = np.zeros([rows*3, 6])
+            C[:rows, 0::3] = dst[1][:, :2]
+            C[rows:rows*2, 1::3] = dst[1][:, :2]
+            C[rows*2:, 2::3] = dst[1][:, :2]
+            F = F.append(C)
+
+        # Build Up complete solution
+        if len(e) < 1:
+            raise ValueError('You must specify at least one of either point/line correspondences.')
+        e = np.vstack(e)
+        F = np.vstack(F)
+
+        # Solve
+        m = linalg.lstsq(F, e, overwrite_a=True, overwrite_b=True)[0]
+
+        # Build Result
+        self._forward = m.reshape(2, 3)
+        self._params = self.characterise(self._forward)
+        self._inverse = np.linalg.inv(np.append(self._forward, [[0, 0, 1]], axis=0))[:2, :]
+
+        # Return self for chaining
+        return self
+
+
 class ScaleTranslation:
     """
     Defines an Affine Transform which is restricted to Scale/Translation, independently for X/Y.
@@ -218,35 +369,7 @@ class ScaleTranslation:
         return self.matrix
 
 
-def characterise_affine(a: np.ndarray):
-    """
-    Characterise an affine transform as consisting of a Rotation*Shear*Scale + Translation
 
-    This follows Stephan's Answer in:
-     https://math.stackexchange.com/questions/612006/decomposing-an-affine-transformation
-    :param a: The 2*3 Affine Transform
-    :return: The Parameters of the Affine Transform, in order:
-            * (Translation_x, Translation_y)
-            * (Scale_x, Scale_y)
-            * Shear
-            * Rotation
-    """
-    b = a[:2, -1]
-    s_x = np.linalg.norm(a[:2, 0])
-    theta = np.arctan2(a[1, 0], a[0, 0])
-
-    _sin = np.sin(theta)
-    _cos = np.cos(theta)
-
-    msy = a[0, 1] * _cos + a[1, 1] * _sin
-    if _sin != 0:
-        s_y = (msy * _cos - a[0, 1]) / _sin
-    else:
-        s_y = (a[1, 1] - msy * _sin) / _cos
-
-    m = msy / s_y
-
-    return b, np.asarray((s_x, s_y)), m, theta
 
 
 def pairwise_iou(a, b, cutoff=0, distance=False):

@@ -16,6 +16,7 @@ Author: Michael P. J. Camilleri
 from scipy.spatial.distance import pdist
 from scipy.stats import entropy, f
 from lapsolver import solve_dense
+from deprecated import deprecated
 from scipy.special import gamma
 from functools import reduce
 import pandas as pd
@@ -319,7 +320,7 @@ def hungarian(costs: np.ndarray, maximise=False, cutoff=None, row_labels=None, c
     """
     Solves the Assignment problem.
 
-    This method is a wrapper around scipy's linear_sum_assignment that:
+    This method is a wrapper lapsolver's solve_dense that:
      1. Can Threshold certain costs,
      2. Can Handle np.NaN (as np.Inf)
      3. Can deal with rows/columns of NaN
@@ -384,6 +385,7 @@ def swap_columns(x, cols):
     return temp
 
 
+@deprecated('Functionality can in general be done by way of np.array()')
 def ensure2d(a, axis=0):
     """
     Returns a matrix of dimensionality 2 from a potentially linear vector
@@ -392,7 +394,9 @@ def ensure2d(a, axis=0):
     :param axis: Axis to append if missing: either 0 or 1
     :return: 2D Matrix
     """
-    if np.ndim(a) > 1:
+    if np.ndim(a) > 2:
+        raise ValueError('Dimension must be 2 or less.')
+    elif np.ndim(a) == 2:
         return a
     elif np.ndim(a) == 1:
         return a[np.newaxis, :] if axis == 0 else a[:, np.newaxis]
