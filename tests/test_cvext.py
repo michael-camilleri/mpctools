@@ -21,7 +21,7 @@ import unittest
 from mpctools.extensions import cvext, utils
 
 # @TODO include tests for Video Parser Seeking
-# @TODO Fix tests for BoundingBox IoU
+
 
 class TestBoundingBox(unittest.TestCase):
 
@@ -99,47 +99,131 @@ class TestBoundingBox(unittest.TestCase):
                         cvext.BoundingBox(*utils.masked_list(self.BBs[1], inits_r)),
                     )
 
-    # def test_iou(self):
-    #     with self.subTest("Equal BBs"):
-    #         self.assertEqual(cvext.BoundingBox(tl=())
+    def test_iou(self):
+        with self.subTest("Equal BBs"):
+            for t, s in zip([(0, 0), (10, 20), (-5, -1)], [(100, 20), (40, 20), (40, 30)]):
+                self.assertEqual(
+                    cvext.BoundingBox(tl=t, sz=s).iou(cvext.BoundingBox(tl=t, sz=s)), 1
+                )
+        with self.subTest("Other Within"):
+            for a, b, i in zip(
+                [[0, 0, 10, 10], [10, 10, 10, 10], [-1, -1, 20, 20]],
+                [[0, 0, 5, 10], [12, 11, 5, 5], [0, 0, 10, 10]],
+                [0.5, 0.25, 0.25],
+            ):
+                self.assertEqual(
+                    cvext.BoundingBox(tl=a[:2], sz=a[2:]).iou(
+                        cvext.BoundingBox(tl=b[:2], sz=b[2:])
+                    ),
+                    i,
+                )
+        with self.subTest("Self Within"):
+            for a, b, i in zip(
+                [[0, 0, 5, 10], [12, 11, 5, 5], [0, 0, 10, 10]],
+                [[0, 0, 10, 10], [10, 10, 10, 10], [-1, -1, 20, 20]],
+                [0.5, 0.25, 0.25],
+            ):
+                self.assertEqual(
+                    cvext.BoundingBox(tl=a[:2], sz=a[2:]).iou(
+                        cvext.BoundingBox(tl=b[:2], sz=b[2:])
+                    ),
+                    i,
+                )
+        with self.subTest("Outwith"):
+            for a, b in zip(
+                [[0, 0, 5, 5], [5, 5, 6, 10], [-10, -10, 10, 11]],
+                [[5, 5, 6, 10], [0, 0, 5, 5], [5, 5, 6, 10]],
+            ):
+                self.assertEqual(
+                    cvext.BoundingBox(tl=a[:2], sz=a[2:]).iou(
+                        cvext.BoundingBox(tl=b[:2], sz=b[2:])
+                    ),
+                    0,
+                )
+        with self.subTest("Partial"):
+            for a, b, i in zip(
+                [[2, 3, 10, 10], [2, 3, 10, 10], [7, 8, 10, 10], [7, 8, 20, 20]],
+                [[7, 8, 10, 10], [7, 8, 20, 20], [2, 3, 10, 10], [2, 3, 10, 10]],
+                [25 / 175, 25 / 475, 25 / 175, 25 / 475],
+            ):
+                self.assertEqual(
+                    cvext.BoundingBox(tl=a[:2], sz=a[2:]).iou(
+                        cvext.BoundingBox(tl=b[:2], sz=b[2:])
+                    ),
+                    i,
+                )
 
 
+class TestAffine(unittest.TestCase):
+    def test_initialisation(self):
+        with self.subTest("From Parameters"):
+            self.assertTrue(np.array_equal(   # Default
+                cvext.Affine().matrix_f, np.append(np.eye(2), [[0], [0]], axis=1)
+            ))
+            self.assertTrue(np.array_equal(  # Translation (single)
+                cvext.Affine(translation=-2).matrix_f, np.append(np.eye(2), [[-2], [-2]], axis=1)
+            ))
+            self.assertTrue(np.array_equal(   # Translation (Multiple)
+                cvext.Affine(translation=[0.5, -4]).matrix_f, np.append(np.eye(2), [[0.5], [-4]], axis=1)
+            ))
+            self.assertTrue(np.array_equal(   # Scaling (single)
+                cvext.Affine(scale=2.3).matrix_f, np.append(np.eye(2) * 2.3, [[0], [0]], axis=1)
+            ))
+            self.assertTrue(np.array_equal(  # Scaling (single)
+                cvext.Affine(scale=[-1, 5]).matrix_f, np.append(np.diag([-1, 5]), [[0], [0]], axis=1)
+            ))
+            self.assertTrue(np.array_equal(  # Shearing
+                cvext.Affine(shear=0.31).matrix_f, np.asarray([[1, 0.31, 0], [0, 1, 0]])
+            ))
+            self.assertTrue(np.allclose(  # Rotation
+                cvext.Affine(rotation=0.5).matrix_f,
+                np.asarray([[0.87758256, -0.47942554, 0], [0.47942554, 0.87758256, 0]])
+            ))
+        with self.subTest("From Matrix (Characterisation)"):
+            # Identity
+            for mtr in ([[1, 0, 0], [0, 1, 0]], [[1, 0, 0], [0, 1, 0], [0, 0, 1]]):
+                affine = cvext.Affine(matrix=np.asarray(mtr))
+                self.assertTrue(np.array_equal(affine.translation, [0, 0]))
+                self.assertTrue(np.array_equal(affine.scale, [1, 1]))
+                self.assertEqual(affine.shear, 0)
+                self.assertEqual(affine.rotation, 0)
+            # Generate some at random.
+            for _ in range(10):
+                tr = np.random.randint(-10, 20, 2)
+                sc = np.random.random(2) * 5
+                rot = np.random.random() * np.pi - np.pi/2
+                sr = np.random.random() * 2 - 1
+                affine = cvext.Affine(matrix=cvext.Affine(None, sc, rot, sr, tr).matrix_f)
+                self.assertTrue(np.array_equal(affine.translation, tr))
+                self.assertTrue(np.allclose(affine.scale, sc))
+                self.assertAlmostEqual(affine.shear, sr)
+                self.assertAlmostEqual(affine.rotation, rot)
+        with self.subTest("Inverse Computation"):
+            # Just Identity
+            affine = cvext.Affine()
+            self.assertTrue(np.array_equal(affine.matrix_f, [[1, 0, 0], [0, 1, 0]]))
+            self.assertTrue(np.array_equal(affine.matrix_i, [[1, 0, 0], [0, 1, 0]]))
+            # try that inverse of inverse is original.
+            for _ in range(10):
+                forward = cvext.Affine(
+                    scale=np.random.random(2) * 5,
+                    rotation=np.random.random() * np.pi - np.pi/2,
+                    shear=np.random.random() * 2 - 1,
+                    translation=np.random.randint(-10, 20, 2)
+                )
+                inverse = cvext.Affine(matrix=forward.matrix_i)
+                self.assertTrue(np.allclose(forward.matrix_f, inverse.matrix_i))
 
-    # class TestIntersectionOverUnion(unittest.TestCase):
-    #     def test_equal(self):
-    #         # A bunch of equal rectangles
-    #         cvext.intersection_over_union([0, 0, 100, 20], [0, 0, 100, 20]), 1.0)
-    #         self.assertEqual(cvext.intersection_over_union([10, 20, 40, 20], [10, 20, 40, 20]), 1.0)
-    #         self.assertEqual(cvext.intersection_over_union([-5, -1, 40, 30], [-5, -1, 40, 30]), 1.0)
-    #
-    #     def test_pred_within(self):
-    #         # A bunch of predictions fully contained within the ground-truth
-    #         self.assertEqual(cvext.intersection_over_union([0, 0, 10, 10], [0, 0, 5, 10]), 0.5)
-    #         self.assertEqual(cvext.intersection_over_union([10, 10, 10, 10], [12, 11, 5, 5]), 0.25)
-    #         self.assertEqual(cvext.intersection_over_union([-1, -1, 20, 20], [0, 0, 10, 10]), 0.25)
-    #
-    #     def test_gt_within(self):
-    #         # A bunch of predictions fully encompassing the ground-truth
-    #         self.assertEqual(cvext.intersection_over_union([0, 0, 5, 10], [0, 0, 10, 10]), 0.5)
-    #         self.assertEqual(cvext.intersection_over_union([12, 11, 5, 5], [10, 10, 10, 10]), 0.25)
-    #         self.assertEqual(cvext.intersection_over_union([0, 0, 5, 5], [-1, -1, 10, 10]), 0.25)
-    #
-    #     def test_outwith(self):
-    #         # A bunch of predictions entirely disjoint from the ground-truth
-    #         self.assertEqual(cvext.intersection_over_union([0, 0, 5, 5], [5, 5, 6, 10]), 0.0)
-    #         self.assertEqual(cvext.intersection_over_union([5, 5, 6, 10], [0, 0, 5, 5]), 0.0)
-    #         self.assertEqual(cvext.intersection_over_union([-10, -10, 10, 11], [5, 5, 6, 10]), 0.0)
-    #
-    #     def test_partial(self):
-    #         # A bunch of predictions with partial overlap
-    #         self.assertEqual(cvext.intersection_over_union([2, 3, 10, 10], [7, 8, 10, 10]),
-    #                          25 / 175)
-    #         self.assertEqual(cvext.intersection_over_union([2, 3, 10, 10], [7, 8, 20, 20]),
-    #                          25 / 475)
-    #         self.assertEqual(cvext.intersection_over_union([7, 8, 10, 10], [2, 3, 10, 10]),
-    #                          25 / 175)
-    #         self.assertEqual(cvext.intersection_over_union([7, 8, 20, 20], [2, 3, 10, 10]),
-    #                          25 / 475)
+    def test_estimation(self):
+        pass
+
+    def test_transform(self):
+        with self.subTest("Forward"):
+            pass
+        with self.subTest("Inverse"):
+            pass
+        with self.subTest("Shape & Homogeneous"):
+            pass
 
 
 class TestSWAHE(unittest.TestCase):

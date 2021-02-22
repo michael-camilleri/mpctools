@@ -218,12 +218,13 @@ class Affine:
         Initialises the Model, using either the matrix or any of the other parameters.
 
         :param matrix: Matrix description of the Affine Transform. If this is specified,
-        then it takes precedence in the specification of the transform. Note that it can be
-        specified in either augmented euclidean [2x3] or homogenous [3x3] form.
-        :param scale: Scale parameter. 2D (X/Y)
-        :param rotation: Rotation parameter (theta) in radians
+            then it takes precedence in the specification of the transform. Note that it can be
+            specified in either augmented euclidean [2x3] or homogenous [3x3] form (in the latter
+            case, the last row is completely ignored, and no check is done for correctness).
+        :param scale: Scale parameter. 2D (X/Y), or scalar (same)
+        :param rotation: Rotation parameter (theta) in *radians*
         :param shear: Shear parameter
-        :param translation: Translation. 2D (X/Y)
+        :param translation: Translation. 2D (X/Y) or scalar (same)
         """
         if matrix is not None:
             # Handle Shape
@@ -234,12 +235,14 @@ class Affine:
             # Characterise
             self._params = self.characterise(self._forward)
         else:
-            _s, _c = np.sin(rotation), np.cos(rotation)
+            sin_r, cos_r = np.sin(rotation), np.cos(rotation)
+            sx, sy = (scale, scale) if np.isscalar(scale) else scale
+            tx, ty = (translation, translation) if np.isscalar(translation) else translation
             self._forward = np.asarray(
-                [[scale[0] * _c, scale[1] * (shear * _c - _s), translation[0]],
-                 [scale[0] * _s, scale[1] * (shear * _s + _c), translation[1]]]
+                [[sx * cos_r, sy * (shear * cos_r - sin_r), tx],
+                 [sx * sin_r, sy * (shear * sin_r + cos_r), ty]]
             )
-            self._params = (translation, scale, shear, rotation)
+            self._params = (np.asarray((tx, ty)), np.asarray((sx, sy)), shear, rotation)
         # Compute Inverse once
         self._inverse = np.linalg.inv(np.append(self._forward, [[0, 0, 1]], axis=0))[:2, :]
 
@@ -303,6 +306,42 @@ class Affine:
 
         # Return self for chaining
         return self
+
+    def forward(self, points):
+        """
+        Transforms the points in the forward direction
+        """
+        return self.__apply_transform(self._forward, points)
+
+    def inverse(self, points):
+        """
+        Transforms the points ine reverse direction
+        """
+        return self.__apply_transform(self._inverse, points)
+
+    @property
+    def matrix_f(self):
+        return self._forward.copy()
+
+    @property
+    def matrix_i(self):
+        return self._inverse.copy()
+
+    @property
+    def translation(self):
+        return np.copy(self._params[0])
+
+    @property
+    def scale(self):
+        return np.copy(self._params[1])
+
+    @property
+    def shear(self):
+        return self._params[2]
+
+    @property
+    def rotation(self):
+        return self._params[3]
 
 
 class ScaleTranslation:
