@@ -13,6 +13,7 @@ see http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 
+from skimage.transform import AffineTransform as SKAffine
 import numpy as np
 import itertools
 import unittest
@@ -155,6 +156,48 @@ class TestBoundingBox(unittest.TestCase):
 
 
 class TestAffine(unittest.TestCase):
+
+    @staticmethod
+    def random_transform():
+        return {
+            'T': np.random.randint(-10, 20, 2),
+            'S': np.random.random(2) * 5,
+            'R': np.random.random() * np.pi - np.pi / 2,
+            'M': np.random.random() * 2 - 1
+        }
+
+    @staticmethod
+    def line(pts):
+        x_1, y_1, x_2, y_2 = pts
+        if x_1 == x_2:
+            return np.asarray((1, 0, -x_1))
+        elif y_1 == y_2:
+            return np.asarray((0, 1, -y_1))
+        else:
+            m = (y_1 - y_2)/(x_1 - x_2)
+            k = y_1 - m * x_1
+            return np.asarray((m, -1, k))
+
+    @staticmethod
+    def sample_pts(gts):
+        pts_s = np.random.randint(-10, 20, size=[10, 2])
+        pts_d = gts.forward(pts_s)
+        return pts_s, pts_d
+
+    @staticmethod
+    def sample_lines(gts):
+        lns_s = np.asarray([[], [], []]).T
+        lns_d = np.asarray([[], [], []]).T
+        while len(lns_s) < 10:
+            pts_s = np.random.randint(-10, 20, size=4)
+            l_s = TestAffine.line(pts_s)
+            if l_s[-1] != 0:
+                l_d = TestAffine.line(np.append(gts.forward(pts_s[:2]), gts.forward(pts_s[2:])))
+                if l_d[-1] != 0:
+                    lns_s = np.vstack([lns_s, l_s])
+                    lns_d = np.vstack([lns_d, l_d])
+        return lns_s, lns_d
+
     def test_initialisation(self):
         with self.subTest("From Parameters"):
             self.assertTrue(np.array_equal(   # Default
@@ -189,15 +232,14 @@ class TestAffine(unittest.TestCase):
                 self.assertEqual(affine.rotation, 0)
             # Generate some at random.
             for _ in range(10):
-                tr = np.random.randint(-10, 20, 2)
-                sc = np.random.random(2) * 5
-                rot = np.random.random() * np.pi - np.pi/2
-                sr = np.random.random() * 2 - 1
-                affine = cvext.Affine(matrix=cvext.Affine(None, sc, rot, sr, tr).matrix_f)
-                self.assertTrue(np.array_equal(affine.translation, tr))
-                self.assertTrue(np.allclose(affine.scale, sc))
-                self.assertAlmostEqual(affine.shear, sr)
-                self.assertAlmostEqual(affine.rotation, rot)
+                m = self.random_transform()
+                affine = cvext.Affine(matrix=cvext.Affine(
+                    scale=m['S'], rotation=m['R'], shear=m['M'], translation=m['T']
+                ).matrix_f)
+                self.assertTrue(np.array_equal(affine.translation, m['T']))
+                self.assertTrue(np.allclose(affine.scale, m['S']))
+                self.assertAlmostEqual(affine.shear, m['M'])
+                self.assertAlmostEqual(affine.rotation, m['R'])
         with self.subTest("Inverse Computation"):
             # Just Identity
             affine = cvext.Affine()
@@ -205,25 +247,84 @@ class TestAffine(unittest.TestCase):
             self.assertTrue(np.array_equal(affine.matrix_i, [[1, 0, 0], [0, 1, 0]]))
             # try that inverse of inverse is original.
             for _ in range(10):
+                m = self.random_transform()
                 forward = cvext.Affine(
-                    scale=np.random.random(2) * 5,
-                    rotation=np.random.random() * np.pi - np.pi/2,
-                    shear=np.random.random() * 2 - 1,
-                    translation=np.random.randint(-10, 20, 2)
+                    scale=m['S'], rotation=m['R'], shear=m['M'], translation=m['T']
                 )
                 inverse = cvext.Affine(matrix=forward.matrix_i)
                 self.assertTrue(np.allclose(forward.matrix_f, inverse.matrix_i))
 
-    def test_estimation(self):
-        pass
-
     def test_transform(self):
-        with self.subTest("Forward"):
-            pass
-        with self.subTest("Inverse"):
-            pass
-        with self.subTest("Shape & Homogeneous"):
-            pass
+        with self.subTest("Shape & Homogeneous"): # Just test identity
+            # Single entry
+            self.assertEqual(cvext.Affine().forward([1, 1]).ndim, 1)
+            self.assertEqual(len(cvext.Affine().forward([1, 1])), 2)
+            self.assertTrue(np.array_equal(cvext.Affine().forward([1, 1]), [1, 1]))
+            self.assertEqual(cvext.Affine().forward([1, 1, 1]).ndim, 1)
+            self.assertEqual(len(cvext.Affine().forward([1, 1, 1])), 2)
+            self.assertTrue(np.array_equal(cvext.Affine().forward([1, 1, 1]), [1, 1]))
+            # Multi points
+            pts, pts_h = [[1, 1], [0, 5], [1, 3]], [[1, 1, 1], [0, 2.5, 0.5], [2, 6, 2]]
+            self.assertEqual(cvext.Affine().forward(pts).ndim, 2)
+            self.assertEqual(len(cvext.Affine().forward(pts)), 3)
+            self.assertEqual(cvext.Affine().forward(pts).shape[1], 2)
+            self.assertTrue(np.array_equal(cvext.Affine().forward(pts), pts))
+            self.assertEqual(cvext.Affine().forward(pts_h).ndim, 2)
+            self.assertEqual(len(cvext.Affine().forward(pts_h)), 3)
+            self.assertEqual(cvext.Affine().forward(pts_h).shape[1], 2)
+            self.assertTrue(np.array_equal(cvext.Affine().forward(pts_h), pts))
+        with self.subTest("Transform"): # Compare with SKAffine
+            for i in range(10):
+                mdl = self.random_transform()
+                affine = cvext.Affine(
+                    scale=mdl['S'], rotation=mdl['R'], shear=mdl['M'], translation=mdl['T']
+                )
+                skaffine = SKAffine(
+                    matrix=np.append(affine.matrix_f, np.asarray([[0, 0, 1]]), axis=0)
+                )
+                pts = np.random.randint(-10, 20, size=[10, 2])
+                self.assertTrue(np.allclose(affine.forward(pts), skaffine(pts)))
+                self.assertTrue(np.allclose(affine.inverse(pts), skaffine.inverse(pts)))
+
+    def test_estimation(self):
+        # This will be noiseless estimation
+        with self.subTest("Error Handling"):
+            affine = cvext.Affine()
+            self.assertRaises(ValueError, affine.estimate, (), ([], []))
+            self.assertRaises(ValueError, affine.estimate, ([], []), ())
+            self.assertRaises(ValueError, affine.estimate, (None, None), (None, None))
+            self.assertRaises(ValueError, affine.estimate, ([], None), (None, []))
+            self.assertRaises(ValueError, affine.estimate, (None, []), ([], None))
+        with self.subTest("Points Only"):
+            for _ in range(10):
+                mdl = self.random_transform()
+                gts = cvext.Affine(
+                    scale=mdl['S'], rotation=mdl['R'], shear=mdl['M'], translation=mdl['T']
+                )
+                pts_s, pts_d = self.sample_pts(gts)
+                learnt = cvext.Affine().estimate((pts_s, None), (pts_d, None))
+                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f))
+        with self.subTest("Lines only"):
+            for _ in range(10):
+                mdl = self.random_transform()
+                gts = cvext.Affine(
+                    scale=mdl['S'], rotation=mdl['R'], shear=mdl['M'], translation=mdl['T']
+                )
+                # Build Lines from points: since we cannot support lines passing through origin,
+                #      I will do this in an iterative fashion, until I hit 10 lines.
+                lns_s, lns_d = self.sample_lines(gts)
+                learnt = cvext.Affine().estimate((None, lns_s), (None, lns_d))
+                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f))
+        with self.subTest("Points and Lines"):
+            for _ in range(10):
+                mdl = self.random_transform()
+                gts = cvext.Affine(
+                    scale=mdl['S'], rotation=mdl['R'], shear=mdl['M'], translation=mdl['T']
+                )
+                pts_s, pts_d = self.sample_pts(gts)
+                lns_s, lns_d = self.sample_lines(gts)
+                learnt = cvext.Affine().estimate((pts_s, lns_s), (pts_d, lns_d))
+                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f))
 
 
 class TestSWAHE(unittest.TestCase):

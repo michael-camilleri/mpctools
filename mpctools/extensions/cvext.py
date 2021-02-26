@@ -172,6 +172,9 @@ class Affine:
     This is different from how skimage defines the components, and has implications on how the
     decomposition happens.
     """
+    AFFINE = 0
+    SIMILARITY = 1
+    TRANSLATION = 2
 
     @staticmethod
     def characterise(matrix):
@@ -202,14 +205,19 @@ class Affine:
     def __apply_transform(matrix: np.ndarray, points: np.ndarray):
         """
         Applies a Matrix Transformation on a set of points. Takes care of converting them to 2D
-        if need be and ignoring
+        if need be and ignoring. Note that the returned value is always in R^2, and will be
+        squeezed if there is only one point.
         :return:
         """
         # Ensure first that the coordinates are a 2D array
         points = np.array(points, copy=False, ndmin=2)
         # If need be, add 1 for homogeneous coordinate
-        if points.shape[1] < 3:
+        if points.shape[1] == 2:
             points = np.append(points, np.ones([points.shape[0], 1]), axis=1)
+        elif points.shape[1] == 3:
+            points = points / points[:, -1][:, np.newaxis]
+        else:
+            raise ValueError("points parameter must live in R^2 or R^3.")
         # Perform Multiplication (and squeeze out redundant dimensions)
         return np.squeeze(points @ matrix.T)
 
@@ -245,19 +253,29 @@ class Affine:
             self._params = (np.asarray((tx, ty)), np.asarray((sx, sy)), shear, rotation)
         # Compute Inverse once
         self._inverse = np.linalg.inv(np.append(self._forward, [[0, 0, 1]], axis=0))[:2, :]
+        # Finally, for estimation, we reserve the quality
+        self._qlt = [None, None]
 
-    def estimate(self, src: tuple, dst: tuple):
+    def estimate(self, src: tuple, dst: tuple, weight=0.5, dof=AFFINE):
         """
         Estimates the transform from point and/or line correspondences
 
         The method can estimate the affine transformation from either point or line
-        correspondences (or both). Note that both Points/Lines may be specified as euclidean or
-        homogenous coordinates
+        correspondences (or both). Note that both Points may be specified as euclidean or
+        homogenous coordinates: Lines are always 3-parameter vectors.
 
         :param src: Source Points and Lines. 2-Tuple of Arraylike
         :param dst: Destination Points/Lines. 2-Tuple of Arraylike
+        :param weight: Weight for Point (as opposed to line) correspondences.
+        :param dof: Degrees of Freedom (in decreasing flexibility)
+                    AFFINE: Full affine [Default]
+                    SIMILARITY: Similarity Transform (univariate scale, rotation and translation)
+                    TRANSLATION: Translation-only (2D)
         :return: self, for chaining
         """
+        if len(src) != 2 or len(dst) != 2:
+            raise ValueError("Source and Destination must both be 2-tuples")
+
         # Prepare placeholders for target and design matrix (see eq. 11)
         e, F = [], []
 
@@ -267,28 +285,53 @@ class Affine:
                 raise ValueError('Destination and Source Points must be same size.')
             rows = len(src[0])
             # Define Target: X's, Y's, not interlaced
-            e = e.append(dst[0][:, :2].T.flatten())
+            e.append(dst[0][:, :2].T.flatten()[:, np.newaxis] * np.sqrt(weight))
             # Define and build Design Matrix
             A = np.zeros([rows*2, 6])
             A[:rows, 0:2] = src[0][:, :2]
             A[:rows, 2] = 1
             A[rows:, 3:5] = src[0][:, :2]
             A[rows:, 5] = 1
-            F = F.append(A)
+            F.append(A * np.sqrt(weight))
 
         # If we have Lines to match
         if src[1] is not None:
             if dst[1] is None or len(dst[1]) != len(dst[1]):
-                raise ValueError('Destination and Source Points must be same size.')
+                raise ValueError('Destination and Source Lines must be same size.')
+            if (src[1][:, -1] == 0).any() or (dst[1][:, -1] == 0).any():
+                raise ValueError('Currently, I cannot handle lines passing through Origin.')
+            # Define the elements, and normalise where possible
             rows = len(src[1])
-            # Define Target - U's, V's, 0's
-            e = e.append(np.append(src[1][:, :2].T, np.zeros(rows)))
+            u_s, v_s, w_s = src[1].T.copy()
+            w_s_nz = w_s != 0
+            u_s[w_s_nz] = u_s[w_s_nz] / w_s[w_s_nz]
+            v_s[w_s_nz] = v_s[w_s_nz] / w_s[w_s_nz]
+            w_s[w_s_nz] = 1
+            u_d, v_d, w_d = dst[1].T.copy()
+            w_d_nz = w_d != 0
+            u_d[w_d_nz] = u_d[w_d_nz] / w_d[w_d_nz]
+            v_d[w_d_nz] = v_d[w_d_nz] / w_d[w_d_nz]
+            w_d[w_d_nz] = 1
+            # Define Target - U's, V's, W's, not interlaced
+            d = np.zeros(rows*3)
+            d[:rows] = -v_s * w_d
+            d[rows:rows*2] = u_s * w_d
+            e.append(d[:, np.newaxis] * np.sqrt(1-weight))
             # Define Design Matrix
             C = np.zeros([rows*3, 6])
-            C[:rows, 0::3] = dst[1][:, :2]
-            C[rows:rows*2, 1::3] = dst[1][:, :2]
-            C[rows*2:, 2::3] = dst[1][:, :2]
-            F = F.append(C)
+            C[:rows, 1] = -w_s * u_d
+            C[:rows, 2] = v_s * u_d
+            C[:rows, 4] = -w_s * v_d
+            C[:rows, 5] = v_s * v_d
+            C[rows:rows*2, 0] = w_s * u_d
+            C[rows:rows*2, 2] = -u_s * u_d
+            C[rows:rows*2, 3] = w_s * v_d
+            C[rows:rows*2, 5] = -u_s * v_d
+            C[rows*2:, 0] = -v_s * u_d
+            C[rows*2:, 1] = u_s * u_d
+            C[rows*2:, 3] = -v_s * v_d
+            C[rows*2:, 4] = u_s * v_d
+            F.append(C  * np.sqrt(1-weight))
 
         # Build Up complete solution
         if len(e) < 1:
@@ -297,7 +340,9 @@ class Affine:
         F = np.vstack(F)
 
         # Solve
-        m = linalg.lstsq(F, e, overwrite_a=True, overwrite_b=True)[0]
+        m, self._qlt[0], self._qlt[1], _ = linalg.lstsq(
+            F, e, overwrite_a=True, overwrite_b=True, lapack_driver='gelss'
+        )
 
         # Build Result
         self._forward = m.reshape(2, 3)
@@ -318,6 +363,13 @@ class Affine:
         Transforms the points ine reverse direction
         """
         return self.__apply_transform(self._inverse, points)
+
+    @property
+    def fit_quality(self):
+        if self._qlt[0] is not None:
+            return {'Residuals': self._qlt[0].sum(), 'Rank': self._qlt[1]}
+        else:
+            return None
 
     @property
     def matrix_f(self):
