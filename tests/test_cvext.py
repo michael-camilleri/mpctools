@@ -160,7 +160,7 @@ class TestAffine(unittest.TestCase):
     @staticmethod
     def random_transform():
         return {
-            'T': np.random.randint(-10, 20, 2),
+            'T': np.random.randint(-100, 100, 2),
             'S': np.random.random(2) * 5,
             'R': np.random.random() * np.pi - np.pi / 2,
             'M': np.random.random() * 2 - 1
@@ -179,24 +179,19 @@ class TestAffine(unittest.TestCase):
             return np.asarray((m, -1, k))
 
     @staticmethod
-    def sample_pts(gts):
-        pts_s = np.random.randint(-10, 20, size=[10, 2])
+    def sample_pts(gts, num_pts=10):
+        pts_s = np.random.randint(0, 2000, size=[num_pts, 2])
         pts_d = gts.forward(pts_s)
         return pts_s, pts_d
 
     @staticmethod
-    def sample_lines(gts):
-        lns_s = np.asarray([[], [], []]).T
-        lns_d = np.asarray([[], [], []]).T
-        while len(lns_s) < 10:
-            pts_s = np.random.randint(-10, 20, size=4)
-            l_s = TestAffine.line(pts_s)
-            if l_s[-1] != 0:
-                l_d = TestAffine.line(np.append(gts.forward(pts_s[:2]), gts.forward(pts_s[2:])))
-                if l_d[-1] != 0:
-                    lns_s = np.vstack([lns_s, l_s])
-                    lns_d = np.vstack([lns_d, l_d])
-        return lns_s, lns_d
+    def sample_lines(gts, num_pts=5):
+        pts_s, pts_d = TestAffine.sample_pts(gts, num_pts)
+        lns_s, lns_d = [], []
+        for b, e in itertools.combinations(range(5), 2):
+            lns_s.append(TestAffine.line(np.append(pts_s[b, :], pts_s[e, :])))
+            lns_d.append(TestAffine.line(np.append(pts_d[b, :], pts_d[e, :])))
+        return np.asarray(lns_s), np.asarray(lns_d)
 
     def test_initialisation(self):
         with self.subTest("From Parameters"):
@@ -305,18 +300,17 @@ class TestAffine(unittest.TestCase):
                 learnt = cvext.Affine().estimate((pts_s, None), (pts_d, None))
                 self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f))
         with self.subTest("Lines only"):
-            for _ in range(10):
+            for _ in range(20):
                 mdl = self.random_transform()
                 gts = cvext.Affine(
                     scale=mdl['S'], rotation=mdl['R'], shear=mdl['M'], translation=mdl['T']
                 )
-                # Build Lines from points: since we cannot support lines passing through origin,
-                #      I will do this in an iterative fashion, until I hit 10 lines.
+                # Build Lines from points.
                 lns_s, lns_d = self.sample_lines(gts)
                 learnt = cvext.Affine().estimate((None, lns_s), (None, lns_d))
-                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f))
+                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f), (mdl, lns_s, lns_d))
         with self.subTest("Points and Lines"):
-            for _ in range(10):
+            for _ in range(20):
                 mdl = self.random_transform()
                 gts = cvext.Affine(
                     scale=mdl['S'], rotation=mdl['R'], shear=mdl['M'], translation=mdl['T']
@@ -324,7 +318,7 @@ class TestAffine(unittest.TestCase):
                 pts_s, pts_d = self.sample_pts(gts)
                 lns_s, lns_d = self.sample_lines(gts)
                 learnt = cvext.Affine().estimate((pts_s, lns_s), (pts_d, lns_d))
-                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f))
+                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f), (mdl, lns_s, lns_d))
 
 
 class TestSWAHE(unittest.TestCase):

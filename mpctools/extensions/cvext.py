@@ -29,6 +29,7 @@ from threading import Thread
 from scipy import linalg
 import numpy as np
 import time as tm
+import warnings
 import math
 import cv2
 import os
@@ -221,6 +222,15 @@ class Affine:
         # Perform Multiplication (and squeeze out redundant dimensions)
         return np.squeeze(points @ matrix.T)
 
+    @staticmethod
+    def __normalise_lines(lines):
+        u, v, w = np.array(lines, dtype=np.float64, copy=True).T
+        # w_nz = (w != 0)
+        # u[w_nz] = u[w_nz] / w[w_nz]
+        # v[w_nz] = v[w_nz] / w[w_nz]
+        # w[w_nz] = 1
+        return u, v, w
+
     def __init__(self, matrix=None, scale=(1, 1), rotation=0, shear=0, translation=(0, 0)):
         """
         Initialises the Model, using either the matrix or any of the other parameters.
@@ -252,19 +262,23 @@ class Affine:
             )
             self._params = (np.asarray((tx, ty)), np.asarray((sx, sy)), shear, rotation)
         # Compute Inverse once
-        self._inverse = np.linalg.inv(np.append(self._forward, [[0, 0, 1]], axis=0))[:2, :]
+        try:
+            self._inverse = np.linalg.inv(np.append(self._forward, [[0, 0, 1]], axis=0))[:2, :]
+        except np.linalg.LinAlgError:
+            self._inverse = None
+            warnings.warn("Forward Transform is Singular and cannot be inverted.")
         # Finally, for estimation, we reserve the quality
-        self._qlt = [None, None]
+        self._qlt = None
 
     def estimate(self, src: tuple, dst: tuple, weight=0.5, dof=AFFINE):
         """
         Estimates the transform from point and/or line correspondences
 
         The method can estimate the affine transformation from either point or line
-        correspondences (or both). Note that both Points may be specified as euclidean or
-        homogenous coordinates: Lines are always 3-parameter vectors.
+        correspondences (or both). Lines are specified in terms of two (end-)points. Points
+        themselves may be specified in either euclidean or homogeneous co-ordinates.
 
-        :param src: Source Points and Lines. 2-Tuple of Arraylike
+        :param src: Source Points and Lines. 2-Tuple of Arraylike.
         :param dst: Destination Points/Lines. 2-Tuple of Arraylike
         :param weight: Weight for Point (as opposed to line) correspondences.
         :param dof: Degrees of Freedom (in decreasing flexibility)
@@ -285,9 +299,9 @@ class Affine:
                 raise ValueError('Destination and Source Points must be same size.')
             rows = len(src[0])
             # Define Target: X's, Y's, not interlaced
-            e.append(dst[0][:, :2].T.flatten()[:, np.newaxis] * np.sqrt(weight))
+            e.append(dst[0][:, :2].astype(np.float64).T.flatten()[:, np.newaxis] * np.sqrt(weight))
             # Define and build Design Matrix
-            A = np.zeros([rows*2, 6])
+            A = np.zeros([rows*2, 6], dtype=np.float64)
             A[:rows, 0:2] = src[0][:, :2]
             A[:rows, 2] = 1
             A[rows:, 3:5] = src[0][:, :2]
@@ -298,27 +312,19 @@ class Affine:
         if src[1] is not None:
             if dst[1] is None or len(dst[1]) != len(dst[1]):
                 raise ValueError('Destination and Source Lines must be same size.')
-            if (src[1][:, -1] == 0).any() or (dst[1][:, -1] == 0).any():
-                raise ValueError('Currently, I cannot handle lines passing through Origin.')
+            # if (src[1][:, -1] == 0).any() or (dst[1][:, -1] == 0).any():
+            #     raise ValueError('Currently, I cannot handle lines passing through Origin.')
             # Define the elements, and normalise where possible
             rows = len(src[1])
-            u_s, v_s, w_s = src[1].T.copy()
-            w_s_nz = w_s != 0
-            u_s[w_s_nz] = u_s[w_s_nz] / w_s[w_s_nz]
-            v_s[w_s_nz] = v_s[w_s_nz] / w_s[w_s_nz]
-            w_s[w_s_nz] = 1
-            u_d, v_d, w_d = dst[1].T.copy()
-            w_d_nz = w_d != 0
-            u_d[w_d_nz] = u_d[w_d_nz] / w_d[w_d_nz]
-            v_d[w_d_nz] = v_d[w_d_nz] / w_d[w_d_nz]
-            w_d[w_d_nz] = 1
+            u_s, v_s, w_s = self.__normalise_lines(src[1])
+            u_d, v_d, w_d = self.__normalise_lines(dst[1])
             # Define Target - U's, V's, W's, not interlaced
-            d = np.zeros(rows*3)
+            d = np.zeros(rows*2, dtype=np.float64)
             d[:rows] = -v_s * w_d
             d[rows:rows*2] = u_s * w_d
             e.append(d[:, np.newaxis] * np.sqrt(1-weight))
             # Define Design Matrix
-            C = np.zeros([rows*3, 6])
+            C = np.zeros([rows*2, 6], dtype=np.float64)
             C[:rows, 1] = -w_s * u_d
             C[:rows, 2] = v_s * u_d
             C[:rows, 4] = -w_s * v_d
@@ -327,11 +333,7 @@ class Affine:
             C[rows:rows*2, 2] = -u_s * u_d
             C[rows:rows*2, 3] = w_s * v_d
             C[rows:rows*2, 5] = -u_s * v_d
-            C[rows*2:, 0] = -v_s * u_d
-            C[rows*2:, 1] = u_s * u_d
-            C[rows*2:, 3] = -v_s * v_d
-            C[rows*2:, 4] = u_s * v_d
-            F.append(C  * np.sqrt(1-weight))
+            F.append(C * np.sqrt(1-weight))
 
         # Build Up complete solution
         if len(e) < 1:
@@ -340,14 +342,19 @@ class Affine:
         F = np.vstack(F)
 
         # Solve
-        m, self._qlt[0], self._qlt[1], _ = linalg.lstsq(
+        m, res, rnk, s = linalg.lstsq(
             F, e, overwrite_a=True, overwrite_b=True, lapack_driver='gelss'
         )
 
         # Build Result
         self._forward = m.reshape(2, 3)
         self._params = self.characterise(self._forward)
-        self._inverse = np.linalg.inv(np.append(self._forward, [[0, 0, 1]], axis=0))[:2, :]
+        try:
+            self._inverse = np.linalg.inv(np.append(self._forward, [[0, 0, 1]], axis=0))[:2, :]
+        except np.linalg.LinAlgError:
+            self._inverse = None
+            warnings.warn("Forward Transform is Singular and cannot be inverted.")
+        self._qlt = (res.sum(), rnk, abs(s[0] / s[-1]))
 
         # Return self for chaining
         return self
@@ -362,12 +369,15 @@ class Affine:
         """
         Transforms the points ine reverse direction
         """
-        return self.__apply_transform(self._inverse, points)
+        if self._inverse is not None:
+            return self.__apply_transform(self._inverse, points)
+        else:
+            raise RuntimeError("No Inverse exists for this Transform.")
 
     @property
     def fit_quality(self):
-        if self._qlt[0] is not None:
-            return {'Residuals': self._qlt[0].sum(), 'Rank': self._qlt[1]}
+        if self._qlt is not None:
+            return {'Residuals': self._qlt[0], 'Rank': self._qlt[1], 'Condition': self._qlt[2]}
         else:
             return None
 
