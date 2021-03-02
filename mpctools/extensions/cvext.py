@@ -173,6 +173,7 @@ class Affine:
     This is different from how skimage defines the components, and has implications on how the
     decomposition happens.
     """
+
     AFFINE = 0
     SIMILARITY = 1
     TRANSLATION = 2
@@ -202,35 +203,6 @@ class Affine:
 
         return b, np.asarray((s_x, s_y)), m, theta
 
-    @staticmethod
-    def __apply_transform(matrix: np.ndarray, points: np.ndarray):
-        """
-        Applies a Matrix Transformation on a set of points. Takes care of converting them to 2D
-        if need be and ignoring. Note that the returned value is always in R^2, and will be
-        squeezed if there is only one point.
-        :return:
-        """
-        # Ensure first that the coordinates are a 2D array
-        points = np.array(points, copy=False, ndmin=2)
-        # If need be, add 1 for homogeneous coordinate
-        if points.shape[1] == 2:
-            points = np.append(points, np.ones([points.shape[0], 1]), axis=1)
-        elif points.shape[1] == 3:
-            points = points / points[:, -1][:, np.newaxis]
-        else:
-            raise ValueError("points parameter must live in R^2 or R^3.")
-        # Perform Multiplication (and squeeze out redundant dimensions)
-        return np.squeeze(points @ matrix.T)
-
-    @staticmethod
-    def __normalise_lines(lines):
-        u, v, w = np.array(lines, dtype=np.float64, copy=True).T
-        # w_nz = (w != 0)
-        # u[w_nz] = u[w_nz] / w[w_nz]
-        # v[w_nz] = v[w_nz] / w[w_nz]
-        # w[w_nz] = 1
-        return u, v, w
-
     def __init__(self, matrix=None, scale=(1, 1), rotation=0, shear=0, translation=(0, 0)):
         """
         Initialises the Model, using either the matrix or any of the other parameters.
@@ -257,8 +229,10 @@ class Affine:
             sx, sy = (scale, scale) if np.isscalar(scale) else scale
             tx, ty = (translation, translation) if np.isscalar(translation) else translation
             self._forward = np.asarray(
-                [[sx * cos_r, sy * (shear * cos_r - sin_r), tx],
-                 [sx * sin_r, sy * (shear * sin_r + cos_r), ty]]
+                [
+                    [sx * cos_r, sy * (shear * cos_r - sin_r), tx],
+                    [sx * sin_r, sy * (shear * sin_r + cos_r), ty],
+                ]
             )
             self._params = (np.asarray((tx, ty)), np.asarray((sx, sy)), shear, rotation)
         # Compute Inverse once
@@ -270,16 +244,17 @@ class Affine:
         # Finally, for estimation, we reserve the quality
         self._qlt = None
 
-    def estimate(self, src: tuple, dst: tuple, weight=0.5, dof=AFFINE):
+    def estimate(self, pts, lns, weight=0.5, dof=AFFINE):
         """
         Estimates the transform from point and/or line correspondences
 
         The method can estimate the affine transformation from either point or line
-        correspondences (or both). Lines are specified in terms of two (end-)points. Points
-        themselves may be specified in either euclidean or homogeneous co-ordinates.
+        correspondences (or both). Points themselves may be specified in either euclidean or
+        homogeneous co-ordinates, yielding an Nx(2/3) matrix. Lines are specified in terms of two
+        (end-)points (each euclidean or homogeneous), and hence is an Nx2x(2/3) matrix.
 
-        :param src: Source Points and Lines. 2-Tuple of Arraylike.
-        :param dst: Destination Points/Lines. 2-Tuple of Arraylike
+        :param pts: Source/Destination Points. 2-Tuple of array-like or None
+        :param lns: Destination Points/Lines. 2-Tuple of Arraylike
         :param weight: Weight for Point (as opposed to line) correspondences.
         :param dof: Degrees of Freedom (in decreasing flexibility)
                     AFFINE: Full affine [Default]
@@ -287,70 +262,73 @@ class Affine:
                     TRANSLATION: Translation-only (2D)
         :return: self, for chaining
         """
-        if len(src) != 2 or len(dst) != 2:
-            raise ValueError("Source and Destination must both be 2-tuples")
+        # Set up Weights
+        pt_w, ln_w = np.sqrt(weight), np.sqrt(1 - weight)
+        # Some Error checking
+        if pts is None and lns is None:
+            raise ValueError("You must specify at least one of either point/line correspondences.")
+        if pts is not None:
+            if len(pts) != 2:
+                raise ValueError("You must specify both Source and Destination Points")
+            if len(pts[0]) != len(pts[1]):
+                raise ValueError("Destination and Source Points must be same size.")
+        else:
+            pts = (None, None)
+            ln_w = 1  # Update line weight to be 1
+        if lns is not None:
+            if len(lns) != 2:
+                raise ValueError("You must specify both Source and Destination Lines")
+            if len(lns[0]) != len(lns[1]):
+                raise ValueError("Destination and Source Lines must be same size.")
+        else:
+            lns = (None, None)
+            pt_w = 1  # Update point weight to be 1
 
-        # Prepare placeholders for target and design matrix (see eq. 11)
-        e, F = [], []
+        # Get Normalised Point/Line coordinates
+        (n_p, n_l), (x_s, y_s), (u_s, v_s, w_s), T_s = self.__normalise(pts[0], lns[0])
+        _, (x_d, y_d), (u_d, v_d, w_d), T_d = self.__normalise(pts[1], lns[1])
 
-        # If we have Points to match
-        if src[0] is not None:
-            if dst[0] is None or len(src[0]) != len(dst[0]):
-                raise ValueError('Destination and Source Points must be same size.')
-            rows = len(src[0])
-            # Define Target: X's, Y's, not interlaced
-            e.append(dst[0][:, :2].astype(np.float64).T.flatten()[:, np.newaxis] * np.sqrt(weight))
-            # Define and build Design Matrix
-            A = np.zeros([rows*2, 6], dtype=np.float64)
-            A[:rows, 0:2] = src[0][:, :2]
-            A[:rows, 2] = 1
-            A[rows:, 3:5] = src[0][:, :2]
-            A[rows:, 5] = 1
-            F.append(A * np.sqrt(weight))
+        # Fill up:
+        #  Note that for simplicity, I am not interlacing, instead opting to stack
+        #  - Start with e -
+        e = np.zeros([(n_p + n_l) * 2, 1], dtype=np.float64)
+        if n_p > 0:
+            e[:n_p, 0] = x_d * pt_w
+            e[n_p : n_p * 2, 0] = y_d * pt_w
+        if n_l > 0:
+            e[n_p * 2 : n_p * 2 + n_l, 0] = -v_s * w_d * ln_w
+            e[n_p * 2 + n_l :, 0] = u_s * w_d * ln_w
+        #  - Now, F -
+        F = np.zeros([(n_p + n_l) * 2, 6], dtype=np.float64)
+        if n_p > 0:
+            F[:n_p, 0] = x_s * pt_w
+            F[:n_p, 1] = y_s * pt_w
+            F[:n_p, 2] = pt_w
+            F[n_p : n_p * 2, 3] = x_s * pt_w
+            F[n_p : n_p * 2, 4] = y_s * pt_w
+            F[n_p : n_p * 2, 5] = pt_w
+        if n_l > 0:
+            F[n_p * 2 : n_p * 2 + n_l, 1] = -w_s * u_d * ln_w
+            F[n_p * 2 : n_p * 2 + n_l, 2] = v_s * u_d * ln_w
+            F[n_p * 2 : n_p * 2 + n_l, 4] = -w_s * v_d * ln_w
+            F[n_p * 2 : n_p * 2 + n_l, 5] = v_s * v_d * ln_w
+            F[n_p * 2 + n_l :, 0] = w_s * u_d * ln_w
+            F[n_p * 2 + n_l :, 2] = -u_s * u_d * ln_w
+            F[n_p * 2 + n_l :, 3] = w_s * v_d * ln_w
+            F[n_p * 2 + n_l :, 5] = -u_s * v_d * ln_w
 
-        # If we have Lines to match
-        if src[1] is not None:
-            if dst[1] is None or len(dst[1]) != len(dst[1]):
-                raise ValueError('Destination and Source Lines must be same size.')
-            # if (src[1][:, -1] == 0).any() or (dst[1][:, -1] == 0).any():
-            #     raise ValueError('Currently, I cannot handle lines passing through Origin.')
-            # Define the elements, and normalise where possible
-            rows = len(src[1])
-            u_s, v_s, w_s = self.__normalise_lines(src[1])
-            u_d, v_d, w_d = self.__normalise_lines(dst[1])
-            # Define Target - U's, V's, W's, not interlaced
-            d = np.zeros(rows*2, dtype=np.float64)
-            d[:rows] = -v_s * w_d
-            d[rows:rows*2] = u_s * w_d
-            e.append(d[:, np.newaxis] * np.sqrt(1-weight))
-            # Define Design Matrix
-            C = np.zeros([rows*2, 6], dtype=np.float64)
-            C[:rows, 1] = -w_s * u_d
-            C[:rows, 2] = v_s * u_d
-            C[:rows, 4] = -w_s * v_d
-            C[:rows, 5] = v_s * v_d
-            C[rows:rows*2, 0] = w_s * u_d
-            C[rows:rows*2, 2] = -u_s * u_d
-            C[rows:rows*2, 3] = w_s * v_d
-            C[rows:rows*2, 5] = -u_s * v_d
-            F.append(C * np.sqrt(1-weight))
-
-        # Build Up complete solution
-        if len(e) < 1:
-            raise ValueError('You must specify at least one of either point/line correspondences.')
-        e = np.vstack(e)
-        F = np.vstack(F)
-
-        # Solve
+        # Solve, and also build Isotropic Transform
         m, res, rnk, s = linalg.lstsq(
-            F, e, overwrite_a=True, overwrite_b=True, lapack_driver='gelss'
+            F, e, overwrite_a=True, overwrite_b=True, lapack_driver="gelss"
         )
 
         # Build Result
-        self._forward = m.reshape(2, 3)
+        self._forward = (np.linalg.inv(T_d) @ np.vstack([m.reshape(2, 3), [[0, 0, 1]]]) @ T_s)[
+            :2, :
+        ]
         self._params = self.characterise(self._forward)
         try:
-            self._inverse = np.linalg.inv(np.append(self._forward, [[0, 0, 1]], axis=0))[:2, :]
+            self._inverse = np.linalg.inv(np.vstack([self._forward, [[0, 0, 1]]]))[:2, :]
         except np.linalg.LinAlgError:
             self._inverse = None
             warnings.warn("Forward Transform is Singular and cannot be inverted.")
@@ -377,7 +355,7 @@ class Affine:
     @property
     def fit_quality(self):
         if self._qlt is not None:
-            return {'Residuals': self._qlt[0], 'Rank': self._qlt[1], 'Condition': self._qlt[2]}
+            return {"Residuals": self._qlt[0], "Rank": self._qlt[1], "Condition": self._qlt[2]}
         else:
             return None
 
@@ -404,6 +382,89 @@ class Affine:
     @property
     def rotation(self):
         return self._params[3]
+
+    @staticmethod
+    def __build_line(pts):
+        x_1, y_1, x_2, y_2 = pts
+        if x_1 == x_2:
+            if y_1 == y_2:
+                raise ValueError("Line cannot be specified from two equal points.")
+            return np.asarray((1, 0, -x_1))
+        elif y_1 == y_2:
+            return np.asarray((0, 1, -y_1))
+        else:
+            m = (y_1 - y_2) / (x_1 - x_2)
+            k = y_1 - m * x_1
+            return np.asarray((m, -1, k))
+
+    @staticmethod
+    def __normalise(pts, lines):
+        """
+        Gets Normalised Points/Line Entries
+
+        Returns Normalised Parameters
+            (p, l): Number of Points/Lines respectively
+            (x, y): If points provided, normalised x/y coordinates
+            (u, v, w): If lines provided, normalised u/v/w coordinates
+            T: Translation/Isotropic Scaling matrix
+        """
+        # Build Points
+        all_pts = []
+        if pts is not None:
+            pts = np.array(pts, dtype=np.float64, copy=True)
+            if pts.shape[1] == 3:
+                pts /= pts[:, [2]]
+            all_pts.append(pts)
+        if lines is not None:
+            lines = np.array(lines, dtype=np.float64, copy=True)
+            if lines.shape[2] == 3:
+                lines /= lines[:, :, [2]]
+            all_pts.append(lines[:, 0, :])  # Begin
+            all_pts.append(lines[:, 1, :])  # End
+        all_pts = np.vstack(all_pts)
+
+        # Find (forward) Transform [i.e. Add/Multiply)
+        t = -all_pts.mean(axis=0)
+        s = np.sqrt(2) / np.linalg.norm(all_pts + t, axis=1).mean()
+        T = np.asarray([[s, 0, t[0] * s], [0, s, t[1] * s], [0, 0, 1]], dtype=np.float64)
+        # Prepare Values to Return
+        if pts is not None:
+            x, y = (pts[:, 0] + t[0]) * s, (pts[:, 1] + t[1]) * s
+            p = len(x)
+        else:
+            x, y = None, None
+            p = 0
+        if lines is not None:
+            l_b = (lines[:, 0, :] + t[np.newaxis, :]) * s
+            l_e = (lines[:, 1, :] + t[np.newaxis, :]) * s
+            u, v, w = np.apply_along_axis(Affine.__build_line, 1, np.hstack([l_b, l_e])).T
+            l = len(u)
+        else:
+            u, v, w = None, None, None
+            l = 0
+
+        # Return
+        return (p, l), (x, y), (u, v, w), T
+
+    @staticmethod
+    def __apply_transform(matrix: np.ndarray, points: np.ndarray):
+        """
+        Applies a Matrix Transformation on a set of points. Takes care of converting them to 2D
+        if need be and ignoring. Note that the returned value is always in R^2, and will be
+        squeezed if there is only one point.
+        :return:
+        """
+        # Ensure first that the coordinates are a 2D array
+        points = np.array(points, copy=False, ndmin=2)
+        # If need be, add 1 for homogeneous coordinate
+        if points.shape[1] == 2:
+            points = np.append(points, np.ones([points.shape[0], 1]), axis=1)
+        elif points.shape[1] == 3:
+            points = points / points[:, -1][:, np.newaxis]
+        else:
+            raise ValueError("points parameter must live in R^2 or R^3.")
+        # Perform Multiplication (and squeeze out redundant dimensions)
+        return np.squeeze(points @ matrix.T)
 
 
 class ScaleTranslation:
@@ -437,9 +498,7 @@ class ScaleTranslation:
         res = LinearRegression(fit_intercept=False).fit(_X, _Y).coef_
         # Prepare
         if scale_dof == 1:
-            self._forward = AffineTransform(
-                scale=res[0], rotation=0, shear=0, translation=res[1:3]
-            )
+            self._forward = AffineTransform(scale=res[0], rotation=0, shear=0, translation=res[1:3])
         else:
             self._forward = AffineTransform(
                 scale=res[0:2], rotation=0, shear=0, translation=res[2:4]
@@ -468,9 +527,6 @@ class ScaleTranslation:
 
     def __repr__(self):
         return self.matrix
-
-
-
 
 
 def pairwise_iou(a, b, cutoff=0, distance=False):
