@@ -293,29 +293,68 @@ class Affine:
         #  - Start with e -
         e = np.zeros([(n_p + n_l) * 2, 1], dtype=np.float64)
         if n_p > 0:
-            e[:n_p, 0] = x_d * pt_w
-            e[n_p : n_p * 2, 0] = y_d * pt_w
+            if dof == self.TRANSLATION:
+                e[:n_p, 0] = (x_d - x_s) * pt_w
+                e[n_p: n_p * 2, 0] = (y_d - y_s) * pt_w
+            else:
+                e[:n_p, 0] = x_d * pt_w
+                e[n_p : n_p * 2, 0] = y_d * pt_w
         if n_l > 0:
-            e[n_p * 2 : n_p * 2 + n_l, 0] = -v_s * w_d * ln_w
-            e[n_p * 2 + n_l :, 0] = u_s * w_d * ln_w
+            if dof == self.TRANSLATION:
+                e[n_p * 2: n_p * 2 + n_l, 0] = (w_s * v_d - v_s * w_d) * ln_w
+                e[n_p * 2 + n_l:, 0] = (u_s * w_d - w_s * u_d) * ln_w
+            else:
+                e[n_p * 2 : n_p * 2 + n_l, 0] = -v_s * w_d * ln_w
+                e[n_p * 2 + n_l :, 0] = u_s * w_d * ln_w
         #  - Now, F -
-        F = np.zeros([(n_p + n_l) * 2, 6], dtype=np.float64)
-        if n_p > 0:
-            F[:n_p, 0] = x_s * pt_w
-            F[:n_p, 1] = y_s * pt_w
-            F[:n_p, 2] = pt_w
-            F[n_p : n_p * 2, 3] = x_s * pt_w
-            F[n_p : n_p * 2, 4] = y_s * pt_w
-            F[n_p : n_p * 2, 5] = pt_w
-        if n_l > 0:
-            F[n_p * 2 : n_p * 2 + n_l, 1] = -w_s * u_d * ln_w
-            F[n_p * 2 : n_p * 2 + n_l, 2] = v_s * u_d * ln_w
-            F[n_p * 2 : n_p * 2 + n_l, 4] = -w_s * v_d * ln_w
-            F[n_p * 2 : n_p * 2 + n_l, 5] = v_s * v_d * ln_w
-            F[n_p * 2 + n_l :, 0] = w_s * u_d * ln_w
-            F[n_p * 2 + n_l :, 2] = -u_s * u_d * ln_w
-            F[n_p * 2 + n_l :, 3] = w_s * v_d * ln_w
-            F[n_p * 2 + n_l :, 5] = -u_s * v_d * ln_w
+        if dof == self.TRANSLATION:
+            F = np.zeros([(n_p + n_l) * 2, 2], dtype=np.float64)
+            if n_p > 0:
+                F[:n_p, 0] = pt_w
+                F[n_p : n_p * 2, 1] = pt_w
+            if n_l > 0:
+                F[n_p * 2: n_p * 2 + n_l, 0] = v_s * u_d * ln_w
+                F[n_p * 2: n_p * 2 + n_l, 1] = v_s * v_d * ln_w
+                F[n_p * 2 + n_l :, 0] = -u_s * u_d * ln_w
+                F[n_p * 2 + n_l :, 1] = -u_s * v_d * ln_w
+        elif dof == self.SIMILARITY:
+            F = np.zeros([(n_p + n_l) * 2, 4], dtype=np.float64)
+            if n_p > 0:
+                F[:n_p, 0] = x_s * pt_w
+                F[:n_p, 1] = y_s * pt_w
+                F[:n_p, 2] = pt_w
+                F[n_p: n_p * 2, 0] = y_s * pt_w
+                F[n_p: n_p * 2, 1] = x_s * pt_w
+                F[n_p: n_p * 2, 3] = pt_w
+            if n_l > 0:
+                F[n_p * 2: n_p * 2 + n_l, 0] = -w_s * v_d * ln_w
+                F[n_p * 2: n_p * 2 + n_l, 1] = -w_s * u_d * ln_w
+                F[n_p * 2: n_p * 2 + n_l, 2] = v_s * u_d * ln_w
+                F[n_p * 2: n_p * 2 + n_l, 3] = v_s * v_d * ln_w
+                F[n_p * 2 + n_l:, 0] = w_s * u_d * ln_w
+                F[n_p * 2 + n_l:, 1] = w_s * v_d * ln_w
+                F[n_p * 2 + n_l:, 2] = -u_s * u_d * ln_w
+                F[n_p * 2 + n_l:, 3] = -u_s * v_d * ln_w
+        elif dof == self.AFFINE:
+            F = np.zeros([(n_p + n_l) * 2, 6], dtype=np.float64)
+            if n_p > 0:
+                F[:n_p, 0] = x_s * pt_w
+                F[:n_p, 1] = y_s * pt_w
+                F[:n_p, 2] = pt_w
+                F[n_p : n_p * 2, 3] = x_s * pt_w
+                F[n_p : n_p * 2, 4] = y_s * pt_w
+                F[n_p : n_p * 2, 5] = pt_w
+            if n_l > 0:
+                F[n_p * 2 : n_p * 2 + n_l, 1] = -w_s * u_d * ln_w
+                F[n_p * 2 : n_p * 2 + n_l, 2] = v_s * u_d * ln_w
+                F[n_p * 2 : n_p * 2 + n_l, 4] = -w_s * v_d * ln_w
+                F[n_p * 2 : n_p * 2 + n_l, 5] = v_s * v_d * ln_w
+                F[n_p * 2 + n_l :, 0] = w_s * u_d * ln_w
+                F[n_p * 2 + n_l :, 2] = -u_s * u_d * ln_w
+                F[n_p * 2 + n_l :, 3] = w_s * v_d * ln_w
+                F[n_p * 2 + n_l :, 5] = -u_s * v_d * ln_w
+        else:
+            raise ValueError("DOF Mode not recognised.")
 
         # Solve, and also build Isotropic Transform
         m, res, rnk, s = linalg.lstsq(
@@ -323,9 +362,13 @@ class Affine:
         )
 
         # Build Result
-        self._forward = (np.linalg.inv(T_d) @ np.vstack([m.reshape(2, 3), [[0, 0, 1]]]) @ T_s)[
-            :2, :
-        ]
+        if dof == self.TRANSLATION:
+            M = np.asarray([[1, 0, m[0]], [0, 1, m[1]], [0, 0, 1]], dtype=np.float64)
+        elif dof == self.SIMILARITY:
+            M = np.asarray([[m[0], m[1], m[2]], [m[1], m[0], m[3]], [0, 0, 1]], dtype=np.float64)
+        else:
+            M = np.asarray([[m[0], m[1], m[2]], [m[3], m[4], m[5]], [0, 0, 1]], dtype=np.float64)
+        self._forward = (np.linalg.inv(T_d) @ M @ T_s)[:2, :]
         self._params = self.characterise(self._forward)
         try:
             self._inverse = np.linalg.inv(np.vstack([self._forward, [[0, 0, 1]]]))[:2, :]
