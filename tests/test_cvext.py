@@ -184,47 +184,47 @@ class TestAffine(unittest.TestCase):
         with self.subTest("From Parameters"):
             self.assertTrue(
                 np.array_equal(  # Default
-                    cvext.Affine().matrix_f, np.append(np.eye(2), [[0], [0]], axis=1)
+                    cvext.AffineTransform().matrix_f, np.append(np.eye(2), [[0], [0]], axis=1)
                 )
             )
             self.assertTrue(
                 np.array_equal(  # Translation (single)
-                    cvext.Affine(translation=-2).matrix_f,
+                    cvext.AffineTransform(translation=-2).matrix_f,
                     np.append(np.eye(2), [[-2], [-2]], axis=1),
                 )
             )
             self.assertTrue(
                 np.array_equal(  # Translation (Multiple)
-                    cvext.Affine(translation=[0.5, -4]).matrix_f,
+                    cvext.AffineTransform(translation=[0.5, -4]).matrix_f,
                     np.append(np.eye(2), [[0.5], [-4]], axis=1),
                 )
             )
             self.assertTrue(
                 np.array_equal(  # Scaling (single)
-                    cvext.Affine(scale=2.3).matrix_f, np.append(np.eye(2) * 2.3, [[0], [0]], axis=1)
+                    cvext.AffineTransform(scale=2.3).matrix_f, np.append(np.eye(2) * 2.3, [[0], [0]], axis=1)
                 )
             )
             self.assertTrue(
                 np.array_equal(  # Scaling (single)
-                    cvext.Affine(scale=[-1, 5]).matrix_f,
+                    cvext.AffineTransform(scale=[-1, 5]).matrix_f,
                     np.append(np.diag([-1, 5]), [[0], [0]], axis=1),
                 )
             )
             self.assertTrue(
                 np.array_equal(  # Shearing
-                    cvext.Affine(shear=0.31).matrix_f, np.asarray([[1, 0.31, 0], [0, 1, 0]])
+                    cvext.AffineTransform(shear=0.31).matrix_f, np.asarray([[1, 0.31, 0], [0, 1, 0]])
                 )
             )
             self.assertTrue(
                 np.allclose(  # Rotation
-                    cvext.Affine(rotation=0.5).matrix_f,
+                    cvext.AffineTransform(rotation=0.5).matrix_f,
                     np.asarray([[0.87758256, -0.47942554, 0], [0.47942554, 0.87758256, 0]]),
                 )
             )
         with self.subTest("From Matrix (Characterisation)"):
             # Identity
             for mtr in ([[1, 0, 0], [0, 1, 0]], [[1, 0, 0], [0, 1, 0], [0, 0, 1]]):
-                affine = cvext.Affine(matrix=np.asarray(mtr))
+                affine = cvext.AffineTransform(matrix=np.asarray(mtr))
                 self.assertTrue(np.array_equal(affine.translation, [0, 0]))
                 self.assertTrue(np.array_equal(affine.scale, [1, 1]))
                 self.assertEqual(affine.shear, 0)
@@ -232,8 +232,8 @@ class TestAffine(unittest.TestCase):
             # Generate some at random.
             for _ in range(10):
                 m = self.random_transform()
-                affine = cvext.Affine(
-                    matrix=cvext.Affine(
+                affine = cvext.AffineTransform(
+                    matrix=cvext.AffineTransform(
                         scale=m["S"], rotation=m["R"], shear=m["M"], translation=m["T"]
                     ).matrix_f
                 )
@@ -243,41 +243,41 @@ class TestAffine(unittest.TestCase):
                 self.assertAlmostEqual(affine.rotation, m["R"])
         with self.subTest("Inverse Computation"):
             # Just Identity
-            affine = cvext.Affine()
+            affine = cvext.AffineTransform()
             self.assertTrue(np.array_equal(affine.matrix_f, [[1, 0, 0], [0, 1, 0]]))
             self.assertTrue(np.array_equal(affine.matrix_i, [[1, 0, 0], [0, 1, 0]]))
             # try that inverse of inverse is original.
             for _ in range(10):
                 m = self.random_transform()
-                forward = cvext.Affine(
+                forward = cvext.AffineTransform(
                     scale=m["S"], rotation=m["R"], shear=m["M"], translation=m["T"]
                 )
-                inverse = cvext.Affine(matrix=forward.matrix_i)
+                inverse = cvext.AffineTransform(matrix=forward.matrix_i)
                 self.assertTrue(np.allclose(forward.matrix_f, inverse.matrix_i))
 
     def test_transform(self):
         with self.subTest("Shape & Homogeneous"):  # Just test identity
             # Single entry
-            self.assertEqual(cvext.Affine().forward([1, 1]).ndim, 1)
-            self.assertEqual(len(cvext.Affine().forward([1, 1])), 2)
-            self.assertTrue(np.array_equal(cvext.Affine().forward([1, 1]), [1, 1]))
-            self.assertEqual(cvext.Affine().forward([1, 1, 1]).ndim, 1)
-            self.assertEqual(len(cvext.Affine().forward([1, 1, 1])), 2)
-            self.assertTrue(np.array_equal(cvext.Affine().forward([1, 1, 1]), [1, 1]))
+            self.assertEqual(cvext.AffineTransform().forward([1, 1]).ndim, 1)
+            self.assertEqual(len(cvext.AffineTransform().forward([1, 1])), 2)
+            self.assertTrue(np.array_equal(cvext.AffineTransform().forward([1, 1]), [1, 1]))
+            self.assertEqual(cvext.AffineTransform().forward([1, 1, 1]).ndim, 1)
+            self.assertEqual(len(cvext.AffineTransform().forward([1, 1, 1])), 2)
+            self.assertTrue(np.array_equal(cvext.AffineTransform().forward([1, 1, 1]), [1, 1]))
             # Multi points
             pts, pts_h = [[1, 1], [0, 5], [1, 3]], [[1, 1, 1], [0, 2.5, 0.5], [2, 6, 2]]
-            self.assertEqual(cvext.Affine().forward(pts).ndim, 2)
-            self.assertEqual(len(cvext.Affine().forward(pts)), 3)
-            self.assertEqual(cvext.Affine().forward(pts).shape[1], 2)
-            self.assertTrue(np.array_equal(cvext.Affine().forward(pts), pts))
-            self.assertEqual(cvext.Affine().forward(pts_h).ndim, 2)
-            self.assertEqual(len(cvext.Affine().forward(pts_h)), 3)
-            self.assertEqual(cvext.Affine().forward(pts_h).shape[1], 2)
-            self.assertTrue(np.array_equal(cvext.Affine().forward(pts_h), pts))
+            self.assertEqual(cvext.AffineTransform().forward(pts).ndim, 2)
+            self.assertEqual(len(cvext.AffineTransform().forward(pts)), 3)
+            self.assertEqual(cvext.AffineTransform().forward(pts).shape[1], 2)
+            self.assertTrue(np.array_equal(cvext.AffineTransform().forward(pts), pts))
+            self.assertEqual(cvext.AffineTransform().forward(pts_h).ndim, 2)
+            self.assertEqual(len(cvext.AffineTransform().forward(pts_h)), 3)
+            self.assertEqual(cvext.AffineTransform().forward(pts_h).shape[1], 2)
+            self.assertTrue(np.array_equal(cvext.AffineTransform().forward(pts_h), pts))
         with self.subTest("Transform"):  # Compare with SKAffine
             for i in range(10):
                 mdl = self.random_transform()
-                affine = cvext.Affine(
+                affine = cvext.AffineTransform(
                     scale=mdl["S"], rotation=mdl["R"], shear=mdl["M"], translation=mdl["T"]
                 )
                 skaffine = SKAffine(
@@ -290,45 +290,73 @@ class TestAffine(unittest.TestCase):
     def test_estimation(self):
         # This will be noiseless estimation
         with self.subTest("Error Handling"):
-            affine = cvext.Affine()
+            affine = cvext.AffineTransform()
             self.assertRaises(ValueError, affine.estimate, None, None)
             self.assertRaises(ValueError, affine.estimate, ([],), None)
             self.assertRaises(ValueError, affine.estimate, None, ([],))
-            self.assertRaises(
-                ValueError, affine.estimate, (np.zeros([10, 2]), np.zeros([5, 2])), None
-            )
-            self.assertRaises(
-                ValueError, affine.estimate, None, (np.zeros([10, 2]), np.zeros([5, 2]))
-            )
+            self.assertRaises(ValueError, affine.estimate, (np.zeros([10, 2]), np.zeros([5, 2])))
+            self.assertRaises(ValueError, affine.estimate, lns=(np.zeros([10, 2]), np.zeros([5, 2])))
         with self.subTest("Points Only"):
             for _ in range(10):
                 mdl = self.random_transform()
-                gts = cvext.Affine(
+                gts = cvext.AffineTransform(
                     scale=mdl["S"], rotation=mdl["R"], shear=mdl["M"], translation=mdl["T"]
                 )
                 pts_s, pts_d = self.sample_pts(gts)
-                learnt = cvext.Affine().estimate((pts_s, pts_d), None)
+                learnt = cvext.AffineTransform().estimate((pts_s, pts_d))
+                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f))
+                pts_s = np.hstack([pts_s, np.ones([10, 1])])
+                pts_d = np.hstack([pts_d, np.ones([10, 1])])
+                learnt = cvext.AffineTransform().estimate((pts_s, pts_d))
+                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f))
+                pts_s = pts_s * (np.random.random() * 5 + 0.5)
+                pts_d = pts_d * (np.random.random() * 5 + 0.5)
+                learnt = cvext.AffineTransform().estimate((pts_s, pts_d))
                 self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f))
         with self.subTest("Lines only"):
             for _ in range(20):
                 mdl = self.random_transform()
-                gts = cvext.Affine(
+                gts = cvext.AffineTransform(
                     scale=mdl["S"], rotation=mdl["R"], shear=mdl["M"], translation=mdl["T"]
                 )
                 # Build Lines from points.
                 lns_s, lns_d = self.sample_lines(gts)
-                learnt = cvext.Affine().estimate(None, (lns_s, lns_d))
-                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f), (mdl, lns_s, lns_d))
+                learnt = cvext.AffineTransform().estimate(lns=(lns_s, lns_d))
+                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f))
+                lns_s = np.pad(lns_s, ((0, 0), (0, 0), (0, 1)), constant_values=1)
+                lns_d = np.pad(lns_d, ((0, 0), (0, 0), (0, 1)), constant_values=1)
+                learnt = cvext.AffineTransform().estimate(lns=(lns_s, lns_d))
+                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f))
+                lns_s = lns_s * (np.random.random() * 5 + 0.5)
+                lns_d = lns_d * (np.random.random() * 5 + 0.5)
+                learnt = cvext.AffineTransform().estimate(lns=(lns_s, lns_d))
+                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f))
         with self.subTest("Points and Lines"):
             for _ in range(20):
                 mdl = self.random_transform()
-                gts = cvext.Affine(
+                gts = cvext.AffineTransform(
                     scale=mdl["S"], rotation=mdl["R"], shear=mdl["M"], translation=mdl["T"]
                 )
                 pts_s, pts_d = self.sample_pts(gts)
                 lns_s, lns_d = self.sample_lines(gts)
-                learnt = cvext.Affine().estimate((pts_s, pts_d), (lns_s, lns_d))
-                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f), (mdl, lns_s, lns_d))
+                learnt = cvext.AffineTransform().estimate((pts_s, pts_d), (lns_s, lns_d))
+                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f))
+                pts_s_h = np.hstack([pts_s, np.ones([10, 1])])
+                pts_d_h = np.hstack([pts_d, np.ones([10, 1])])
+                learnt = cvext.AffineTransform().estimate((pts_s_h, pts_d_h), (lns_s, lns_d))
+                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f))
+                lns_s_h = np.pad(lns_s, ((0, 0), (0, 0), (0, 1)), constant_values=1)
+                lns_d_h = np.pad(lns_d, ((0, 0), (0, 0), (0, 1)), constant_values=1)
+                learnt = cvext.AffineTransform().estimate((pts_s, pts_d), (lns_s_h, lns_d_h))
+                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f))
+                learnt = cvext.AffineTransform().estimate((pts_s_h, pts_d_h), (lns_s_h, lns_d_h))
+                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f))
+                pts_s_h = pts_s_h * (np.random.random() * 5 + 0.5)
+                pts_d_h = pts_d_h * (np.random.random() * 5 + 0.5)
+                lns_s_h = lns_s_h * (np.random.random() * 5 + 0.5)
+                lns_d_h = lns_d_h * (np.random.random() * 5 + 0.5)
+                learnt = cvext.AffineTransform().estimate((pts_s_h, pts_d_h), (lns_s_h, lns_d_h))
+                self.assertTrue(np.allclose(gts.matrix_f, learnt.matrix_f))
 
 
 class TestSWAHE(unittest.TestCase):

@@ -20,8 +20,6 @@ see http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 
-from sklearn.linear_model import LinearRegression
-from skimage.transform import AffineTransform
 from numba import jit, uint8, uint16, double
 from queue import Queue, Empty, Full
 from scipy import optimize as optim
@@ -155,13 +153,13 @@ class Homography:
         return self.__convert(points, self.toWrld)
 
 
-class Affine:
+class AffineTransform:
     """
     Defines an Affine Transform.
 
     This class is an extension to skimage's and opencv's affine transformation. It encapsulates the
     definition of an affine, storing its parameters, and implements fitting the parameters in
-    such a way that one can use both points and line correspondences.
+    such a way that one can use both points and/or line correspondences.
 
     Note that as regards the individual components, we define an affine transformation by a
     translation (t_x, t_y) plus a scale (s_x, s_y), shear (m) and rotation (θ), in that order, st:
@@ -244,7 +242,12 @@ class Affine:
         # Finally, for estimation, we reserve the quality
         self._qlt = None
 
-    def estimate(self, pts, lns, weight=0.5, dof=AFFINE):
+    def __repr__(self):
+        _s = [f'{s:.2f}' for s in self.scale]
+        _t = [f'{t:.0f}' for t in self.translation]
+        return f'AFFINE {{R({self.rotation:.2f}) M({self.shear:.2f}) S{_s} T{_t}}}'
+
+    def estimate(self, pts=None, lns=None, weight=0.5, dof=AFFINE):
         """
         Estimates the transform from point and/or line correspondences
 
@@ -267,6 +270,8 @@ class Affine:
         # Some Error checking
         if pts is None and lns is None:
             raise ValueError("You must specify at least one of either point/line correspondences.")
+        if dof not in (self.AFFINE, self.SIMILARITY, self.TRANSLATION):
+            raise ValueError("DOF Mode not recognised.")
         if pts is not None:
             if len(pts) != 2:
                 raise ValueError("You must specify both Source and Destination Points")
@@ -285,8 +290,8 @@ class Affine:
             pt_w = 1  # Update point weight to be 1
 
         # Get Normalised Point/Line coordinates
-        (n_p, n_l), (x_s, y_s), (u_s, v_s, w_s), T_s = self.__normalise(pts[0], lns[0])
-        _, (x_d, y_d), (u_d, v_d, w_d), T_d = self.__normalise(pts[1], lns[1])
+        (n_p, n_l), (x_s, y_s), (u_s, v_s, w_s), T_s = self.__normalise(pts[0], lns[0], dof == self.TRANSLATION)
+        _, (x_d, y_d), (u_d, v_d, w_d), T_d = self.__normalise(pts[1], lns[1], dof == self.TRANSLATION)
 
         # Fill up:
         #  Note that for simplicity, I am not interlacing, instead opting to stack
@@ -353,8 +358,6 @@ class Affine:
                 F[n_p * 2 + n_l :, 2] = -u_s * u_d * ln_w
                 F[n_p * 2 + n_l :, 3] = w_s * v_d * ln_w
                 F[n_p * 2 + n_l :, 5] = -u_s * v_d * ln_w
-        else:
-            raise ValueError("DOF Mode not recognised.")
 
         # Solve, and also build Isotropic Transform
         m, res, rnk, s = linalg.lstsq(
@@ -427,23 +430,12 @@ class Affine:
         return self._params[3]
 
     @staticmethod
-    def __build_line(pts):
-        x_1, y_1, x_2, y_2 = pts
-        if x_1 == x_2:
-            if y_1 == y_2:
-                raise ValueError("Line cannot be specified from two equal points.")
-            return np.asarray((1, 0, -x_1))
-        elif y_1 == y_2:
-            return np.asarray((0, 1, -y_1))
-        else:
-            m = (y_1 - y_2) / (x_1 - x_2)
-            k = y_1 - m * x_1
-            return np.asarray((m, -1, k))
-
-    @staticmethod
-    def __normalise(pts, lines):
+    def __normalise(pts, lines, translate_only=False):
         """
         Gets Normalised Points/Line Entries
+
+        Note that a line is defined in terms of its end-point. If translate_only is set,
+        then there is no scaling, just translation
 
         Returns Normalised Parameters
             (p, l): Number of Points/Lines respectively
@@ -457,19 +449,23 @@ class Affine:
             pts = np.array(pts, dtype=np.float64, copy=True)
             if pts.shape[1] == 3:
                 pts /= pts[:, [2]]
-            all_pts.append(pts)
+            all_pts.append(pts[:, :2]) #
         if lines is not None:
             lines = np.array(lines, dtype=np.float64, copy=True)
             if lines.shape[2] == 3:
-                lines /= lines[:, :, [2]]
+                lines = lines[:, :, :2] / lines[:, :, [2]]
             all_pts.append(lines[:, 0, :])  # Begin
             all_pts.append(lines[:, 1, :])  # End
         all_pts = np.vstack(all_pts)
 
         # Find (forward) Transform [i.e. Add/Multiply)
         t = -all_pts.mean(axis=0)
-        s = np.sqrt(2) / np.linalg.norm(all_pts + t, axis=1).mean()
+        if translate_only:
+            s = 1
+        else:
+            s = np.sqrt(2) / np.linalg.norm(all_pts + t, axis=1).mean()
         T = np.asarray([[s, 0, t[0] * s], [0, s, t[1] * s], [0, 0, 1]], dtype=np.float64)
+
         # Prepare Values to Return
         if pts is not None:
             x, y = (pts[:, 0] + t[0]) * s, (pts[:, 1] + t[1]) * s
@@ -480,7 +476,7 @@ class Affine:
         if lines is not None:
             l_b = (lines[:, 0, :] + t[np.newaxis, :]) * s
             l_e = (lines[:, 1, :] + t[np.newaxis, :]) * s
-            u, v, w = np.apply_along_axis(Affine.__build_line, 1, np.hstack([l_b, l_e])).T
+            u, v, w = np.apply_along_axis(build_line, 1, np.hstack([l_b, l_e])).T
             l = len(u)
         else:
             u, v, w = None, None, None
@@ -508,68 +504,6 @@ class Affine:
             raise ValueError("points parameter must live in R^2 or R^3.")
         # Perform Multiplication (and squeeze out redundant dimensions)
         return np.squeeze(points @ matrix.T)
-
-
-class ScaleTranslation:
-    """
-    Defines an Affine Transform which is restricted to Scale/Translation, independently for X/Y.
-    """
-
-    def __init__(self, src, dest, scale_dof=1):
-        """
-        Initialise the Transform
-
-        :param src: Source set of points
-        :param dest: Destination set of points
-        """
-        # Solve
-        # --- Build X and Y
-        if scale_dof == 1:
-            _X = np.zeros([np.size(src), 3])
-            _X[::2, 0] = src[:, 0]
-            _X[::2, 1] = 1
-            _X[1::2, 0] = src[:, 1]
-            _X[1::2, 2] = 1
-        else:
-            _X = np.zeros([np.size(src), 4])
-            _X[::2, 0] = src[:, 0]
-            _X[::2, 2] = 1
-            _X[1::2, 1] = src[:, 1]
-            _X[1::2, 3] = 1
-        _Y = dest.flatten()
-        # --- Solve using Least-Squares
-        res = LinearRegression(fit_intercept=False).fit(_X, _Y).coef_
-        # Prepare
-        if scale_dof == 1:
-            self._forward = AffineTransform(scale=res[0], rotation=0, shear=0, translation=res[1:3])
-        else:
-            self._forward = AffineTransform(
-                scale=res[0:2], rotation=0, shear=0, translation=res[2:4]
-            )
-
-    def forward(self, src):
-        """
-        Perform the Forward transform
-        :param src:
-        :return:
-        """
-        return self._forward(src)
-
-    def inverse(self, dest):
-        """
-        Perform inverse transform
-
-        :param dest:
-        :return:
-        """
-        return self._forward.inverse(dest)
-
-    @property
-    def matrix(self):
-        return self._forward.params[:2, :]
-
-    def __repr__(self):
-        return self.matrix
 
 
 def pairwise_iou(a, b, cutoff=0, distance=False):
@@ -803,6 +737,27 @@ class BoundingBox:
         return (
             BoundingBox(tl=(x_tl, y_tl), br=(x_br, y_br)) if (x_br > x_tl and y_br > y_tl) else None
         )
+
+
+def build_line(pts, normalised=True):
+    """
+    Build a Line from two end-points
+    :param pts: The end-points, either as 2x2 ([x_1, y_1], [x_2, y_2]) or 4x1 (x_1, y_1, x_2, y_2)
+    :param normalised: If True, normalise to unit vector
+    :return: Line representation, normalised if need be
+    """
+    x_1, y_1, x_2, y_2 = pts.flatten()
+    if x_1 == x_2:
+        if y_1 == y_2:
+            raise ValueError("Line cannot be specified from two equal points.")
+        _line = np.asarray((1, 0, -x_1), dtype=np.float64)
+    elif y_1 == y_2:
+        _line = np.asarray((0, 1, -y_1), dtype=np.float64)
+    else:
+        m = (y_1 - y_2) / (x_1 - x_2)
+        k = y_1 - m * x_1
+        _line = np.asarray((m, -1, k), dtype=np.float64)
+    return _line/np.linalg.norm(_line) if normalised else _line
 
 
 def line(img, pt1, pt2, color, thickness=1, lineType=8, shift=0, linestyle="-"):
