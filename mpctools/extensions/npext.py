@@ -13,10 +13,10 @@ see http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 
-from scipy.spatial.distance import pdist
-from scipy.stats import entropy, f
+from hotelling import stats as hstats
 from lapsolver import solve_dense
 from deprecated import deprecated
+from scipy.stats import entropy
 from scipy.special import gamma
 from functools import reduce
 import pandas as pd
@@ -526,12 +526,11 @@ class Dirichlet:
 
 def ttest_mult(a, b):
     """
-    Calculates the Multivariate Welch T^2 Statistic for two independent multivariate samples
+    Calculates the Multivariate Hotelling T^2 Statistic for two independent multivariate samples
 
-    This is a two-sided test for the null hypothesis that 2 independent samples have identical
-    average (expected) values. The multivariate computation of the Welch T2 statistic follows the
-    distance formulation in [1], while the p-value computation then uses the method described in [2]
-    (based on the F-Distribution).
+    This is a wrapper around the implementation in hotelling package, to confirm to the scipy
+    ttest nomenclature. Note that this uses the pooled covariance matrix version which might be
+    less accurate.
 
     Parameters
     -----------
@@ -546,13 +545,6 @@ def ttest_mult(a, b):
        The two-tailed p-value
     dof: int
         Degrees of Freedom
-
-    References
-    ----------
-    .. [1] Alexander V. Alekseyenko, Multivariate Welch t-test on distances, Bioinformatics,
-           Volume 32, Issue 23, 1 December 2016, Pages 3552–3558,
-           https://doi.org/10.1093/bioinformatics/btw524
-    .. [2] https://stackoverflow.com/questions/25412954/hotellings-t2-scores-in-python/59152294#59152294
     """
     # Compute some Sizes
     if np.ndim(a) != 2 or np.ndim(b) != 2:
@@ -562,24 +554,26 @@ def ttest_mult(a, b):
     na, p = a.shape
     nb = b.shape[1]
 
-    # Compute Distances as per [1]
-    #  Note that my computation is not the most efficient (effectively, I am doing some
-    #  computations twice), but this ensures correctness.
-    da = np.square(pdist(a, "euclidean")).sum()
-    db = np.square(pdist(b, "euclidean")).sum()
-    dz = np.square(pdist(np.vstack([a, b]), "euclidean")).sum()
-
-    # Compute T2 Statistic as per [1] and [2]
-    t2 = (
-        ((na + nb) / (na * nb))
-        * (dz / (na + nb) - da / na - db / nb)
-        / (da / (na ** 2 * (na - 1)) + db / (nb ** 2 * (nb - 1)))
-    )
-
-    # Now compute p-Value as per [2]
+    # # Compute Distances as per [1]
+    # #  Note that my computation is not the most efficient (effectively, I am doing some
+    # #  computations twice), but this ensures correctness.
+    # da = np.square(pdist(a, "euclidean")).sum()
+    # db = np.square(pdist(b, "euclidean")).sum()
+    # dz = np.square(pdist(np.vstack([a, b]), "euclidean")).sum()
+    #
+    # # Compute T2 Statistic as per [1] and [2]
+    # t2 = (
+    #     ((na + nb) / (na * nb))
+    #     * (dz / (na + nb) - da / na - db / nb)
+    #     / (da / (na ** 2 * (na - 1)) + db / (nb ** 2 * (nb - 1)))
+    # )
+    #
+    # # Now compute p-Value as per [2]
+    #
+    # tstat = t2 * dof / (p * (na + nb - 2))
+    # pvalue = 1 - f.cdf(tstat, p, dof)
+    t2, _, pvalue, _ = hstats.hotelling_t2(a, b, True)
     dof = na + nb - p - 1
-    tstat = t2 * dof / (p * (na + nb - 2))
-    pvalue = 1 - f.cdf(tstat, p, dof)
 
     # return
     return t2, pvalue, dof

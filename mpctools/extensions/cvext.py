@@ -172,8 +172,8 @@ class AffineTransform:
     decomposition happens.
     """
 
-    AFFINE = 0
-    SIMILARITY = 1
+    AFFINE = 6
+    SIMILARITY = 4
     TRANSLATION = 2
 
     @staticmethod
@@ -326,14 +326,14 @@ class AffineTransform:
             F = np.zeros([(n_p + n_l) * 2, 4], dtype=np.float64)
             if n_p > 0:
                 F[:n_p, 0] = x_s * pt_w
-                F[:n_p, 1] = y_s * pt_w
+                F[:n_p, 1] = -y_s * pt_w
                 F[:n_p, 2] = pt_w
                 F[n_p: n_p * 2, 0] = y_s * pt_w
                 F[n_p: n_p * 2, 1] = x_s * pt_w
                 F[n_p: n_p * 2, 3] = pt_w
             if n_l > 0:
                 F[n_p * 2: n_p * 2 + n_l, 0] = -w_s * v_d * ln_w
-                F[n_p * 2: n_p * 2 + n_l, 1] = -w_s * u_d * ln_w
+                F[n_p * 2: n_p * 2 + n_l, 1] = w_s * u_d * ln_w
                 F[n_p * 2: n_p * 2 + n_l, 2] = v_s * u_d * ln_w
                 F[n_p * 2: n_p * 2 + n_l, 3] = v_s * v_d * ln_w
                 F[n_p * 2 + n_l:, 0] = w_s * u_d * ln_w
@@ -368,7 +368,7 @@ class AffineTransform:
         if dof == self.TRANSLATION:
             M = np.asarray([[1, 0, m[0]], [0, 1, m[1]], [0, 0, 1]], dtype=np.float64)
         elif dof == self.SIMILARITY:
-            M = np.asarray([[m[0], m[1], m[2]], [m[1], m[0], m[3]], [0, 0, 1]], dtype=np.float64)
+            M = np.asarray([[m[0], -m[1], m[2]], [m[1], m[0], m[3]], [0, 0, 1]], dtype=np.float64)
         else:
             M = np.asarray([[m[0], m[1], m[2]], [m[3], m[4], m[5]], [0, 0, 1]], dtype=np.float64)
         self._forward = (np.linalg.inv(T_d) @ M @ T_s)[:2, :]
