@@ -8,9 +8,7 @@ A set of python tools for extending standard (and non-standard) libraries. These
 The library currently contains the following two packages:
  1. `extensions`: A number of extensions to numpy, sklearn, pandas and matplotlib, as well as general-purpose utilities.
  2. `parallel`: A set of tools for wrapping pathos multiprocessing in a simple easy to use interface with multiple
-     parallel workers. 
- 
-Eventually, I plan to add a neural toolbox.
+     parallel workers.
 
 More details for each library are provided as doxygen-style comments in the modules.
 

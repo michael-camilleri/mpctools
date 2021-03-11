@@ -539,7 +539,7 @@ class BoundingBox:
     coordinates grow downwards and to the right, meaning that BR > TL always. No checks are done
     for this.
 
-    In addition, the class is generally immutable, and hence can be hashable.
+    Note that while I define a repr function, the class should not be taken to be hashable.
     """
 
     def __init__(self, tl=None, br=None, sz=None, c=None):
@@ -737,6 +737,33 @@ class BoundingBox:
         return (
             BoundingBox(tl=(x_tl, y_tl), br=(x_br, y_br)) if (x_br > x_tl and y_br > y_tl) else None
         )
+
+    def transform(self, affine: AffineTransform, inplace=False):
+        """
+        Transforms the bounding box by an Affine Transform
+
+        The method transforms the bounding box according to the specified affine transform returning
+        another axis-aligned bounding box according to the following scheme:
+         1. Transform the Corners of the bounding box:
+         2. Find the center-point of each edge
+         3. Construct an axis-aligned bounding box passing through these points
+
+        Note that unless inplace=True, a new bounding box is returned and this is not mutated.
+        :param affine: An Affine Transform
+        :param inplace: If True, update self
+        :return: self or a new bounding box.
+        """
+        corners = affine.forward(self.corners)
+        xs = np.sort(corners[:, 0]).reshape(2, 2).mean(axis=1)
+        ys = np.sort(corners[:, 1]).reshape(2, 2).mean(axis=1)
+        if inplace:
+            self.__tl = np.asarray((xs[0], ys[0]), dtype=float)
+            self.__br = np.asarray((xs[0], ys[0]), dtype=float)
+            self.__c = (self.__tl + self.__br) / 2
+            self.__sz = self.__br - self.__tl
+            return self
+        else:
+            return BoundingBox(tl=(xs[0], ys[0]), br=(xs[1], ys[1]))
 
 
 def build_line(pts, normalised=True):
