@@ -13,10 +13,11 @@ see http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 
+from scipy.spatial.distance import pdist
 from hotelling import stats as hstats
 from lapsolver import solve_dense
 from deprecated import deprecated
-from scipy.stats import entropy
+from scipy.stats import entropy, f
 from scipy.special import gamma
 from functools import reduce
 import pandas as pd
@@ -524,18 +525,23 @@ class Dirichlet:
             return sample
 
 
-def ttest_mult(a, b):
+def ttest_mult(a, b, equal_var=False):
     """
     Calculates the Multivariate Hotelling T^2 Statistic for two independent multivariate samples
 
-    This is a wrapper around the implementation in hotelling package, to confirm to the scipy
-    ttest nomenclature. Note that this uses the pooled covariance matrix version which might be
-    less accurate.
+    This is a two-sided test for the null hypothesis that 2 independent samples have identical
+    average (expected) values. If not pooling covariance, the multivariate computation of the
+    Welch T2 statistic follows the distance formulation in [1], while the p-value computation then
+    uses the method described in [2] (based on the F-Distribution). Otherwise, (i.e. pooled
+    covariance) this acts as a wrapper around the hotelling package, to confirm to the scipy ttest
+    nomenclature.
 
     Parameters
     -----------
     a, b : array_like
       These must be 2-Dimensional arrays, with sample index along the rows (first dimension).
+    equal_var : bool
+      If true, assume a pooled Covariance Matrix: otherwise, follow the method in [1]/[2]
 
     Returns
     --------
@@ -545,35 +551,43 @@ def ttest_mult(a, b):
        The two-tailed p-value
     dof: int
         Degrees of Freedom
+
+    References
+    ----------
+    .. [1] Alexander V. Alekseyenko, Multivariate Welch t-test on distances, Bioinformatics,
+           Volume 32, Issue 23, 1 December 2016, Pages 3552–3558,
+           https://doi.org/10.1093/bioinformatics/btw524
+    .. [2] https://stackoverflow.com/questions/25412954/hotellings-t2-scores-in-python/59152294#59152294
     """
+
     # Compute some Sizes
     if np.ndim(a) != 2 or np.ndim(b) != 2:
         raise ValueError("Parameters a/b must be 2D!")
     if a.shape[1] != b.shape[-1]:
         raise ValueError("Data (a/b) must have the same number of features")
     na, p = a.shape
-    nb = b.shape[1]
+    nb = b.shape[0]
 
-    # # Compute Distances as per [1]
-    # #  Note that my computation is not the most efficient (effectively, I am doing some
-    # #  computations twice), but this ensures correctness.
-    # da = np.square(pdist(a, "euclidean")).sum()
-    # db = np.square(pdist(b, "euclidean")).sum()
-    # dz = np.square(pdist(np.vstack([a, b]), "euclidean")).sum()
-    #
-    # # Compute T2 Statistic as per [1] and [2]
-    # t2 = (
-    #     ((na + nb) / (na * nb))
-    #     * (dz / (na + nb) - da / na - db / nb)
-    #     / (da / (na ** 2 * (na - 1)) + db / (nb ** 2 * (nb - 1)))
-    # )
-    #
-    # # Now compute p-Value as per [2]
-    #
-    # tstat = t2 * dof / (p * (na + nb - 2))
-    # pvalue = 1 - f.cdf(tstat, p, dof)
-    t2, _, pvalue, _ = hstats.hotelling_t2(a, b, True)
+    # Calculate DOF
     dof = na + nb - p - 1
+
+    if equal_var:
+        # Just Wrap around Hotelling's package
+        t2, _, pvalue, _ = hstats.hotelling_t2(a, b, True)
+    else:
+        # Compute Distances as per [1] (not the most efficient, but correct)
+        da = np.square(pdist(a, "euclidean")).sum()
+        db = np.square(pdist(b, "euclidean")).sum()
+        dz = np.square(pdist(np.vstack([a, b]), "euclidean")).sum()
+        # Compute T2 Statistic as per [1] and [2]
+        t2 = (
+            ((na + nb) / (na * nb))
+            * (dz / (na + nb) - da / na - db / nb)
+            / (da / (na ** 2 * (na - 1)) + db / (nb ** 2 * (nb - 1)))
+        )
+        # Now compute p-Value as per [2]
+        t2 = t2 * dof / (p * (na + nb - 2))
+        pvalue = 1 - f.cdf(t2, p, dof)
 
     # return
     return t2, pvalue, dof
