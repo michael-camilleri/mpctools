@@ -150,8 +150,8 @@ def plot_matrix(
         )
 
     # Add Ticks/Labels
+    y_labels = x_labels if (type(y_labels) is str and y_labels.lower() == 'same') else y_labels
     if x_labels is not None:
-        y_labels = x_labels if y_labels is None else y_labels
         if mode:
             ax.set_xticks(np.arange(len(x_labels)))
         else:
@@ -159,6 +159,7 @@ def plot_matrix(
         ax.set_xticklabels(
             x_labels, rotation=x_rot, horizontalalignment="center" if x_rot == 0 else "right", fontsize=fs
         )
+    if y_labels is not None:
         if mode:
             ax.set_yticks(np.arange(len(y_labels)))
         else:

@@ -722,7 +722,6 @@ def mutual_information(prior, emission, normalised=False, base=None):
     :param base:        The numeric base to operate with.
     :return:            Mutual Information
     """
-
     # First Collapse all emissions into 1 by computing outer product along X-axis (i.e. finding the
     #  cross-product) This is done by a smart use of the self-looping and the outer product
     #  function. Basically, we need to find the cross-combination of all emissions. To do this,
