@@ -525,6 +525,22 @@ class Dirichlet:
             return sample
 
 
+class delta:
+    """
+    By Abuse of what a PDF is, this is a spike distribution which has probability 1 at a specific
+    value, and 0 otherwise.
+    """
+
+    def __init__(self, loc):
+        self.loc = np.array(loc, ndmin=1)
+
+    def pdf(self, x):
+        return int(np.array_equal(self.loc, np.array(x, ndmin=1)))
+
+    def logpdf(self, x):
+        return 0 if self.pdf(x) == 1 else np.NINF
+
+
 def ttest_mult(a, b, equal_var=False):
     """
     Calculates the Multivariate Hotelling T^2 Statistic for two independent multivariate samples

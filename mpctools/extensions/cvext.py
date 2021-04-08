@@ -539,7 +539,8 @@ class BoundingBox:
     coordinates grow downwards and to the right, meaning that BR > TL always. No checks are done
     for this.
 
-    Note that while I define a repr function, the class should not be taken to be hashable.
+    Note that while I define a hash function, the class should not be taken to be immutable in the
+    strict sense.
     """
 
     def __init__(self, tl=None, br=None, sz=None, c=None):
@@ -578,8 +579,7 @@ class BoundingBox:
 
     def __hash__(self):
         """
-        Since we do not expect to mutate the object, we can hash it. Hashing is based on the
-        string representation of the array, and hence, is only accurate up to differences in 1 dp.
+        Hashing is based on the string representation of the array, and hence, is only accurate up to differences in 1 dp.
         """
         return hash(str(self))
 
@@ -696,6 +696,13 @@ class BoundingBox:
         Return in CoCo Format [X, Y, W, H]
         """
         return np.append(self.top_left, self.size)
+
+    @property
+    def cs(self):
+        """
+        Return in Center-Size format [X, Y, W, H]
+        """
+        return np.append(self.center, self.size)
 
     def iou(self, other):
         """

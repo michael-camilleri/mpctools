@@ -308,7 +308,7 @@ def plot_lifespans(
 
     :param ts: A 2D array to plot, where time is along the rows (to follow from Pandas
                         DataFrames). The values themselves are generally ignored (although see
-                        cmap), and visibility is governed by it being a finite number.
+                        colors), and visibility is governed by it being a finite number.
     :param colors:      Colours to use for the bars. Can be:
                           False: Default - Do not colour (all gray)
                           True: Interpret the values in time_series as colours
@@ -319,7 +319,6 @@ def plot_lifespans(
     :param x_labels:    Labels to use for the x-axis
     :param fs:          Font-Size
     :param invert_y: If True (default) invert y-axis
-    discarding those which do not fit
     :return:
     """
     # Evaluate Parameters
