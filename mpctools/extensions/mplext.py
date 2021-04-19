@@ -40,31 +40,32 @@ def plot_matrix(
     """
     Draw Hinton/Heatmap diagram for visualizing a weight matrix.
 
-    Hinton diagrams are useful for visualizing the values of a 2D array (e.g. a weight matrix): Positive and negative
-    values are represented by white and black squares, respectively, and the size of each square represents the
-    magnitude of each value. Heatmaps on the other hand simply colour-code the weights.
+    Hinton diagrams are useful for visualizing the values of a 2D array (e.g. a weight matrix):
+    Positive and negative values are represented by white and black squares, respectively, and the
+    size of each square represents the magnitude of each value. Heatmaps on the other hand simply
+    colour-code the weights.
 
-    Rows (first-dimension) of the matrix are printed along the y-axis, with columns (2nd dimension) along the X-axis.
-    Note that by default, the y-axes is inverted.
+    Rows (first-dimension) of the matrix are printed along the y-axis, with columns (2nd dimension)
+    along the X-axis. Note that by default, the y-axes is inverted.
 
     TODO: Support NaN plotting
 
-    Inspired by [Hinton Demo](https://matplotlib.org/examples/specialty_plots/hinton_demo.html). The heatmap makes
-    use of seaborn functionality, with some pre/post processing.
+    Inspired by [Hinton Demo](https://matplotlib.org/examples/specialty_plots/hinton_demo.html). The
+    heatmap makes use of seaborn functionality, with some pre/post processing.
 
     :param matrix:      2D Matrix to Display.
     :param mode:        Plotting Mode. Options are (not case sensitive):
                             'hinton' - Plot a Hinton diagram [Default]
                             'heatmap' - Plot a Heatmap
     :param min_max:     Range to plot at. This can be:
-                            None: Infer from Data. For Hinton diagrams, this will infer one value, whereas it will
-                                  infer separate minimum/maximum for Heatmaps
+                            None: Infer from Data. For Hinton diagrams, this will infer one value,
+                                  whereas it will infer separate minimum/maximum for Heatmaps
                             Float: Only valid for Hinton plots - use this as the maximum weight
                             Tuple/List: (minimum, maximum). Only for Heatmaps.
     :param show_val:    If True, then show the numerical value on the heatmap/hinton
     :param ax:          Axes to plot on
-    :param cax: Only relevant when mode is 'heatmap': if not None, specifies a seperate  axes for the colour bar.
-                If False, then do not plot a heatmap colour-bar.
+    :param cax: Only relevant when mode is 'heatmap': if not None, specifies a separate  axes for
+                the colour bar. If False, then do not plot a heatmap colour-bar.
     :param x_labels:    Labels for the x-axes.
     :param y_labels:    Labels for the y-axes - if None, use same as x
     :param x_rot:       Rotation for the X-Axis Labels

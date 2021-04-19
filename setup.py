@@ -18,6 +18,7 @@ setup(
         "opencv-python",
         "scikit-learn",
         "matplotlib",
+        "deprecated",
         "lapsolver",
         "hotelling",
         "seaborn",

@@ -1,11 +1,6 @@
 """
 This Module will serve as an alternative and extension to opencv - hence the name
 
-Some notes re compatibility with OpenCV.
-
- 1. Sizes: OpenCV expects sizes to be passed as [W x H]. However, in following with normal matrix
-    manipulations, Images are passed as [H x W x 3]
-
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU
 General Public License as published by the Free Software Foundation, either version 3 of the
 License, or (at your option) any later version.
@@ -170,6 +165,8 @@ class AffineTransform:
 
     This is different from how skimage defines the components, and has implications on how the
     decomposition happens.
+
+    Note also, that by definition, vectors are defined as [X, Y (1)]
     """
 
     AFFINE = 6
@@ -755,7 +752,7 @@ class BoundingBox:
          2. Find the center-point of each edge
          3. Construct an axis-aligned bounding box passing through these points
 
-        Note that unless inplace=True, a new bounding box is returned and this is not mutated.
+        Note that unless inplace=True, a new bounding box is returned and the object is not mutated.
         :param affine: An Affine Transform
         :param inplace: If True, update self
         :return: self or a new bounding box.
@@ -1213,7 +1210,10 @@ class SwCLAHE:
     Note that the algorithm is modified as follows to allow a history:
      a) Keep track of per-pixel raw-counts in a histogram.
      b) For the true lut, perform clipping based on the number of frames used in the histogram
-        computation.
+        computation
+
+    Finally, while sizes follow the WxH convention, matrices are manipulated as H x W (to follow
+    matrix convention of rows x column).
     """
 
     def __init__(self, imgSize, clipLimit=2.0, tileGridSize=(8, 8), padding="reflect"):
