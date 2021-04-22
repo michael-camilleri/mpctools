@@ -986,6 +986,10 @@ class VideoParser:
             else None
         )
 
+    @property
+    def FourCC(self):
+        return int(self.get(cv2.CAP_PROP_FOURCC)) if self.thread is not None else None
+
     def __len__(self):
         return int(self.get(cv2.CAP_PROP_FRAME_COUNT)) if self.thread is not None else -1
 
