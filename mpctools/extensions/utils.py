@@ -97,6 +97,7 @@ class Pool:
     def assigned(self):
         """
         Returns the assignment status of each value (much like a reverse dict).
+
         :return: A Dictionary showing for each value the assigned index or None As per Python
         Standard, the returned order follows the set of values as passed to the Initialiser.
         """

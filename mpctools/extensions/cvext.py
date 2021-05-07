@@ -1200,7 +1200,7 @@ class FrameGetter:
 
         else:
             _pth = os.path.join(self.Path, self.Fmt.format(item))
-            assert os.path.exists(_pth), f"Image {item} does not exist."
+            assert os.path.exists(_pth), f"Image {item} does not exist at {_pth}."
             return cv2.imread(_pth)
 
 
