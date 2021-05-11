@@ -187,6 +187,16 @@ def value_map(array, _to, _from=None, shuffle=False):
         return np.asarray(_to)[sort_idx][idx]
 
 
+def contiguous(a):
+    """
+    Breaks a into contiguous sub-arrays, indicated by increasing numeric count
+
+    :param a: Array to break up. Ideally should be sorted and ascending
+    :return: Array of subsets (counts)
+    """
+    return np.cumsum(np.diff(a, prepend=a[0]) > 1)
+
+
 def run_lengths(a, how="I", return_values=False, return_positions=False):
     """
     Compute the length of continuous runs of the same values in an array.
