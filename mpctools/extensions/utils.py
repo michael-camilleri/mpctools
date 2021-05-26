@@ -40,6 +40,7 @@ class BitField:
             self.__flag = f"{(10 ** (width - 1 - np.asarray(vals, dtype=int))).sum():0{width}d}"
         else:
             self.__flag = "0" * width
+        self.__it = None
 
     def __repr__(self):
         return self.__flag
@@ -52,6 +53,19 @@ class BitField:
 
     def __len__(self):
         return len(self.__flag)
+
+    def __iter__(self):
+        self.__it = 0
+        return self
+
+    def __next__(self):
+        idx = self.__flag.find('1', self.__it)
+        if idx > -1:
+            self.__it = idx+1
+            return idx
+        else:
+            self.__it = -1
+            raise StopIteration
 
 
 class Pool:
