@@ -48,6 +48,9 @@ class BitField:
     def ison(self, item):
         return self.__flag[item] == "1"
 
+    def any(self):
+        return "1" in self.__flag
+
     def __contains__(self, item):
         return self.ison(item)
 
