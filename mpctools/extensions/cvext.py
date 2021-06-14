@@ -799,8 +799,6 @@ def line(img, pt1, pt2, color, thickness=1, lineType=8, shift=0, linestyle="-"):
             '.': Dotted line
         For other arguments, see cv2.line(). Note that lineType and shift are ignored if
         linestyle is not '-'
-
-    @TODO: Some fancy checks to ensure that line ends with a dash.
     """
 
     if linestyle == "-":

@@ -148,6 +148,7 @@ def plot_matrix(
             ax=ax,
             cbar=cax is not False,
             cbar_ax=cax if isinstance(cax, axes.Axes) else None,
+            annot_kws={"size": fs},
         )
 
     # Add Ticks/Labels
