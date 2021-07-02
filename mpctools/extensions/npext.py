@@ -583,7 +583,7 @@ def ttest_mult(a, b, equal_var=False):
     .. [1] Alexander V. Alekseyenko, Multivariate Welch t-test on distances, Bioinformatics,
            Volume 32, Issue 23, 1 December 2016, Pages 3552–3558,
            https://doi.org/10.1093/bioinformatics/btw524
-    .. [2] https://stackoverflow.com/questions/25412954/hotellings-t2-scores-in-python/59152294#59152294
+    .. [2] https://stackoverflow.com/questions/25412954/hotellings-t2-scores-in-python/59152294
     """
 
     # Compute some Sizes

@@ -917,6 +917,9 @@ def point(img, center, color, size=1, style="."):
         cv2.circle(img, (int(center[0]), int(center[1])), size, color, -1)
     elif style == "o":
         cv2.circle(img, (int(center[0]), int(center[1])), size, color, int(math.ceil(size / 5)))
+    elif style == 'x':
+        ctr = (int(center[0] - 5*size), int(center[1] + 4*size))
+        cv2.putText(img, 'x', ctr, cv2.FONT_HERSHEY_PLAIN, size, color, size*2)
 
 
 class TimeFrame:
