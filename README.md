@@ -20,14 +20,17 @@ This Library has the following dependencies:
   * opencv-python
   * scikit-learn
   * matplotlib
+  * deprecated
+  * lapsolver
+  * hotelling
   * seaborn
   * pandas
   * pathos
   * scipy
   * numpy
   * numba
-  
-In most cases, the above can be automatically installed through the library itself (i.e. pip will 
+
+In most cases, the above can be automatically installed through the library itself (i.e. pip will
 attempt to download them). If this causes issues, or you wish to install specific versions (such
 as building `opencv` from source), you can prevent dependency checking by passing the `--no-deps`
 flag.
@@ -41,8 +44,8 @@ The project is available on [PyPi](https://pypi.org/project/mpctools/), and henc
   ```
 Note that the `--no-deps` flag is optional (as described [above](#requirements)).
 
-Alternatively, you may choose to install directly from source. This has the added advantage that if 
-you change any of the implementations, the changes will be reflected without having to rebuild. 
+Alternatively, you may choose to install directly from source. This has the added advantage that if
+you change any of the implementations, the changes will be reflected without having to rebuild.
 However, you will have to manually download the source (via git or just zipped and then extracted):
   ```shell script
   python setup.py build develop [--no-deps]
