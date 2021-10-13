@@ -16,6 +16,7 @@ Author: Michael P. J. Camilleri
 from datetime import timedelta, datetime
 from itertools import tee, islice
 import numpy as np
+import contextlib
 import shutil
 import copy
 import os
@@ -451,8 +452,7 @@ def short_int(_int):
 
 def make_dir(_path, _clear=False):
     """
-    Static (Module) Method for ensuring that the given path exists, and if not, will attempt to
-    create it.
+    Ensures that a given path exists, and if not, attempts to create it.
 
     :param _path: The Full Directory to create. Note that this will silently ignore None Paths
     :param _clear: If True, will clear any contents previously in the directory if it existed.
@@ -473,3 +473,13 @@ def make_dir(_path, _clear=False):
         if not os.path.isdir(_path):
             raise
 
+
+def remove(_path):
+    """
+    Deletes a file (path) if exists, and ignores if it does not
+
+    :param _path: path to delete
+    :return: None
+    """
+    with contextlib.suppress(FileNotFoundError):
+        os.remove(_path)
