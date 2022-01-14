@@ -948,6 +948,8 @@ class TimeFrame:
 class VideoParser:
     """
     The Video Parser (Wrapper) Object
+
+    **Note: May be deprecated soon in favour of decord**
     """
 
     def __init__(self, path, qsize=16):
