@@ -929,17 +929,19 @@ class TimeFrame:
     Note:
         time is always returned in MS.
         frames are by default 0-offset, but this can be changed in the initialiser
+        floor allows one to chose between flooring or rounding when converting non-numeric values.
     """
 
-    def __init__(self, fps=25, frm_offset=0):
+    def __init__(self, fps=25, frm_offset=0, floor=False):
         self.FPS = fps
         self.offset = frm_offset
+        self._round = np.floor if floor else np.around
 
     def to_frame(self, ms):
         if type(ms) == np.ndarray:
-            return (np.around(ms * self.FPS / 1000) + self.offset).astype(int)
+            return (self._round(ms * self.FPS / 1000) + self.offset).astype(int)
         else:
-            return int(np.round(ms * self.FPS / 1000) + self.offset)
+            return int(self._round(ms * self.FPS / 1000) + self.offset)
 
     def to_time(self, frm):
         return (frm - self.offset) * 1000 / self.FPS
