@@ -94,7 +94,7 @@ class Homography:
                 0: Use OpenCV's LeastSquares method
                 1: Use OpenCV's RANSAC: in this case, params MUST specify the inlier cutoff (in
                 terms of pixel distance) as a scalar.
-                10: Use my method based on BFGS and setting H_{3,3} = 1
+                10: Use my method based on Nelder-Mead and setting H_{3,3} = 1
         :param params: Parameters needed for each of the methods
                 MTHD_OPENCV_LS: ignored
                 MTHD_OPENCV_RNSC: Inlier cutoff, scalar
