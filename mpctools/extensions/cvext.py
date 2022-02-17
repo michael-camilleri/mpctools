@@ -943,8 +943,11 @@ class TimeFrame:
         else:
             return int(self._round(ms * self.FPS / 1000) + self.offset)
 
-    def to_time(self, frm):
-        return (frm - self.offset) * 1000 / self.FPS
+    def to_time(self, frm, ms=True):
+        if ms:
+            return (frm - self.offset) * 1000 / self.FPS
+        else:
+            return (frm - self.offset) / self.FPS
 
 
 class VideoParser:
@@ -1121,15 +1124,9 @@ class VideoParser:
             stream.set(cv2.CAP_PROP_POS_FRAMES, self.StartAt)
             assert stream.get(cv2.CAP_PROP_POS_FRAMES) == self.StartAt
 
-        # Store/Initialise some properties
-        self.properties[cv2.CAP_PROP_POS_MSEC] = stream.get(cv2.CAP_PROP_POS_MSEC)
-        self.properties[cv2.CAP_PROP_POS_FRAMES] = stream.get(cv2.CAP_PROP_POS_FRAMES)
-        self.properties[cv2.CAP_PROP_FRAME_HEIGHT] = stream.get(cv2.CAP_PROP_FRAME_HEIGHT)
-        self.properties[cv2.CAP_PROP_FRAME_WIDTH] = stream.get(cv2.CAP_PROP_FRAME_WIDTH)
-        self.properties[cv2.CAP_PROP_FPS] = stream.get(cv2.CAP_PROP_FPS)
-        self.properties[cv2.CAP_PROP_FRAME_COUNT] = stream.get(cv2.CAP_PROP_FRAME_COUNT)
-        self.properties[cv2.CAP_PROP_FOURCC] = stream.get(cv2.CAP_PROP_FOURCC)
-        self.properties[cv2.CAP_PROP_CONVERT_RGB] = stream.get(cv2.CAP_PROP_CONVERT_RGB)
+        # Store/Initialise CV2s properties
+        for prop in filter(lambda p: p >=0, self.properties.keys()):
+            self.properties[prop] = stream.get(prop)
 
         # Now indicate started
         self.signal_started = True

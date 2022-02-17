@@ -57,6 +57,7 @@ def plot_matrix(
     :param mode:        Plotting Mode. Options are (not case sensitive):
                             'hinton' - Plot a Hinton diagram [Default]
                             'heatmap' - Plot a Heatmap
+                            'matrix' - Just the Matrix as a figure
     :param min_max:     Range to plot at. This can be:
                             None: Infer from Data. For Hinton diagrams, this will infer one value,
                                   whereas it will infer separate minimum/maximum for Heatmaps
@@ -75,16 +76,13 @@ def plot_matrix(
     :return:
     """
     # Sort out the mode
-    if mode.lower() == "hinton":
-        mode = True
-    elif mode.lower() == "heatmap":
-        mode = False
-    else:
+    mode = mode.lower()
+    if mode not in ('hinton', 'heatmap', 'matrix'):
         warnings.warn("Unrecognised Mode: Defaulting to Hinton plot", UserWarning)
-        mode = True
+        mode = 'hinton'
 
     # Sort out the min_max:
-    if mode:
+    if mode == 'hinton':
         if min_max is None:
             min_max = np.power(2, np.ceil(np.log2(np.abs(matrix).max())))
         elif np.size(min_max) == 1:
@@ -94,7 +92,7 @@ def plot_matrix(
                 "Hinton Plot only accepts a single min_max value: inferring from data", UserWarning,
             )
             min_max = np.power(2, np.ceil(np.log2(np.abs(matrix).max())))
-    else:
+    elif mode == 'heatmap':
         if min_max is None:
             min_max = [matrix.min(), matrix.max()]
         elif np.size(min_max) == 2:
@@ -109,7 +107,7 @@ def plot_matrix(
     ax = ax if ax is not None else plt.gca()
 
     # Plot
-    if mode:
+    if mode == 'hinton':
         ax.patch.set_facecolor("gray")
         ax.set_aspect("equal", "box")
         ax.xaxis.set_major_locator(plt.NullLocator())
@@ -138,7 +136,7 @@ def plot_matrix(
         ax.set_ylim(-1, matrix.shape[0])
         ax.set_xlim(-1, matrix.shape[1])
         ax.invert_yaxis()
-    else:
+    elif mode == 'heatmap':
         sns.heatmap(
             matrix,
             vmin=min_max[0],
@@ -150,24 +148,35 @@ def plot_matrix(
             cbar_ax=cax if isinstance(cax, axes.Axes) else None,
             annot_kws={"size": fs},
         )
+    else:
+        sns.heatmap(
+            np.zeros_like(matrix),
+            annot=matrix,
+            cmap=[(0.9, 0.9, 0.9),],
+            fmt=fmt,
+            ax=ax,
+            cbar=False,
+            annot_kws={"size": fs},
+            linewidths=2,
+        )
 
     # Add Ticks/Labels
     y_labels = x_labels if (type(y_labels) is str and y_labels.lower() == 'same') else y_labels
     if x_labels is not None:
-        if mode:
+        if mode == 'hinton':
             ax.set_xticks(np.arange(len(x_labels)))
         else:
             ax.set_xticks(np.arange(0.5, len(x_labels) + 0.5))
         ax.set_xticklabels(
-            x_labels, rotation=x_rot, horizontalalignment="center" if x_rot == 0 else "right", fontsize=fs
+            x_labels, rotation=x_rot, horizontalalignment="center" if abs(x_rot - 45) > 25 else "right", fontsize=fs
         )
     if y_labels is not None:
-        if mode:
+        if mode == 'hinton':
             ax.set_yticks(np.arange(len(y_labels)))
         else:
             ax.set_yticks(np.arange(0.5, len(y_labels) + 0.5))
         ax.set_yticklabels(
-            y_labels, rotation=y_rot, verticalalignment="center" if y_rot == 0 else "bottom", fontsize=fs
+            y_labels, rotation=y_rot, verticalalignment="center" if abs(y_rot - 45) > 25 else "bottom", fontsize=fs
         )
 
 
