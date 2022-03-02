@@ -14,8 +14,30 @@ Author: Michael P. J. Camilleri
 """
 from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
 from scipy.spatial.distance import squareform
-from mpctools.extensions import npext
+from mpctools.extensions import npext, utils
+from sklearn import metrics as skmetrics
 import numpy as np
+
+
+def class_accuracy(y_true, y_pred, labels=None, normalize=True):
+    """
+    Computes per-class, one-v-rest accuracy
+
+    :param y_true: True labels (N)
+    :param y_pred: Predicted labels (N)
+    :param labels: If not None, specifies labels to consider: otherwise any label that appears in
+                   y_true or y_pred is considered
+    :param normalize: If True, normalise relative to all samples: else report number of samples.
+    :return: Accuracy-score per-class
+    """
+    # Define Labels
+    labels = utils.default(labels, np.union1d(np.unique(y_pred), np.unique(y_true)))
+
+    # compute per-class accuracy
+    accuracy = np.empty(len(labels))
+    for i, lbl in enumerate(labels):
+        accuracy[i] = skmetrics.accuracy_score(y_true == lbl, y_pred == lbl, normalize=normalize)
+    return accuracy
 
 
 def hierarchical_log_loss(y_true, y_prob, mapping, eps=1e-15):

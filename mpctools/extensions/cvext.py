@@ -14,6 +14,7 @@ see http://www.gnu.org/licenses/.
 
 Author: Michael P. J. Camilleri
 """
+import glob
 
 from numba import jit, uint8, uint16, double
 from queue import Queue, Empty, Full
@@ -1201,6 +1202,19 @@ class FrameGetter:
             _pth = os.path.join(self.Path, self.Fmt.format(item))
             assert os.path.exists(_pth), f"Image {item} does not exist at {_pth}."
             return cv2.imread(_pth)
+
+    def __len__(self):
+        """
+        Retrieves the number of Frames
+
+        This is 'approximate', by counting the number of files matching the extension.
+
+        :return: Length
+        """
+        if self.Fmt.lower() == "video":
+            return int(cv2.VideoCapture(self.Path).get(cv2.CAP_PROP_FRAME_COUNT))
+        else:
+            return len(glob.glob(os.path.join(self.Path, f'*{os.path.splitext(self.Fmt)[1]}')))
 
 
 class SwCLAHE:
