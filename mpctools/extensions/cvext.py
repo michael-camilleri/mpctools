@@ -768,6 +768,20 @@ class BoundingBox:
             return BoundingBox(tl=(xs[0], ys[0]), br=(xs[1], ys[1]))
 
 
+def average_bbox(bboxes):
+    """
+    Computes the average from a set of bboxes
+
+    :param bboxes: Iterable of BBoxes. If empty, returns NaN
+    :return: Average BBox
+    """
+    if len(bboxes):
+        avg = np.mean(np.asarray([bb.extrema for bb in bboxes]), axis=0)
+        return BoundingBox(tl=avg[:2], br=avg[2:])
+    else:
+        return np.NaN
+
+
 def build_line(pts, normalised=True):
     """
     Build a Line from two end-points

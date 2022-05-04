@@ -13,6 +13,7 @@ see http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
+from sklearn.calibration import CalibrationDisplay
 from scipy.spatial.distance import squareform
 from mpctools.extensions import npext, utils
 from sklearn import metrics as skmetrics
@@ -38,6 +39,35 @@ def class_accuracy(y_true, y_pred, labels=None, normalize=True):
     for i, lbl in enumerate(labels):
         accuracy[i] = skmetrics.accuracy_score(y_true == lbl, y_pred == lbl, normalize=normalize)
     return accuracy
+
+
+def multi_class_calibration(
+        y_true, y_prob, n_bins=5, strategy='uniform', names=None, ref_line=True, ax=None, **kwargs
+):
+    """
+    Displays a multi-class Calibration Curve (one line per class in one-v-rest setup)
+
+    :param y_true: True Labels: note that labels must be sequential starting from 0
+    :param y_prob: Predicted Probabilities
+    :param n_bins: Number of bins to use (see CalibrationDisplay.from_predictions)
+    :param strategy: Strategy for bins (see CalibrationDisplay.from_predictions)
+    :param names:  Class names to use
+    :param ref_line: Whether to plot reference line (see CalibrationDisplay.from_predictions)
+    :param ax: Axes to draw on (see CalibrationDisplay.from_predictions)
+    :param kwargs: Keyword arguments passed on to plot
+    :return: Dict of Calibration Displays (by name)
+    """
+    # Iterate over classes
+    names = utils.default(names, np.arange(y_prob.shape[1]))
+    displays = {}
+    for cls, name in zip(range(y_prob.shape[1]), names):
+        _y_true = (y_true == cls).astype(int)  # Get positive class for this label
+        _y_prob = y_prob[:, cls]  # Get probability assigned to this class
+        displays[name] = CalibrationDisplay.from_predictions(
+            _y_true, _y_prob, n_bins=n_bins, strategy=strategy, name=name, ref_line=ref_line, ax=ax,
+            **kwargs
+        )
+    return displays
 
 
 def hierarchical_log_loss(y_true, y_prob, mapping, eps=1e-15):

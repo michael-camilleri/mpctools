@@ -36,6 +36,7 @@ def plot_matrix(
     y_rot=0,
     fmt=".2f",
     fs=10,
+    buffer=1.0,
 ):
     """
     Draw Hinton/Heatmap diagram for visualizing a weight matrix.
@@ -72,7 +73,8 @@ def plot_matrix(
     :param x_rot:       Rotation for the X-Axis Labels
     :param y_rot:       Rotation for the Y-Axis Labels
     :param fmt:         Formatting String for Value labels (if any)
-    :param fs: Font-Size
+    :param fs:          Font-Size
+    :param buffer:      Buffer around the Hinton plot
     :return:
     """
     # Sort out the mode
@@ -133,8 +135,8 @@ def plot_matrix(
                     color="black" if w > 0 else "white",
                     fontsize=fs,
                 )
-        ax.set_ylim(-1, matrix.shape[0])
-        ax.set_xlim(-1, matrix.shape[1])
+        ax.set_ylim(-buffer, matrix.shape[0] -1 + buffer)
+        ax.set_xlim(-buffer, matrix.shape[1] -1 + buffer)
         ax.invert_yaxis()
     elif mode == 'heatmap':
         sns.heatmap(
