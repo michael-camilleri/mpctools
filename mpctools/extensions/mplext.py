@@ -37,6 +37,7 @@ def plot_matrix(
     fmt=".2f",
     fs=10,
     buffer=1.0,
+    hm_args={},
 ):
     """
     Draw Hinton/Heatmap diagram for visualizing a weight matrix.
@@ -75,6 +76,7 @@ def plot_matrix(
     :param fmt:         Formatting String for Value labels (if any)
     :param fs:          Font-Size
     :param buffer:      Buffer around the Hinton plot
+    :param hm_args:    Any further arguments to pass to seaborn heatmap
     :return:
     """
     # Sort out the mode
@@ -149,6 +151,7 @@ def plot_matrix(
             cbar=cax is not False,
             cbar_ax=cax if isinstance(cax, axes.Axes) else None,
             annot_kws={"size": fs},
+            **hm_args
         )
     else:
         sns.heatmap(

@@ -589,6 +589,7 @@ class BoundingBox:
             else:
                 self.__tl = self.__c - self.__sz / 2
         return self.__tl
+    tl = top_left
 
     @property
     def bottom_right(self):
@@ -601,6 +602,7 @@ class BoundingBox:
             else:
                 self.__br = self.__c + self.__sz / 2
         return self.__br
+    br = bottom_right
 
     @property
     def size(self):
@@ -629,10 +631,12 @@ class BoundingBox:
     @property
     def bottom_left(self):
         return np.asarray([self.top_left[0], self.bottom_right[1]])
+    bl = bottom_left
 
     @property
     def top_right(self):
         return np.asarray([self.bottom_right[0], self.top_left[1]])
+    tr = top_right
 
     def __getitem__(self, item):
         item = item.lower()
