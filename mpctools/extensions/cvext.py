@@ -1189,27 +1189,30 @@ class FrameGetter:
     Note that as per OpenCV defaults, the returned images are always in BGR
     """
 
-    def __init__(self, path, fmt="{:06d}.jpg"):
+    def __init__(self, path, fmt="{:06d}.jpg", offset=0):
         """
         Initialiser
 
         :param path: Path to the extracted frames or the Video File
         :param fmt:  The format mode for the name. If 'Video', then this is treated as a video
+        :param offset: Optional offset to the frame numbering
         """
         if fmt.lower() != "video" and not os.path.isdir(path):
             raise RuntimeError("A Directory must be specified when fmt is not a video.")
         self.Path = path
         self.Fmt = fmt
+        self.__offset = offset
 
     def __getitem__(self, item):
         """
         Retrieve a frame by Number
 
-        :param item: Frame Number. Note that this is translated directly to image name as per the
-               fmt if reading from folder.
+        :param item: Frame Number. Note that this is translated directly to image name (plus any
+                offset) as per the fmt if reading from folder.
         :return: OpenCV Image
         :raises  AssertionError if the frame does not exist
         """
+        item += self.__offset
         if self.Fmt.lower() == "video":
             v = cv2.VideoCapture(self.Path)
             v.set(cv2.CAP_PROP_POS_FRAMES, item)
