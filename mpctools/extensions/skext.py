@@ -149,6 +149,16 @@ def multi_way_split(y, sizes, splitter, random_state=None):
     return idcs
 
 
+def mlp_complexity(mlp):
+    """
+    Computes the complexity (number of trainable parameters) of a MLP model
+
+    :param mlp: Model to evaluate
+    :return: Number of (scalars) to learn
+    """
+    return np.sum([np.prod(c.shape) for c in mlp.coefs_]) + np.sum([np.prod(i.shape) for i in mlp.intercepts_])
+
+
 class HierarchicalClustering:
     """
     A Class to wrap Scipy's Linkage methods in a convenient framework similar to sklearn. This adds

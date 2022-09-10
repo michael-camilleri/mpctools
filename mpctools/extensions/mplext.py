@@ -65,12 +65,13 @@ def plot_matrix(
                                   whereas it will infer separate minimum/maximum for Heatmaps
                             Float: Only valid for Hinton plots - use this as the maximum weight
                             Tuple/List: (minimum, maximum). Only for Heatmaps.
-    :param show_val:    If True, then show the numerical value on the heatmap/hinton
+    :param show_val:    If True, then show the numerical value on the heatmap/hinton: if a
+                            matrix, then use it as the values to show.
     :param ax:          Axes to plot on
     :param cax: Only relevant when mode is 'heatmap': if not None, specifies a separate  axes for
                 the colour bar. If False, then do not plot a heatmap colour-bar.
     :param x_labels:    Labels for the x-axes.
-    :param y_labels:    Labels for the y-axes - if None, use same as x
+    :param y_labels:    Labels for the y-axes - if 'same', use same as X
     :param x_rot:       Rotation for the X-Axis Labels
     :param y_rot:       Rotation for the Y-Axis Labels
     :param fmt:         Formatting String for Value labels (if any)
@@ -127,7 +128,17 @@ def plot_matrix(
                     edgecolor="white" if w > 0 else "black",
                 )
             )
-            if show_val:
+            if isinstance(show_val, np.ndarray):
+                ax.text(
+                    x,
+                    y,
+                    show_val[y, x],
+                    horizontalalignment="center",
+                    verticalalignment="center",
+                    color="black" if w > 0 else "white",
+                    fontsize=fs,
+                )
+            elif isinstance(show_val, bool) and show_val:
                 ax.text(
                     x,
                     y,
@@ -137,6 +148,7 @@ def plot_matrix(
                     color="black" if w > 0 else "white",
                     fontsize=fs,
                 )
+
         ax.set_ylim(-buffer, matrix.shape[0] -1 + buffer)
         ax.set_xlim(-buffer, matrix.shape[1] -1 + buffer)
         ax.invert_yaxis()

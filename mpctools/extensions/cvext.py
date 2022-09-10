@@ -1141,7 +1141,7 @@ class VideoParser:
         # If seeking
         if self.StartAt > 0:
             stream.set(cv2.CAP_PROP_POS_FRAMES, self.StartAt)
-            assert stream.get(cv2.CAP_PROP_POS_FRAMES) == self.StartAt
+            assert stream.get(cv2.CAP_PROP_POS_FRAMES) == self.StartAt, f"Unable to set Start for {self.path}"
 
         # Store/Initialise CV2s properties
         for prop in filter(lambda p: p >=0, self.properties.keys()):
