@@ -20,6 +20,29 @@ from sklearn import metrics as skmetrics
 import numpy as np
 
 
+class ThresholdedClassifier:
+    """
+    Simple wrapper which applies a threshold to a classifier.
+
+    Currently, only works for Binary Classifiers
+    """
+    def __init__(self, clf, threshold=0.5):
+        self.__clf = clf
+        self.__thr = threshold
+
+    def fit(self, X, y):
+        """
+        Calls the underlying fit method (not the threshold)
+        """
+        return self.__clf.fit(X, y)
+
+    def predict(self, X):
+        return (self.__clf.predict_proba(X)[:, 1] > self.__thr).astype(int)
+
+    def predict_proba(self, X):
+        return self.__clf.predict_proba(X)
+
+
 def class_accuracy(y_true, y_pred, labels=None, normalize=True):
     """
     Computes per-class, one-v-rest accuracy
