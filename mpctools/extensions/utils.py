@@ -143,7 +143,7 @@ def window(iterable, size):
 def to_tuple(value):
     """
     Static (Module) Method for converting a scalar into a tuple if not already (tuple/list/numpy
-    array). Will also ignore None. Note, that this does not handle dict types!
+    array). Will also ignore None but not NaN. Note, that this does not handle dict types!
 
     :param value: The Value to convert
     :return: A Tuple containing value if a scalar, or value if already a list/tuple/numpy array/none
@@ -223,6 +223,17 @@ def dict_invert(_dict):
         return {v: k for k, v in _dict.items()}
     else:
         return {v: k for k, v in enumerate(_dict)}
+
+
+def subdict(_dict, _keys):
+    """
+    Returns a dictionary with subset of keys: note that no copy is made.
+
+    :param _dict: dictionary to extract from
+    :param _keys: tuple/list of keys to look for
+    :return: subset of dictionary
+    """
+    return {k: v for k, v in _dict.items() if k in _keys}
 
 
 def glen(generator):
