@@ -14,9 +14,11 @@ Author: Michael P. J. Camilleri
 """
 from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
 from sklearn.calibration import CalibrationDisplay
+from sklearn import preprocessing as skpreproc
 from scipy.spatial.distance import squareform
 from mpctools.extensions import npext, utils
 from sklearn import metrics as skmetrics
+from sklearn.svm import SVC
 import numpy as np
 
 
@@ -32,15 +34,95 @@ class ThresholdedClassifier:
 
     def fit(self, X, y):
         """
-        Calls the underlying fit method (not the threshold)
+        Calls the underlying classifier's fit method (does not fit the threshold)
         """
         return self.__clf.fit(X, y)
 
     def predict(self, X):
+        """
+        Returns positive class if probability is above threshold, else negative class.
+        """
         return (self.__clf.predict_proba(X)[:, 1] > self.__thr).astype(int)
 
     def predict_proba(self, X):
+        """
+        Calls the underlying predict_proba() method for the classifier.
+        """
         return self.__clf.predict_proba(X)
+
+
+class SVCProb:
+    """
+    Wrapper around the SVC Classifier to include a probability interpretation of the DF (as
+    opposed to the CV-folds based estimation).
+    This is less accurate but provides a rough estimate for ROC thresholds.
+    """
+    def __init__(
+            self,
+            C=1.0,
+            kernel='rbf',
+            degree=3,
+            gamma='scale',
+            coef0=0.0,
+            shrinking=True,
+            probability=False,
+            tol=0.001,
+            cache_size=200,
+            class_weight=None,
+            verbose=False,
+            max_iter=-1,
+            decision_function_shape='ovr',
+            break_ties=False,
+            random_state=None
+    ):
+        """
+        Calls the underlying Initialiser and also the Min-Max Scaler.
+        """
+        self.__svc = SVC(
+            C=C,
+            kernel=kernel,
+            degree=degree,
+            gamma=gamma,
+            coef0=coef0,
+            shrinking=shrinking,
+            probability=False, # The only forced parameter
+            tol=tol,
+            cache_size=cache_size,
+            class_weight=class_weight,
+            verbose=verbose,
+            max_iter=max_iter,
+            decision_function_shape=decision_function_shape,
+            break_ties=break_ties,
+            random_state=random_state
+        )
+        self.__dfs = skpreproc.MinMaxScaler(clip=True) if probability else None
+
+    def get_params(self, deep=True):
+        """
+        Wrapper around the parameters of the SVC estimator.
+        """
+        params = self.__svc.get_params(deep)
+        params['probability'] = self.__dfs is not None
+        return params
+
+    def fit(self, X, y):
+        """
+        Fits both the SVC and the scaler for the DFS. (Mostly to conform to sklearn framework)
+        """
+        self.__svc.fit(X, y)
+        if self.__dfs is not None:
+            self.__dfs.fit(self.__svc.decision_function(X).reshape(-1, 1))
+        return self
+
+    def predict(self, X):
+        return self.__svc.predict(X)
+
+    def predict_proba(self, X):
+        if self.__dfs is not None:
+            probs = self.__dfs.transform(self.__svc.decision_function(X).reshape(-1, 1))
+            return np.hstack([1-probs, probs])
+        else:
+            raise RuntimeError('No Probability Was Setup.')
 
 
 def class_accuracy(y_true, y_pred, labels=None, normalize=True):
