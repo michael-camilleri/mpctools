@@ -258,7 +258,7 @@ def mlp_complexity(mlp):
     """
     Computes the complexity (number of trainable parameters) of a MLP model
 
-    :param mlp: Model to evaluate
+    :param mlp: Model to evaluate. This must have been fit (or at least seen some data)
     :return: Number of (scalars) to learn
     """
     return np.sum([np.prod(c.shape) for c in mlp.coefs_]) + np.sum([np.prod(i.shape) for i in mlp.intercepts_])

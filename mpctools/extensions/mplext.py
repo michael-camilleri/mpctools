@@ -15,8 +15,8 @@ Author: Michael P. J. Camilleri
 
 from matplotlib.colors import LinearSegmentedColormap as lsc
 from scipy.stats import multivariate_normal as mv_norm
+from mpctools.extensions import npext, utils
 from matplotlib import pyplot as plt, axes
-from mpctools.extensions import npext
 import seaborn as sns
 import pandas as pd
 import numpy as np
@@ -194,6 +194,27 @@ def plot_matrix(
             ax.set_yticks(np.arange(0.5, len(y_labels) + 0.5))
         ax.set_yticklabels(
             y_labels, rotation=y_rot, verticalalignment="center" if abs(y_rot - 45) > 25 else "bottom", fontsize=fs
+        )
+
+
+def autolabel_bar(bars, labels=None, fs=12, ax=None):
+    """
+    Add a Text-Label to the top of each bar in a bar-chart.
+
+    :param bars:  Rectangles returned by plot.bar()
+    :param labels: Alternative labels to override with
+    :param fs: Fontsize for text
+    :param ax:     Axes on which to plot.
+    """
+    ax = utils.default(ax, plt.gca())
+    for i, b in enumerate(bars):
+        ax.annotate(
+            f'{b.get_height()}' if labels is None else labels[i],
+            xy=(b.get_x() + b.get_width() / 2, b.get_height()),
+            xytext=(0, 5),
+            textcoords="offset points",
+            ha='center', va='bottom',
+            fontsize=fs,
         )
 
 
