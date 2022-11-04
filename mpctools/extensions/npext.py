@@ -652,13 +652,9 @@ def invert_softmax(x, enforce_unique=None):
 
     # Branch on how we achieve uniqueness
     if enforce_unique is None:
-        return log_x - np.mean(
-            log_x, axis=-1, keepdims=True
-        )  # Eq. (7), substituting Eq. (8) for C.
+        return log_x - np.mean(log_x, axis=-1, keepdims=True)  # Eq7 substituting Eq8 for C
     else:
-        return log_x - np.expand_dims(
-            log_x[..., enforce_unique], -1
-        )  # Eq. (7), substituting Eq. (9) for C.
+        return log_x - np.expand_dims(log_x[..., enforce_unique], -1)  # Eq7 substituting Eq9 for C
 
 
 def conditional_entropy(emission, prior=None, base=None):

@@ -25,6 +25,7 @@ setup(
         "pandas",
         "pathos",
         "scipy",
+        "torch",
         "numpy",
         "numba",
     ],

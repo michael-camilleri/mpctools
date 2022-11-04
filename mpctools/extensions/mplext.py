@@ -197,7 +197,7 @@ def plot_matrix(
         )
 
 
-def autolabel_bar(bars, labels=None, fs=12, ax=None):
+def autolabel_bar(bars, labels=None, fs=12, prec=3, ax=None):
     """
     Add a Text-Label to the top of each bar in a bar-chart.
 
@@ -209,7 +209,7 @@ def autolabel_bar(bars, labels=None, fs=12, ax=None):
     ax = utils.default(ax, plt.gca())
     for i, b in enumerate(bars):
         ax.annotate(
-            f'{b.get_height()}' if labels is None else labels[i],
+            f'{b.get_height():.{prec}f}' if labels is None else labels[i],
             xy=(b.get_x() + b.get_width() / 2, b.get_height()),
             xytext=(0, 5),
             textcoords="offset points",

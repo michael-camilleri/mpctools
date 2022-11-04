@@ -18,8 +18,11 @@ from sklearn import preprocessing as skpreproc
 from scipy.spatial.distance import squareform
 from mpctools.extensions import npext, utils
 from sklearn import metrics as skmetrics
+from scipy.special import softmax
 from sklearn.svm import SVC
+import torch.nn as tnn
 import numpy as np
+import torch
 
 
 class ThresholdedClassifier:
@@ -254,6 +257,30 @@ def multi_way_split(y, sizes, splitter, random_state=None):
     return idcs
 
 
+def net_benefit_curve(y_true, y_score, pos_label=1, epsilon=1e-3):
+    """
+    Creates a Net-Benefit curve for various thresholds t.
+
+    It basically replicates sklearn.metrics.roc_curve
+
+    :param y_true:  Groundtruth labels
+    :param y_score: Classifier scores
+    :param pos_label: Which label to treat as positive
+    :param epsilon: replacement for 0 - threshold
+    :return:
+    """
+    # Get Statistics
+    N, pos, neg = len(y_true), (y_true == pos_label).sum(), (y_true != pos_label).sum()
+
+    # Compute Rates at different thresholds and subsequently net benefit
+    fpr, tpr, thr = skmetrics.roc_curve(y_true, y_score, pos_label=pos_label)
+    fpr, tpr, thr = np.flip(fpr)[:-1], np.flip(tpr)[:-1], np.flip(np.clip(thr, 0, 1-epsilon))[:-1]
+    nb = (tpr * pos / N) - (fpr * neg / N) * (thr / (1 - thr))
+
+    # Return
+    return nb, thr
+
+
 def mlp_complexity(mlp):
     """
     Computes the complexity (number of trainable parameters) of a MLP model
@@ -381,3 +408,85 @@ class HierarchicalClustering:
             leaf_font_size=fs,
         )
         return self
+
+
+class LogitCalibrator(tnn.Module):
+    """
+    Implementation of Temperature scaling which conforms to sklearn framework
+    """
+    def __init__(self, theta_init=1.0, lr=1e-4, max_iter=100):
+        """
+        Initialises the Model
+        :param theta_init: Initial value for scaling parameter
+        :param lr:  Learning rate
+        :param max_iter: Maximum number of iterations
+        """
+        # Call BaseClass
+        super(LogitCalibrator, self).__init__()
+
+        # Initialise some Parameters
+        self.theta = theta_init
+        self.__lr = lr
+        self.__max_iter = max_iter
+        self.classes_ = None
+
+        # Torch requirements
+        self._theta = tnn.Parameter(torch.tensor([theta_init], dtype=torch.double))
+
+    def fit(self, X, y):
+        """
+        Fits the model on the training Data
+
+        :param X: The input logits
+        :param y: The output labels (one of L behaviours, 0-indexed)
+        """
+        # Update Class List
+        self.classes_ = np.unique(y)
+
+        # Start by transforming to tensors.
+        X, y = torch.tensor(X, dtype=torch.double), torch.tensor(y, dtype=torch.long)
+
+        # Define optimiser (and closure for it)
+        self.train()
+        optimiser = torch.optim.LBFGS(self.parameters(), lr=self.__lr, max_iter=self.__max_iter)
+        loss_func = tnn.NLLLoss()
+
+        def _optim_step():
+            optimiser.zero_grad()
+            loss = loss_func(self(X).log(), y)
+            loss.backward()
+            return loss
+
+        # Optimise Model
+        optimiser.step(_optim_step)
+
+        # Now get the parameters of interest
+        self.eval()
+        with torch.no_grad():
+            self.theta = self._theta.numpy()[0]
+
+        # Return self for chaining
+        return self
+
+    def predict_proba(self, X):
+        """
+        Predict Probabilities
+        """
+        return softmax(X / self.theta, axis=1)
+
+    def predict(self, X):
+        """
+        Predict Behaviour
+
+        Note, this is really a dummy, since the ordering does not change.
+        """
+        return np.argmax(X, axis=1)
+
+    def forward(self, x):
+        """
+        Internal function for optimisation only.
+
+        Computes a forward pass on x (a tensor of logits, of size [# Samples, # Labels])
+        """
+        return (x / self._theta).softmax(dim=1)
+
