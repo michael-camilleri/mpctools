@@ -53,6 +53,10 @@ class ThresholdedClassifier:
         """
         return self.__clf.predict_proba(X)
 
+    @property
+    def threshold(self):
+        return self.__thr
+
 
 class SVCProb:
     """
@@ -414,7 +418,7 @@ class LogitCalibrator(tnn.Module):
     """
     Implementation of Temperature scaling which conforms to sklearn framework
     """
-    def __init__(self, theta_init=1.0, lr=1e-4, max_iter=100):
+    def __init__(self, classes=None, theta_init=1.0, lr=1e-4, max_iter=100):
         """
         Initialises the Model
         :param theta_init: Initial value for scaling parameter
@@ -428,7 +432,7 @@ class LogitCalibrator(tnn.Module):
         self.theta = theta_init
         self.__lr = lr
         self.__max_iter = max_iter
-        self.classes_ = None
+        self.classes_ = classes
 
         # Torch requirements
         self._theta = tnn.Parameter(torch.tensor([theta_init], dtype=torch.double))
@@ -441,7 +445,9 @@ class LogitCalibrator(tnn.Module):
         :param y: The output labels (one of L behaviours, 0-indexed)
         """
         # Update Class List
-        self.classes_ = np.unique(y)
+        if self.classes_ is None:
+            self.classes_ = np.unique(y)
+        assert X.shape[1] == len(self.classes_), f'# Classes ({len(self.classes_)}) does not equal the size of the Logits ({X.shape[1]})'
 
         # Start by transforming to tensors.
         X, y = torch.tensor(X, dtype=torch.double), torch.tensor(y, dtype=torch.long)
