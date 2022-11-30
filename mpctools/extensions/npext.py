@@ -396,23 +396,45 @@ def swap_columns(x, cols):
     return temp
 
 
-@deprecated('Functionality can in general be done by way of np.array()')
-def ensure2d(a, axis=0):
+def part_correlate(a, v, width=5):
     """
-    Returns a matrix of dimensionality 2 from a potentially linear vector
+    A simplification of the correlation function that only evaluates for the specified width on
+    *EITHER* side of the centre. This is more efficient than np.correlate when the size of the
+    array is large relative to the width.
+    Note, that this currently works only with 1D arrays.
 
-    :param a: Numpy array
-    :param axis: Axis to append if missing: either 0 or 1
-    :return: 2D Matrix
+    :param a: Array 1
+    :param v: Other Array (namings to mirror np.correlate)
+    :param width: Width of shifts to evaluate for either way
+    :return: Correlation array for specified shifts.
     """
-    if np.ndim(a) > 2:
-        raise ValueError('Dimension must be 2 or less.')
-    elif np.ndim(a) == 2:
-        return a
-    elif np.ndim(a) == 1:
-        return a[np.newaxis, :] if axis == 0 else a[:, np.newaxis]
-    else:
-        return a * np.ones([1, 1])
+    # Ensure that Padded to allow rolling with 0's
+    a = np.pad(a, [width, width], mode='constant', constant_values=0)
+    v = np.pad(v, [width, width], mode='constant', constant_values=0)
+    c = np.empty([width*2 + 1])
+    # Populate
+    for i, w in enumerate(range(-width, width+1)):
+        c[i] = (a * np.roll(v, w)).sum()
+    # return
+    return c
+
+# @deprecated('Functionality can in general be done by way of np.array()')
+# def ensure2d(a, axis=0):
+#     """
+#     Returns a matrix of dimensionality 2 from a potentially linear vector
+#
+#     :param a: Numpy array
+#     :param axis: Axis to append if missing: either 0 or 1
+#     :return: 2D Matrix
+#     """
+#     if np.ndim(a) > 2:
+#         raise ValueError('Dimension must be 2 or less.')
+#     elif np.ndim(a) == 2:
+#         return a
+#     elif np.ndim(a) == 1:
+#         return a[np.newaxis, :] if axis == 0 else a[:, np.newaxis]
+#     else:
+#         return a * np.ones([1, 1])
 
 
 ################################################################
@@ -765,6 +787,22 @@ def mutual_information(prior, emission, normalised=False, base=None):
     # Now Compute Entropies and return
     mi = hX - conditional_entropy(emission=emission, prior=prior, base=base)
     return mi / hX if normalised else mi
+
+
+def association_factor(contingency: np.ndarray):
+    """
+    Compute the Association Factor for a three-way contingency table.
+
+    :param contingency:  The contingency table (need not be normalised)
+    :return: Association Factor
+    """
+    cont = sum_to_one(contingency, axis=None)
+    marg = {
+        tuple({0, 1, 2}.difference({i, j}))[0]: cont.sum(axis=(i, j))
+        for i, j in itertools.combinations((0, 1, 2), 2)
+    }
+    indp = np.multiply.outer(np.outer(marg[0], marg[1]), marg[2])
+    return cont / indp
 
 
 def markov_stationary(transition):

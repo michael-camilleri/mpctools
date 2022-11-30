@@ -12,6 +12,7 @@ see http://www.gnu.org/licenses/.
 
 Author: Michael P. J. Camilleri
 """
+import pandas as pd
 
 from mpctools.extensions.utils import dict_width
 import numpy as np
@@ -89,6 +90,28 @@ def nanmode(col):
     :return:    The mode
     """
     return col.value_counts(dropna=False).idxmax()
+
+
+def argmax(df, axis=0, name='Max'):
+    """
+    Similar to idxmax but returns numeric index.
+
+    ***Note***: Different from idxmax, it operates under the assumption that NaN's are skipped:
+    however, rows [cols] which are all NaN are NaN.
+
+    :param df:  DataFrame
+    :param axis:  Axis along which to compute max
+    :param name: Name for column
+    :return: Numeric indices for other axis.
+    """
+    # Compute for which there is at least one non-null value
+    _finite = df.dropna(axis=1-axis, how='all')
+    _finite = pd.Series(
+        np.nanargmax(_finite.to_numpy(), axis=axis),
+        index=_finite.columns if axis == 0 else _finite.index,
+        name=name
+    )
+    return _finite.reindex(df.index)
 
 
 def dfmultiindex(df, lvl, vals, indexer=False):

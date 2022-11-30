@@ -37,6 +37,7 @@ def plot_matrix(
     fmt=".2f",
     fs=10,
     buffer=1.0,
+    colour=None,
     hm_args={},
 ):
     """
@@ -77,6 +78,7 @@ def plot_matrix(
     :param fmt:         Formatting String for Value labels (if any)
     :param fs:          Font-Size
     :param buffer:      Buffer around the Hinton plot
+    :param colour:      Colour Scheme (background) for Hinton Plot or Matrix
     :param hm_args:    Any further arguments to pass to seaborn heatmap
     :return:
     """
@@ -113,7 +115,7 @@ def plot_matrix(
 
     # Plot
     if mode == 'hinton':
-        ax.patch.set_facecolor("gray")
+        ax.patch.set_facecolor(utils.default(colour, "gray"))
         ax.set_aspect("equal", "box")
         ax.xaxis.set_major_locator(plt.NullLocator())
         ax.yaxis.set_major_locator(plt.NullLocator())
@@ -169,7 +171,7 @@ def plot_matrix(
         sns.heatmap(
             np.zeros_like(matrix),
             annot=matrix,
-            cmap=[(0.9, 0.9, 0.9),],
+            cmap=[utils.default(colour, (0.9, 0.9, 0.9)),],
             fmt=fmt,
             ax=ax,
             cbar=False,
@@ -195,6 +197,81 @@ def plot_matrix(
         ax.set_yticklabels(
             y_labels, rotation=y_rot, verticalalignment="center" if abs(y_rot - 45) > 25 else "bottom", fontsize=fs
         )
+
+
+def plot_matrix3d(
+        matrix,
+        ax=None,
+        buffer=0.5,
+        margin=0.1,
+        clr='white',
+        max_val=None,
+        annot=None,
+        x_labels=None,
+        y_labels=None,
+        x_rot=0,
+        y_rot=0,
+        fs=12,
+):
+    # Resolve some Parameters
+    s_x, s_y, s_z = matrix.shape
+    max_val = utils.default(max_val, np.power(2, np.ceil(np.log2(np.nanmax(np.abs(matrix))))))
+    x_labels = utils.default(x_labels, np.arange(s_x))
+    y_labels = utils.default(y_labels, np.arange(s_y))
+    hm, scale = margin / 2, 1 - margin
+
+    # Prepare Axis
+    ax = utils.default(ax, plt.gca())
+    ax.patch.set_facecolor(clr)
+    ax.set_aspect("equal", "box")
+    ax.set_xlim(-buffer - hm, s_x + buffer + hm)
+    ax.set_ylim(-buffer - hm, s_y + buffer + hm)
+    ax.xaxis.set_major_locator(plt.NullLocator())
+    ax.yaxis.set_major_locator(plt.NullLocator())
+
+    # Plot Patches
+    for (x, y, z), w in np.ndenumerate(matrix):
+        # If first entry for Z, put the background (so done only once)
+        if z == 0:
+            ax.add_patch(plt.Rectangle((x + hm, y + hm), scale, scale, facecolor='gray'))
+        # Now Compute Size: (scaled by scaling factor as well as by the number of entries)
+        size = np.sqrt(np.abs(w) / max_val) * scale / s_z if np.isfinite(w) else scale / s_z
+        # Now the Location (offset from x/y)
+        loc = hm + (z + 0.5) * scale / s_z - size / 2
+        # Finally the colour
+        color = ("white" if w > 0 else "k") if np.isfinite(w) else clr
+        # Add the specific patch
+        ax.add_patch(plt.Rectangle((x + loc, y + loc), size, size, fc=color))
+
+    # Do Text Annotation
+    if annot is not None:
+        if isinstance(annot, np.ndarray):
+            for (x, y, z), v in np.ndenumerate(annot):
+                loc = hm + (z + 0.5) * scale / s_z
+                ax.text(
+                    x + loc,
+                    y + loc,
+                    v,
+                    ha="center",
+                    va="center",
+                    c="black" if matrix[x, y, z] > 0 else "white",
+                    fontsize=fs
+                )
+        else:
+            for (x, y, z), w in np.ndenumerate(matrix):
+                loc = hm + (z + 0.5) * scale / s_z
+                ax.text(x + loc, y + loc, "{{:{}}}".format(annot).format(w), ha="center",
+                        va="center", c="black" if w > 0 else "white", fontsize=fs)
+
+    # Label the Axes
+    if x_labels is not None:
+        ax.set_xticks(np.arange(0.5, len(x_labels) + 0.5))
+        ax.set_xticklabels(x_labels, rotation=x_rot,
+                           ha="center" if abs(x_rot - 45) > 25 else "right", fontsize=fs)
+    if y_labels is not None:
+        ax.set_yticks(np.arange(0.5, len(y_labels) + 0.5))
+        ax.set_yticklabels(y_labels, rotation=y_rot,
+                           va="center" if abs(y_rot - 45) > 25 else "bottom", fontsize=fs)
 
 
 def autolabel_bar(bars, labels=None, fs=12, prec=3, ax=None):
