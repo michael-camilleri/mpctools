@@ -15,9 +15,9 @@ Author: Michael P. J. Camilleri
 
 from scipy.spatial.distance import pdist
 from hotelling import stats as hstats
-from lapsolver import solve_dense
-from deprecated import deprecated
 from scipy.stats import entropy, f
+from lapsolver import solve_dense
+# from deprecated import deprecated
 from scipy.special import gamma
 from functools import reduce
 import pandas as pd
@@ -396,7 +396,7 @@ def swap_columns(x, cols):
     return temp
 
 
-def part_correlate(a, v, width=5):
+def part_convolve(a, v, width=5):
     """
     A simplification of the correlation function that only evaluates for the specified width on
     *EITHER* side of the centre. This is more efficient than np.correlate when the size of the
@@ -417,24 +417,6 @@ def part_correlate(a, v, width=5):
         c[i] = (a * np.roll(v, w)).sum()
     # return
     return c
-
-# @deprecated('Functionality can in general be done by way of np.array()')
-# def ensure2d(a, axis=0):
-#     """
-#     Returns a matrix of dimensionality 2 from a potentially linear vector
-#
-#     :param a: Numpy array
-#     :param axis: Axis to append if missing: either 0 or 1
-#     :return: 2D Matrix
-#     """
-#     if np.ndim(a) > 2:
-#         raise ValueError('Dimension must be 2 or less.')
-#     elif np.ndim(a) == 2:
-#         return a
-#     elif np.ndim(a) == 1:
-#         return a[np.newaxis, :] if axis == 0 else a[:, np.newaxis]
-#     else:
-#         return a * np.ones([1, 1])
 
 
 ################################################################
@@ -639,6 +621,34 @@ def ttest_mult(a, b, equal_var=False):
 
     # return
     return t2, pvalue, dof
+
+
+def contingency(probs, normalise=False):
+    """
+    Builds a contingency table from probabilistic counts
+
+    Constructs a contingency table of arbitrary dimensionality (number of variables) from
+    probability counts for each variable. The dimensions in the table correspond to the order the
+    variables are enumerated in probs.
+
+    :param probs: List of 2D probability arrays (Numpy array, with samples along first dimension).
+    :param normalise: If True, normalise (rather than counts)
+    :return: Contingency table built from Probabilities.
+    """
+    # Prepare Placeholder and ensure dimensions ok
+    cont_table = np.zeros([p.shape[1] for p in probs])
+    if (np.diff([p.shape[0] for p in probs]) != 0).any():
+        raise ValueError('# Samples must be equal for all variables.')
+
+    # Now Build Contingency Table
+    for sample in zip(*probs):
+        cont = 1
+        for var in sample:
+            cont = np.multiply.outer(cont, var)
+        cont_table += cont
+
+    # Normalise (if need be) and return
+    return sum_to_one(cont_table, None, False) if normalise else cont_table
 
 
 def sum_to_one(x, axis=None, norm=False):
