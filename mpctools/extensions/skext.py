@@ -18,10 +18,14 @@ from sklearn import preprocessing as skpreproc
 from scipy.spatial.distance import squareform
 from mpctools.extensions import npext, utils
 from sklearn import metrics as skmetrics
+from scipy import stats as scstats
 from scipy.special import softmax
+from numba import jit, float64
 from sklearn.svm import SVC
 import torch.nn as tnn
 import numpy as np
+import warnings
+import joblib
 import torch
 
 
@@ -131,6 +135,220 @@ class SVCProb:
         else:
             raise RuntimeError('No Probability Was Setup.')
 
+
+class MixtureOfCategoricals:
+    """
+    Implements a multi-variate mixture of categoricals similar to the Dawid-Skene Model but with potentially varying
+    latent and emission dimensionality.
+    """
+
+    def __init__(
+        self, sZ, sX, alpha_pi=None, alpha_psi=None, tol=1e-4, inits=1, random_state=None, max_iter=100, n_jobs=-1
+    ):
+        """
+        Initialises the Class
+
+        :param sZ: Size of the Latent Dimension |Z|. Alternatively, can pass a 1D Numpy array which initialises Pi.
+        :param sX: Sizes of each of the K-emissions: list of integers, with size for k'th variable. Alternatively, can
+                    pass the Psi Parameter (and sizes will be inferred).
+        :param alpha_pi: Array-Like of size Z dictating the alpha-prior over Pi: if None, defaults to uninformative
+                prior alpha=1
+        :param alpha_psi: K-List of priors (alpha) over emission probabilities Psi_k, each of which is a |Z|-list of
+                |X_k| sized arrays: i.e. indexing is [k][z][x]. If None, defaults to uninformative alpha=1 priors
+        :param tol: Tolerance for convergence (stopping criterion)
+        :param inits: Number of random restarts. These are random initialisations from the provided priors.
+        :param random_state: Random Generator State (used to initialise the probability parameters)
+        :param max_iter: Maximum number of iterations taken for the solvers to converge.
+        :param n_jobs: Number of cores used when parallelising over runs.
+        """
+        # Resolve Sizes/Parameters
+        self.sZ, self.sX, self.sk = sZ, sX, len(sX)
+        self.__inits = inits
+        self.__tol = tol
+        self.__max_iter = max_iter
+        self.__n_jobs = n_jobs
+        # Resolve Priors
+        self.__pi_alpha = utils.default(alpha_pi, np.ones(self.sZ))
+        self.__psi_alpha = utils.default(alpha_psi, [[np.ones(sx) for z in range(self.sZ)] for sx in self.sX])
+        # Create Random Generator
+        self.__rnd = np.random.default_rng(random_state)
+        # Create Initial State of Parameters - This ensures that not fit
+        self.Pi, self.Psi = None, None
+
+    def sample(self, N):
+        """
+        Generate Samples from the distribution
+
+        Generates 'n' samples from the distribution. Since each variable k can potentially have different
+        dimensionality, these are returned as a list (see return below).
+
+        :param N: Number of samples to generate
+        :return: Tuple with two entries
+            * Z : Latent variable samples n x |Z|
+            * X : K-List of arrays of sizes n x |X_k|
+        """
+        # Check that model was fit
+        if self.Pi is None or self.Psi is None:
+            raise RuntimeError('Model must be fit first before sampling from it.')
+
+        # Sample from Model
+        _Z = self.__rnd.choice(self.sZ, size=N, p=self.Pi) # Sample Z at one go
+        _X = [np.empty([N, sx]) for sx in self.sX]
+        for n in range(N):
+            for k in range(self.sk):
+                _X[k][n] = self.__rnd.choice(self.sX[k], size=1, p=self.Psi[k][_Z[n]])
+
+        # Return
+        return _Z, _X
+
+    def fit(self, X, z=None):
+        """
+        Fits the Model
+
+        Fits the Pi/Psi parameters using EM.
+
+        :param X: The Observations to fit on: K-List of N x X_k (one-hot encoded if not probabilities)
+        :param z: None: used for compatibility with sklearn framework
+        :return: self, for chaining.
+        """
+        # Create Starting Points
+        #   - These are sampled from the prior
+        start_pi = [scstats.dirichlet.rvs(self.__pi_alpha, 1, seed=self.__rnd).squeeze() for _ in range(self.__inits)]
+        start_psi = [
+            [
+                [scstats.dirichlet.rvs(alpha, 1, self.__rnd).squeeze() for alpha in k_alpha]
+                for k_alpha in self.__psi_alpha
+            ]
+            for _ in range(self.__inits)
+        ]
+
+        # Run Multiple runs in parallel:
+
+    @staticmethod
+    def __fit(X, p_init, optim):
+        """
+        Private static method for fitting a single initialisation of the parameters using EM
+
+        :param X: The Observations to fit on: see fit above
+        :param p_init: Initial Value for the Pi/Psi probabilities
+        :param optim: Optimisation parameters: max_iter, tol, pi_alpha, psi_alpha
+        :return: Tuple with:
+            * Pi: Fit Pi
+            * Psi: Fit Psi
+            * Log-Likelihoods: Log-Likelihood evolution
+            * Converged: True if converged, False otherwise
+        """
+        # Resolve Parameters
+        pi, psi = p_init
+        max_iter, tol, alpha_pi, alpha_psi = optim
+        prior_pi = scstats.dirichlet(alpha_pi)
+        prior_psi = [[scstats.dirichlet(alpha) for alpha in k_alpha] for k_alpha in alpha_psi]
+
+        # Prepare to Run
+        iters = 0
+        log_likelihood = []
+
+        # Run EM
+        while iters < max_iter:
+            # ---- E-Step ---- #
+            gamma, ll = MixtureOfCategoricals.__responsibility(X, pi, psi)
+            log_likelihood.append(
+                ll +
+                prior_pi.logpdf(pi) +
+                np.sum(ppsi.logpdf(_psi) for ppsi, _psi in zip(utils.ravel(prior_psi), utils.ravel(psi)))
+            )
+
+            # ---- Check for Convergence ---- #
+            if MixtureOfCategoricals.__converged(log_likelihood, tol):
+                break
+
+            # ---- M-Step ---- #
+            pi = npext.sum_to_one(gamma.sum(axis=0) + alpha_pi - 1)
+            psi = [k_alpha - 1 for k_alpha in alpha_psi] # No need for deepcopy
+            for k in range(len(X)):
+                MixtureOfCategoricals.__update_psi(X[k], gamma, psi[k])
+                psi[k] = npext.sum_to_one(psi[k], axis=-1)
+
+            # ---- Iterations ---- #
+            iters += 1
+
+        # Return result
+        return pi, psi, log_likelihood, MixtureOfCategoricals.__converged(log_likelihood, tol)
+
+    @staticmethod
+    def __converged(lls, tol):
+        """
+        Convergence Check
+
+        :param lls: Array of Log-Likelihood
+        :param tol: Tolerance Parameter
+        :return: True only if converged, within tolerance
+        """
+        if len(lls) < 2:
+            return False
+        elif lls[-1] < lls[-2]:
+            warnings.warn("Drop in Log-Likelihood Observed! Results are probably wrong.")
+        else:
+            return abs((lls[-1] - lls[-2]) / lls[-2]) < tol
+
+    @staticmethod
+    def __responsibility(X, pi, psi):
+        """
+        Compute the responsibilities (probability over Z)
+
+        :param X: Data: K-List of arrays of size N x |X_k|
+        :param pi: Pi probability
+        :param psi: Psi probability
+        :return: Probability over Z's, as well as log-likelihood (normaliser)
+        """
+        # Some sizes
+        sK, sN = len(X), len(X[0])
+
+        # Compute Log-Space
+        log_pi, log_psi = np.log(pi), [np.log(_psi) for _psi in psi]
+
+        # Prepare Gamma and evaluate in log-space
+        gamma = np.tile(log_pi[np.newaxis, :], [sN, 1])
+        for k in range(sK):
+            MixtureOfCategoricals.__gamma_k(X[k], log_psi[k], gamma)
+
+        # Compute Normaliser (log-likelihood)
+        log_likelihood = -gamma.sum(axis=-1, keepdims=True)
+
+        # Return Gamma and Log-Likelihood
+        return np.exp(gamma + log_likelihood), log_likelihood.sum()
+
+    @staticmethod
+    @jit(signature_or_function=(float64[:,:], float64[:,:], float64[:,:]), nopython=True)
+    def __gamma_k(X_k, logpsi_k, gamma):
+        """
+        JIT Wrapper for computing Gamma for Symbol k
+
+        :param X_k: Observations for Symbol k
+        :param logpsi_k: Emission probabilities for k
+        :param gamma: Current version of Gamma (unnormalised)
+        :return: None (gamma is modified in place)
+        """
+        sN, sZ = gamma.shape
+        for n in range(sN):
+            for z in range(sZ):
+                gamma[n, z] += np.dot(X_k[n, :], logpsi_k[z, :])
+
+    @staticmethod
+    @jit(signature_or_function=(float64[:, :], float64[:, :], float64[:, :]), nopython=True)
+    def __update_psi(X_k, gamma, psi_k):
+        """
+        Convenience wrapper for updating PSI_k using JIT
+
+        :param X_k: Observations for symbol k
+        :param gamma: Responsibilities
+        :param psi_k: Psi entry for symbol k
+        :return: None (Psi is modified in place)
+        """
+        sN, sZ = gamma.shape
+        for n in range(sN):
+            for z in range(sZ):
+                psi_k[z, :] += gamma[n, z] * X_k[n, :]
 
 def class_accuracy(y_true, y_pred, labels=None, normalize=True):
     """

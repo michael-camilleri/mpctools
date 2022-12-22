@@ -295,6 +295,16 @@ def default(var, val):
     return var if var is not None else val
 
 
+def ravel2D(listlike):
+    """
+    Ravel a list of lists
+
+    :param listlike: List of lists
+    :return: Flattened list
+    """
+    return [item for sublist in listlike for item in sublist]
+
+
 ################################################
 #            Printing & Formatting             #
 ################################################
