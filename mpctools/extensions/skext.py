@@ -194,7 +194,7 @@ class MixtureOfCategoricals:
         # Finally, empty set of fit parameters
         self.__fit_params = []
 
-    def sample(self, N):
+    def sample(self, N, as_probs=False):
         """
         Generate Samples from the distribution
 
@@ -202,9 +202,10 @@ class MixtureOfCategoricals:
         different dimensionality, these are returned as a list (see return below).
 
         :param N: Number of samples to generate
+        :param as_probs: If True, use 1-hot encoding
         :return: Tuple with two entries
-            * Z : Latent variable samples n x |Z|
-            * X : K-List of arrays of sizes n x |X_k|
+            * Z : Latent variable samples n
+            * X : K-List of arrays of sizes n
         """
         # Check that model was fit
         if self.Pi is None or self.Psi is None:
@@ -212,10 +213,17 @@ class MixtureOfCategoricals:
 
         # Sample from Model
         _Z = self.__rnd.choice(self.sZ, size=N, p=self.Pi) # Sample Z at one go
-        _X = [np.empty([N, sx]) for sx in self.sX]
+        _X = [np.empty(N) for _ in range(self.sK)] # Sampling of X is conditional
         for n in range(N):
             for k in range(self.sK):
                 _X[k][n] = self.__rnd.choice(self.sX[k], size=1, p=self.Psi[k][_Z[n]])
+
+        if as_probs:
+            _Z = skpreproc.OneHotEncoder(categories=[(0, 1)], sparse=False).fit_transform(_Z[:, np.newaxis])
+            _X = [
+                skpreproc.OneHotEncoder(categories=[np.arange(sx)], sparse=False).fit_transform(X_k[:,np.newaxis])
+                for sx, X_k in zip(self.sX, _X)
+            ]
 
         # Return
         return _Z, _X
@@ -248,7 +256,7 @@ class MixtureOfCategoricals:
         num_jobs = -1 if self.__n_jobs == 0 else self.__n_jobs
         prefered = 'threads' if self.__n_jobs == 0 else 'processes'
         self.__fit_params = joblib.Parallel(n_jobs=num_jobs, prefer=prefered)(
-            joblib.delayed(self._fit)(X, (pi, psi)) for pi, psi in zip(start_pi, start_psi)
+            joblib.delayed(self.partial_fit)(X, (pi, psi)) for pi, psi in zip(start_pi, start_psi)
         )
 
         # Select best
@@ -263,7 +271,7 @@ class MixtureOfCategoricals:
         # Return Self
         return self
 
-    def _fit(self, X, p_init):
+    def partial_fit(self, X, p_init=None):
         """
         Private static method for fitting a single initialisation of the parameters using EM
 
@@ -277,7 +285,7 @@ class MixtureOfCategoricals:
             * Converged: True if converged, False otherwise
         """
         # Resolve Parameters
-        pi, psi = p_init
+        pi, psi = utils.default(p_init, (self.Pi.copy(), self.Psi.copy()))
         dir_pi = scstats.dirichlet(self.__pi_alpha)
         dir_psi = [[scstats.dirichlet(a_kz) for a_kz in a_k] for a_k in self.__psi_alpha]
 
@@ -767,10 +775,14 @@ if __name__ == '__main__':
     ])
 
     # Generate Samples
-    Z, X = MixtureOfCategoricals(sZ=pi, sX=psi).sample(100000)
+    print('Sampling ...')
+    Z, X = MixtureOfCategoricals(sZ=pi, sX=psi).sample(100000, True)
 
-    # Now try to fit the model
-    model = MixtureOfCategoricals(2, (4, 4, 4), inits=1, n_jobs=0).fit(X)
 
-    pass
+    # Now try to fit the model, starting from correct point
+    print('Fitting Model')
+    model = MixtureOfCategoricals(pi, psi, inits=1, n_jobs=0).fit(X)
+
+    print(model.Pi)
+    print(model.Psi)
 
