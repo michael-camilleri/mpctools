@@ -20,7 +20,7 @@ from mpctools.extensions import npext, utils
 from sklearn import metrics as skmetrics
 from scipy import stats as scstats
 from scipy.special import softmax
-from numba import jit, float64
+from numba import njit, float64
 from sklearn.svm import SVC
 import torch.nn as tnn
 import numpy as np
@@ -138,47 +138,45 @@ class SVCProb:
 
 class MixtureOfCategoricals:
     """
-    Implements a multi-variate mixture of categoricals similar to the Dawid-Skene Model but with potentially varying
-    latent and emission dimensionality.
+    Implements a multi-variate mixture of categoricals similar to the Dawid-Skene Model but with
+    potentially varying latent and emission dimensionality.
     """
 
     def __init__(
-        self, sZ, sX, alpha_pi=None, alpha_psi=None, tol=1e-4, inits=1, random_state=None, max_iter=100, n_jobs=-1
+        self, sZ, sKX, alpha_pi=None, alpha_psi=None, tol=1e-4, inits=1, random_state=None, max_iter=100, n_jobs=-1
     ):
         """
         Initialises the Class
 
-        :param sZ: Size of the Latent Dimension |Z| (or) alternatively, can pass a 1D Numpy array
-                    which initialises Pi.
-        :param sX: Sizes of each of the K-emissions: list of integers, with size for k'th variable.
-                    Alternatively, can pass the Psi Parameter (and sizes will be inferred).
+        :param sZ: Size of the Latent Dimension |Z| (or) alternatively, an Array initialiser for Pi.
+        :param sKX: Number of Variables and Size (K, X) (or) alternatively, an initialiser for Psi.
         :param alpha_pi: Array-Like of size Z dictating the alpha-prior over Pi: if None, defaults
                 to uninformative prior alpha=1
-        :param alpha_psi: K-List of priors (alpha) over emission probabilities Psi_k, each of which
-                is a |Z|-list of |X_k| sized arrays: i.e. indexing is [k][z][x]. If None, defaults
-                to uninformative alpha=1 priors
+        :param alpha_psi: Alpha parameters for prior over Psi i.e. indexing is [k][z][x]. If None,
+                defaults to uninformative alpha=1 priors
         :param tol: Tolerance for convergence (stopping criterion)
         :param inits: Number of random restarts. These are random initialisations from the provided
                 priors.
         :param random_state: Random Generator State (used to initialise the probability parameters)
         :param max_iter: Maximum number of iterations taken for the solvers to converge.
-        :param n_jobs: Number of cores used when parallelising over runs. If 0, use Multi-threading.
+        :param n_jobs: Number of cores used when parallelising over runs. If > 0 uses
+                multiprocessing, if < 0 uses threading. 0 is not valid.
         """
         # Resolve Sizes/Parameters
-        if hasattr(sZ, '__len__'):
+        if isinstance(sZ, np.ndarray):
             self.Pi = np.array(sZ, dtype=float, copy=True)
             self.sZ = len(sZ)
         else:
             self.Pi = None
             self.sZ = sZ
-        if hasattr(sX[0], '__len__'):
-            self.Psi = [[np.array(x_kz, dtype=float, copy=True) for x_kz in x_k] for x_k in sX]
-            self.sK = len(sX)
-            self.sX = [len(x_k[0]) for x_k in sX]
+        if isinstance(sKX, np.ndarray):
+            self.Psi = np.array(sKX, dtype=float, copy=True)
+            self.sK = sKX.shape[0]
+            self.sX = sKX.shape[-1]
         else:
             self.Psi = None
-            self.sK = len(sX)
-            self.sX = sX
+            self.sK = sKX[0]
+            self.sX = sKX[1]
         # Copy other parameters
         self.__inits = inits
         self.__tol = tol
@@ -187,7 +185,7 @@ class MixtureOfCategoricals:
         # Resolve Priors
         self.__pi_alpha = utils.default(alpha_pi, np.ones(self.sZ))
         self.__psi_alpha = utils.default(
-            alpha_psi, [[np.ones(sx) for _ in range(self.sZ)] for sx in self.sX]
+            alpha_psi, [[np.ones(self.sX) for _ in range(self.sZ)] for _ in range(self.sK)]
         )
         # Create Random Generator
         self.__rnd = np.random.default_rng(random_state)
@@ -204,8 +202,8 @@ class MixtureOfCategoricals:
         :param N: Number of samples to generate
         :param as_probs: If True, use 1-hot encoding
         :return: Tuple with two entries
-            * Z : Latent variable samples n
-            * X : K-List of arrays of sizes n
+            * Z : Latent variable samples N (x Z)
+            * X : Emission symbols, N x K (x X)
         """
         # Check that model was fit
         if self.Pi is None or self.Psi is None:
@@ -216,17 +214,16 @@ class MixtureOfCategoricals:
         _X = [np.empty(N) for _ in range(self.sK)] # Sampling of X is conditional
         for n in range(N):
             for k in range(self.sK):
-                _X[k][n] = self.__rnd.choice(self.sX[k], size=1, p=self.Psi[k][_Z[n]])
+                _X[k][n] = self.__rnd.choice(self.sX, size=1, p=self.Psi[k, _Z[n], :])
 
         if as_probs:
-            _Z = skpreproc.OneHotEncoder(categories=[(0, 1)], sparse=False).fit_transform(_Z[:, np.newaxis])
-            _X = [
-                skpreproc.OneHotEncoder(categories=[np.arange(sx)], sparse=False).fit_transform(X_k[:,np.newaxis])
-                for sx, X_k in zip(self.sX, _X)
-            ]
+            z_enc = skpreproc.OneHotEncoder(categories=[(0, 1)], sparse=False)
+            _Z = z_enc.fit_transform(_Z[:, np.newaxis])
+            x_enc = skpreproc.OneHotEncoder(categories=[np.arange(self.sX)], sparse=False)
+            _X = [x_enc.fit_transform(X_k[:,np.newaxis]) for X_k in _X]
 
         # Return
-        return _Z, _X
+        return _Z, np.asarray(_X).swapaxes(0, 1)
 
     def fit(self, X, z=None):
         """
@@ -234,29 +231,28 @@ class MixtureOfCategoricals:
 
         Fits the Pi/Psi parameters using EM.
 
-        :param X: The Observations to fit on: K-List of N x X_k (one-hot encoded if not probabilities)
+        :param X: The Observations to fit on: N x K x X
         :param z: None: used for compatibility with sklearn framework
         :return: self, for chaining.
         """
         # Create Starting Points
         #   - These are sampled from the priors
-        start_pi = [
+        start_pi = np.asarray([
             scstats.dirichlet.rvs(self.__pi_alpha, 1, self.__rnd).squeeze()
             for _ in range(self.__inits)
-        ]
-        start_psi = [
+        ])
+        start_psi = np.asarray([
             [
                 [scstats.dirichlet.rvs(alpha_kz, 1, self.__rnd).squeeze() for alpha_kz in alpha_k]
                 for alpha_k in self.__psi_alpha
             ]
             for _ in range(self.__inits)
-        ]
+        ])
 
         # Run Multiple runs in parallel:
-        num_jobs = -1 if self.__n_jobs == 0 else self.__n_jobs
-        prefered = 'threads' if self.__n_jobs == 0 else 'processes'
-        self.__fit_params = joblib.Parallel(n_jobs=num_jobs, prefer=prefered)(
-            joblib.delayed(self.partial_fit)(X, (pi, psi)) for pi, psi in zip(start_pi, start_psi)
+        mode = 'threads' if self.__n_jobs < 0 else 'processes'
+        self.__fit_params = joblib.Parallel(n_jobs=abs(self.__n_jobs), prefer=mode)(
+            joblib.delayed(self.partial_fit)(X, starts) for starts in zip(start_pi, start_psi)
         )
 
         # Select best
@@ -276,7 +272,8 @@ class MixtureOfCategoricals:
         Private static method for fitting a single initialisation of the parameters using EM
 
         :param X: The Observations to fit on: see fit above
-        :param p_init: Initial Value for the Pi/Psi probabilities
+        :param p_init: Initial Value for the Pi/Psi probabilities: if not specified, uses the
+                current member variables.
         :param optim: Optimisation parameters: max_iter, tol, pi_alpha, psi_alpha
         :return: Tuple with:
             * Pi: Fit Pi
@@ -285,7 +282,12 @@ class MixtureOfCategoricals:
             * Converged: True if converged, False otherwise
         """
         # Resolve Parameters
-        pi, psi = utils.default(p_init, (self.Pi.copy(), self.Psi.copy()))
+        if p_init is None:
+            if self.Pi is None or self.Psi is None:
+                raise ValueError('Cannot initialise from self if no initial values for Pi/Psi')
+            pi, psi = self.Pi.copy(), self.Psi.copy()
+        else:
+            pi, psi = p_init
         dir_pi = scstats.dirichlet(self.__pi_alpha)
         dir_psi = [[scstats.dirichlet(a_kz) for a_kz in a_k] for a_k in self.__psi_alpha]
 
@@ -296,25 +298,26 @@ class MixtureOfCategoricals:
         # Run EM
         while iters < self.__max_iter:
             # ---- E-Step ---- #
+            # 1) Compute Responsibilities
             gamma, ll = self.__responsibility(X, pi, psi)
-            log_likelihood.append(
-                ll +
-                dir_pi.logpdf(pi) +
-                np.sum([
-                    dir_kz.logpdf(psi_kz)
-                    for dir_kz, psi_kz in zip(utils.ravel2D(dir_psi), utils.ravel2D(psi))
-                ])
-            )
+            # 2) Update Log-Likelihood, including contribution of Pi/Psi
+            ll += dir_pi.logpdf(pi)
+            for k in range(self.sK):
+                for z in range(self.sZ):
+                    ll += dir_psi[k][z].logpdf(psi[k, z, :])
+            log_likelihood.append(ll)
 
             # ---- Check for Convergence ---- #
             if self.__converged(log_likelihood):
                 break
 
             # ---- M-Step ---- #
+            # 1) Update Pi
             pi = npext.sum_to_one(gamma.sum(axis=0) + self.__pi_alpha - 1)
-            psi = [[alpha_kz - 1 for alpha_kz in alpha_k] for alpha_k in self.__psi_alpha]
+            # 2) Update Psi (per dimension)
+            psi = np.asarray([[a_kz - 1 for a_kz in a_k] for a_k in self.__psi_alpha])
             self.__update_psi(X, gamma, psi)
-            psi = [[npext.sum_to_one(psi_kz) for psi_kz in psi_k] for psi_k in psi]
+            psi = npext.sum_to_one(psi, axis=-1)
 
             # ---- Iterations ---- #
             iters += 1
@@ -334,6 +337,7 @@ class MixtureOfCategoricals:
             return False
         elif lls[-1] < lls[-2]:
             warnings.warn("Drop in Log-Likelihood Observed! Results are probably wrong.")
+            return False
         else:
             return abs((lls[-1] - lls[-2]) / lls[-2]) < self.__tol
 
@@ -345,42 +349,46 @@ class MixtureOfCategoricals:
         :param X: Data: K-List of arrays of size N x |X_k|
         :param pi: Pi probability
         :param psi: Psi probability
-        :return: Probability over Z's, as well as log-likelihood (normaliser)
+        :return: Probability over Z's, as well as log-likelihood (normaliser).
         """
         # Some sizes
-        sK, sN = len(X), len(X[0])
+        sN, sK = X.shape[:2]
 
-        # Compute Log-Space
-        log_pi, log_psi = np.log(pi), [[np.log(psi_kz) for psi_kz in psi_k] for psi_k in psi]
+        # Prepare Gamma and evaluate
+        gamma = np.tile(pi[np.newaxis, :], [sN, 1])
+        MixtureOfCategoricals.__gamma(X, psi, gamma)
+        gamma, ll = npext.sum_to_one(gamma, axis=1, norm=True)
 
-        # Prepare Gamma and evaluate in log-space
-        gamma = np.tile(log_pi[np.newaxis, :], [sN, 1])
-        MixtureOfCategoricals.__gamma(X, log_psi, gamma)
-
-        # Compute Normaliser (log-likelihood)
-        log_likelihood = -gamma.sum(axis=-1, keepdims=True)
+        # # Compute Log-Space
+        # log_pi, log_psi = np.log(pi), np.log(psi)
+        #
+        # # Prepare Gamma and evaluate in log-space, and then convert back to exponentials
+        # gamma = np.tile(log_pi[np.newaxis, :], [sN, 1])
+        # MixtureOfCategoricals.__gamma(X, log_psi, gamma)
+        # gamma, ll = npext.sum_to_one(np.exp(gamma), axis=1, norm=True)
 
         # Return Gamma and Log-Likelihood
-        return np.exp(gamma + log_likelihood), log_likelihood.sum()
+        return gamma, -np.log(ll).sum()
 
     @staticmethod
-    def __gamma(X, logpsi, gamma):
+    @njit(signature_or_function=(float64[:,:,:], float64[:,:,:], float64[:,:]))
+    def __gamma(X, psi, gamma):
         """
-        JIT Wrapper for computing Gamma for Symbol k
-
-        :param X: Observations (2D Array)
+        JIT Wrapper for computing Gamma for Symbol k      :param X: Observations (2D Array)
         :param logpsi: Emission probabilities
         :param gamma: Current version of Gamma (unnormalised)
         :return: None (gamma is modified in place)
         """
-        sK = len(X)
+        sK = X.shape[1]
         sN, sZ = gamma.shape
-        for k in range(sK):
-            for n in range(sN):
-                for z in range(sZ):
-                    gamma[n, z] += np.dot(X[k][n, :], logpsi[k][z])
+        for n in range(sN):
+            for z in range(sZ):
+                for k in range(sK):
+                    # gamma[n, z] += np.dot(X[n, k, :], logpsi[k, z, :])
+                    gamma[n, z] *= np.power(psi[k, z, :], X[n, k, :]).prod()
 
     @staticmethod
+    @njit(signature_or_function=(float64[:, :, :], float64[:, :], float64[:, :, :]))
     def __update_psi(X, gamma, psi):
         """
         Convenience wrapper for updating PSI_k using JIT
@@ -390,12 +398,12 @@ class MixtureOfCategoricals:
         :param psi: Psi
         :return: None (Psi is modified in place)
         """
-        sK = len(X)
+        sK = X.shape[1]
         sN, sZ = gamma.shape
         for k in range(sK):
-            for n in range(sN):
-                for z in range(sZ):
-                    psi[k][z] += gamma[n, z] * X[k][n]
+            for z in range(sZ):
+                for n in range(sN):
+                    psi[k, z, :] += gamma[n, z] * X[n, k, :]
 
 
 def class_accuracy(y_true, y_pred, labels=None, normalize=True):
@@ -763,26 +771,31 @@ class LogitCalibrator(tnn.Module):
         return (x / self._theta).softmax(dim=1)
 
 
-# Test for MixtureOfCategoricals
-if __name__ == '__main__':
-
-    # Base Params
-    pi = np.asarray([0.7, 0.3])
-    psi = np.asarray([
-        [[0.1, 0.2, 0.3, 0.4], [0.4, 0.3, 0.2, 0.1]],
-        [[0.7, 0.1, 0.1, 0.1], [0.2, 0.5, 0.2, 0.1]],
-        [[0.3, 0.3, 0.3, 0.1], [0.1, 0.1, 0.1, 0.7]],
-    ])
-
-    # Generate Samples
-    print('Sampling ...')
-    Z, X = MixtureOfCategoricals(sZ=pi, sX=psi).sample(100000, True)
-
-
-    # Now try to fit the model, starting from correct point
-    print('Fitting Model')
-    model = MixtureOfCategoricals(pi, psi, inits=1, n_jobs=0).fit(X)
-
-    print(model.Pi)
-    print(model.Psi)
+# # Test for MixtureOfCategoricals
+# if __name__ == '__main__':
+#
+#     import time as tm
+#
+#     # Base Params
+#     pi = np.asarray([0.8, 0.2])
+#     psi = np.asarray([
+#         [[0.2, 0.2, 0.1, 0.5], [0.7, 0.1, 0.1, 0.1]],
+#         [[0.1, 0.7, 0.1, 0.1], [0.3, 0.2, 0.3, 0.2]],
+#         [[0.6, 0.1, 0.1, 0.2], [0.1, 0.1, 0.1, 0.7]],
+#     ])
+#
+#     # Generate Samples
+#     print('Sampling ...')
+#     gen = MixtureOfCategoricals(sZ=pi, sKX=psi, random_state=1)
+#     Z, X = gen.sample(200000, True)
+#
+#     # Now try to fit the model, starting from correct point
+#     print('Fitting Model')
+#     s = tm.time()
+#     model = MixtureOfCategoricals(2, (3, 4), inits=20, n_jobs=2)
+#     model.fit(X)
+#     print('Duration = ', tm.time() - s)
+#
+#     print(model.Pi)
+#     print(model.Psi)
 
