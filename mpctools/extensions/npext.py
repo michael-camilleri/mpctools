@@ -341,7 +341,7 @@ def hungarian(costs: np.ndarray, maximise=False, cutoff=None, row_labels=None, c
     :param maximise:   (default: False) - Calculates a maximum weight matching if true.
     :param cutoff:     If set, use this as a threshold. The cutoff range depends on whether
                        maximising (in which case lower-values are invalidated) or minimising
-                       (higher values inadmissable).
+                       (higher values inadmissible).
     :param row_labels: Row-Labels (optional) - If None, using 0-based indices
     :param col_labels: Column-Labels (optional) - If None, using 0-based indices
     :return:

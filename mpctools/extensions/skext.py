@@ -139,7 +139,11 @@ class SVCProb:
 class MixtureOfCategoricals:
     """
     Implements a multi-variate mixture of categoricals similar to the Dawid-Skene Model but with
-    potentially varying latent and emission dimensionality.
+      potentially varying latent and emission dimensionality. Note however that the dimensionality
+      should be the same for all variables.
+
+    Note:
+        Indexing for Psi is always K, Z, X
     """
 
     def __init__(
@@ -149,7 +153,8 @@ class MixtureOfCategoricals:
         Initialises the Class
 
         :param sZ: Size of the Latent Dimension |Z| (or) alternatively, an Array initialiser for Pi.
-        :param sKX: Number of Variables and Size (K, X) (or) alternatively, an initialiser for Psi.
+        :param sKX: Number of Variables and Size (K, X) (or) alternatively, an Array initialiser
+                for Psi.
         :param alpha_pi: Array-Like of size Z dictating the alpha-prior over Pi: if None, defaults
                 to uninformative prior alpha=1
         :param alpha_psi: Alpha parameters for prior over Psi i.e. indexing is [k][z][x]. If None,
@@ -160,7 +165,7 @@ class MixtureOfCategoricals:
         :param random_state: Random Generator State (used to initialise the probability parameters)
         :param max_iter: Maximum number of iterations taken for the solvers to converge.
         :param n_jobs: Number of cores used when parallelising over runs. If > 0 uses
-                multiprocessing, if < 0 uses threading. 0 is not valid.
+                multiprocessing, if < 0 uses threading. 0 indicates serial execution.
         """
         # Resolve Sizes/Parameters
         if isinstance(sZ, np.ndarray):
@@ -191,16 +196,18 @@ class MixtureOfCategoricals:
         self.__rnd = np.random.default_rng(random_state)
         # Finally, empty set of fit parameters
         self.__fit_params = []
+        self.Converged = None
 
-    def sample(self, N, as_probs=False):
+    def sample(self, N, as_probs=False, noisy=None):
         """
         Generate Samples from the distribution
 
-        Generates 'n' samples from the distribution. Since each variable k can potentially have
-        different dimensionality, these are returned as a list (see return below).
+        Generates 'n' samples from the distribution, which are returned as two lists.
 
         :param N: Number of samples to generate
-        :param as_probs: If True, use 1-hot encoding
+        :param as_probs: If True, returns probabilities (rather than integer samples)
+        :param noisy: If as_probs is true, and this is not None, it encodes the level of noise
+            added to the dirichlet for sampling from (i.e. alpha becomes NOISY + one_hot_encoding)
         :return: Tuple with two entries
             * Z : Latent variable samples N (x Z)
             * X : Emission symbols, N x K (x X)
@@ -211,19 +218,30 @@ class MixtureOfCategoricals:
 
         # Sample from Model
         _Z = self.__rnd.choice(self.sZ, size=N, p=self.Pi) # Sample Z at one go
-        _X = [np.empty(N) for _ in range(self.sK)] # Sampling of X is conditional
+        _X = np.empty([N, self.sK]) # Sampling of X is conditional
         for n in range(N):
             for k in range(self.sK):
-                _X[k][n] = self.__rnd.choice(self.sX, size=1, p=self.Psi[k, _Z[n], :])
+                _X[n, k] = self.__rnd.choice(self.sX, size=1, p=self.Psi[k, _Z[n], :])
 
         if as_probs:
-            z_enc = skpreproc.OneHotEncoder(categories=[(0, 1)], sparse=False)
-            _Z = z_enc.fit_transform(_Z[:, np.newaxis])
-            x_enc = skpreproc.OneHotEncoder(categories=[np.arange(self.sX)], sparse=False)
-            _X = [x_enc.fit_transform(X_k[:,np.newaxis]) for X_k in _X]
+            # For Z just fill in ones in the ordinal location.
+            _ZProb = np.zeros([N, self.sZ])
+            for z in range(self.sZ):
+                _ZProb[_Z == z, z] = 1
+            _Z = _ZProb
+            # For X, will need to iterate over cases
+            _XProb = np.zeros([N, self.sK, self.sX])
+            for x in range(self.sX):
+                _mask = _X == x
+                if noisy is not None:
+                    _alpha = np.ones(self.sX) * noisy; _alpha[x] += 1
+                    _XProb[_mask, :] = scstats.dirichlet.rvs(_alpha, _mask.sum(), self.__rnd)
+                else:
+                    _XProb[_X == x, x] = 1
+            _X = _XProb
 
         # Return
-        return _Z, np.asarray(_X).swapaxes(0, 1)
+        return _Z, _X
 
     def fit(self, X, z=None):
         """
@@ -249,11 +267,16 @@ class MixtureOfCategoricals:
             for _ in range(self.__inits)
         ])
 
-        # Run Multiple runs in parallel:
-        mode = 'threads' if self.__n_jobs < 0 else 'processes'
-        self.__fit_params = joblib.Parallel(n_jobs=abs(self.__n_jobs), prefer=mode)(
-            joblib.delayed(self.partial_fit)(X, starts) for starts in zip(start_pi, start_psi)
-        )
+        # Run Multiple runs (in parallel):
+        if self.__n_jobs == 0:  # Run serially
+            self.__fit_params = [
+                self.partial_fit(X, starts) for starts in zip(start_pi, start_psi)
+            ]
+        else:  # Run in parallel using multiprocessing or threads
+            mode = 'threads' if self.__n_jobs < 0 else 'processes'
+            self.__fit_params = joblib.Parallel(n_jobs=abs(self.__n_jobs), prefer=mode)(
+                joblib.delayed(self.partial_fit)(X, starts) for starts in zip(start_pi, start_psi)
+            )
 
         # Select best
         # Check if any converged
@@ -263,6 +286,7 @@ class MixtureOfCategoricals:
         best = np.argmax([fp[2][-1] for fp in self.__fit_params])
         self.Pi = self.__fit_params[best][0]
         self.Psi = self.__fit_params[best][1]
+        self.Converged = self.__fit_params[best][3]
 
         # Return Self
         return self
@@ -371,7 +395,7 @@ class MixtureOfCategoricals:
         return gamma, -np.log(ll).sum()
 
     @staticmethod
-    @njit(signature_or_function=(float64[:,:,:], float64[:,:,:], float64[:,:]))
+    @njit(signature_or_function=(float64[:,:,::1], float64[:,:,::1], float64[:,::1]))
     def __gamma(X, psi, gamma):
         """
         JIT Wrapper for computing Gamma for Symbol k      :param X: Observations (2D Array)
@@ -388,7 +412,7 @@ class MixtureOfCategoricals:
                     gamma[n, z] *= np.power(psi[k, z, :], X[n, k, :]).prod()
 
     @staticmethod
-    @njit(signature_or_function=(float64[:, :, :], float64[:, :], float64[:, :, :]))
+    @njit(signature_or_function=(float64[:, :, ::1], float64[:, ::1], float64[:, :, ::1]))
     def __update_psi(X, gamma, psi):
         """
         Convenience wrapper for updating PSI_k using JIT
@@ -777,7 +801,7 @@ class LogitCalibrator(tnn.Module):
 #     import time as tm
 #
 #     # Base Params
-#     pi = np.asarray([0.8, 0.2])
+#     pi = np.asarray([0.7, 0.3])
 #     psi = np.asarray([
 #         [[0.2, 0.2, 0.1, 0.5], [0.7, 0.1, 0.1, 0.1]],
 #         [[0.1, 0.7, 0.1, 0.1], [0.3, 0.2, 0.3, 0.2]],
@@ -787,12 +811,12 @@ class LogitCalibrator(tnn.Module):
 #     # Generate Samples
 #     print('Sampling ...')
 #     gen = MixtureOfCategoricals(sZ=pi, sKX=psi, random_state=1)
-#     Z, X = gen.sample(200000, True)
+#     Z, X = gen.sample(200000, True, None)
 #
 #     # Now try to fit the model, starting from correct point
 #     print('Fitting Model')
 #     s = tm.time()
-#     model = MixtureOfCategoricals(2, (3, 4), inits=20, n_jobs=2)
+#     model = MixtureOfCategoricals(2, (3, 4), inits=20, n_jobs=0)
 #     model.fit(X)
 #     print('Duration = ', tm.time() - s)
 #
