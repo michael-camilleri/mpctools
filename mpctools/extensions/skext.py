@@ -196,6 +196,7 @@ class MixtureOfCategoricals:
         self.__rnd = np.random.default_rng(random_state)
         # Finally, empty set of fit parameters
         self.__fit_params = []
+        self.Evolution = None
         self.Converged = None
 
     def sample(self, N, as_probs=False, noisy=None):
@@ -286,6 +287,7 @@ class MixtureOfCategoricals:
         best = np.argmax([fp[2][-1] for fp in self.__fit_params])
         self.Pi = self.__fit_params[best][0]
         self.Psi = self.__fit_params[best][1]
+        self.Evolution = self.__fit_params[best][2]
         self.Converged = self.__fit_params[best][3]
 
         # Return Self
