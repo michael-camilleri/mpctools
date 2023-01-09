@@ -169,17 +169,17 @@ class MixtureOfCategoricals:
         """
         # Resolve Sizes/Parameters
         if isinstance(sZ, np.ndarray):
-            self.Pi = np.array(sZ, dtype=float, copy=True)
+            self.__pi = np.array(sZ, dtype=float, copy=True)
             self.sZ = len(sZ)
         else:
-            self.Pi = None
+            self.__pi = None
             self.sZ = sZ
         if isinstance(sKX, np.ndarray):
-            self.Psi = np.array(sKX, dtype=float, copy=True)
+            self.__psi = np.array(sKX, dtype=float, copy=True)
             self.sK = sKX.shape[0]
             self.sX = sKX.shape[-1]
         else:
-            self.Psi = None
+            self.__psi = None
             self.sK = sKX[0]
             self.sX = sKX[1]
         # Copy other parameters
@@ -196,8 +196,7 @@ class MixtureOfCategoricals:
         self.__rnd = np.random.default_rng(random_state)
         # Finally, empty set of fit parameters
         self.__fit_params = []
-        self.Evolution = None
-        self.Converged = None
+        self.__best = None
 
     def sample(self, N, as_probs=False, noisy=None):
         """
@@ -284,14 +283,28 @@ class MixtureOfCategoricals:
         if np.all([not fp[3] for fp in self.__fit_params]):
             warnings.warn('None of the runs converged.')
         # Find run with maximum ll
-        best = np.argmax([fp[2][-1] for fp in self.__fit_params])
-        self.Pi = self.__fit_params[best][0]
-        self.Psi = self.__fit_params[best][1]
-        self.Evolution = self.__fit_params[best][2]
-        self.Converged = self.__fit_params[best][3]
+        self.__best = np.argmax([fp[2][-1] for fp in self.__fit_params])
+        self.__pi = self.__fit_params[self.__best][0].copy()
+        self.__psi = self.__fit_params[self.__best][1].copy()
 
         # Return Self
         return self
+
+    @property
+    def Evolution(self):
+        return np.asarray(self.__fit_params[self.__fit_params][2])
+
+    @property
+    def Converged(self):
+        return self.__fit_params[self.__best][3]
+
+    @property
+    def Pi(self):
+        return self.__pi.copy()
+
+    @property
+    def Psi(self):
+        return self.__psi.copy()
 
     def partial_fit(self, X, p_init=None):
         """
@@ -311,7 +324,7 @@ class MixtureOfCategoricals:
         if p_init is None:
             if self.Pi is None or self.Psi is None:
                 raise ValueError('Cannot initialise from self if no initial values for Pi/Psi')
-            pi, psi = self.Pi.copy(), self.Psi.copy()
+            pi, psi = self.Pi, self.Psi
         else:
             pi, psi = p_init
         dir_pi = scstats.dirichlet(self.__pi_alpha)
@@ -350,6 +363,15 @@ class MixtureOfCategoricals:
 
         # Return result
         return pi, psi, log_likelihood, self.__converged(log_likelihood)
+
+    def logpdf(self, X):
+        """
+        Return the (evidence) log-likelihood for the data
+
+        :param X: The observations to compute the evidence log-likelihood for: N x K x X
+        :return: Log-Likelihood: note that this does not include the prior likelihood
+        """
+        return self.__responsibility(X, self.Pi, self.Psi)[1]
 
     def __converged(self, lls):
         """
