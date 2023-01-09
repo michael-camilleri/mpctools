@@ -206,8 +206,11 @@ class MixtureOfCategoricals:
 
         :param N: Number of samples to generate
         :param as_probs: If True, returns probabilities (rather than integer samples)
-        :param noisy: If as_probs is true, and this is not None, it encodes the level of noise
-            added to the dirichlet for sampling from (i.e. alpha becomes NOISY + one_hot_encoding)
+        :param noisy: If as_probs is true, and this is not None, it encodes the noise for
+        sampling from:
+            * If a scalar, it is an additive constant to the dirichlet such that the X's are
+            sampled from a dirichlet with alpha = (noisy, ..., 1+noisy, ..., noisy)
+            * Otherwise an ndarray, containing the conditional alphas to sample from.
         :return: Tuple with two entries
             * Z : Latent variable samples N (x Z)
             * X : Emission symbols, N x K (x X)
@@ -234,7 +237,10 @@ class MixtureOfCategoricals:
             for x in range(self.sX):
                 _mask = _X == x
                 if noisy is not None:
-                    _alpha = np.ones(self.sX) * noisy; _alpha[x] += 1
+                    if isinstance(noisy, np.ndarray):
+                        _alpha = noisy[x]
+                    else:
+                        _alpha = np.ones(self.sX) * noisy; _alpha[x] += 1
                     _XProb[_mask, :] = scstats.dirichlet.rvs(_alpha, _mask.sum(), self.__rnd)
                 else:
                     _XProb[_X == x, x] = 1
