@@ -298,7 +298,7 @@ class MixtureOfCategoricals:
 
     @property
     def Evolution(self):
-        return np.asarray(self.__fit_params[self.__fit_params][2])
+        return np.asarray(self.__fit_params[self.__best][2])
 
     @property
     def Converged(self):
