@@ -27,6 +27,7 @@ import numpy as np
 import warnings
 import joblib
 import torch
+import copy
 
 
 class ThresholdedClassifier:
@@ -147,7 +148,8 @@ class MixtureOfCategoricals:
     """
 
     def __init__(
-        self, sZ, sKX, alpha_pi=None, alpha_psi=None, tol=1e-4, inits=1, random_state=None, max_iter=100, n_jobs=-1
+        self, sZ, sKX, alpha_pi=None, alpha_psi=None, init_pi=None, init_psi=None, tol=1e-4,
+        inits=1, random_state=None, max_iter=100, n_jobs=-1
     ):
         """
         Initialises the Class
@@ -159,6 +161,9 @@ class MixtureOfCategoricals:
                 to uninformative prior alpha=1
         :param alpha_psi: Alpha parameters for prior over Psi i.e. indexing is [k][z][x]. If None,
                 defaults to uninformative alpha=1 priors
+        :param init_pi: Array-Like of size Z governing sampling Dirichlet for random restarts: if
+                None, uses the same as the prior
+        :param init_psi: List of lists for sampling Psi: if None, uses the prior.
         :param tol: Tolerance for convergence (stopping criterion)
         :param inits: Number of random restarts. These are random initialisations from the provided
                 priors.
@@ -188,10 +193,12 @@ class MixtureOfCategoricals:
         self.__max_iter = max_iter
         self.__n_jobs = n_jobs
         # Resolve Priors
-        self.__pi_alpha = utils.default(alpha_pi, np.ones(self.sZ))
-        self.__psi_alpha = utils.default(
+        self.__pi_prior = utils.default(alpha_pi, np.ones(self.sZ))
+        self.__psi_prior = utils.default(
             alpha_psi, [[np.ones(self.sX) for _ in range(self.sZ)] for _ in range(self.sK)]
         )
+        self.__pi_init = utils.default(init_pi, self.__pi_prior.copy())
+        self.__psi_init = utils.default(init_psi, copy.deepcopy(self.__psi_prior))
         # Create Random Generator
         self.__rnd = np.random.default_rng(random_state)
         # Finally, empty set of fit parameters
@@ -238,7 +245,7 @@ class MixtureOfCategoricals:
                 _mask = _X == x
                 if noisy is not None:
                     if isinstance(noisy, np.ndarray):
-                        _alpha = noisy[x]
+                        _alpha = noisy[x, :]
                     else:
                         _alpha = np.ones(self.sX) * noisy; _alpha[x] += 1
                     _XProb[_mask, :] = scstats.dirichlet.rvs(_alpha, _mask.sum(), self.__rnd)
@@ -262,13 +269,13 @@ class MixtureOfCategoricals:
         # Create Starting Points
         #   - These are sampled from the priors
         start_pi = np.asarray([
-            scstats.dirichlet.rvs(self.__pi_alpha, 1, self.__rnd).squeeze()
+            scstats.dirichlet.rvs(self.__pi_init, 1, self.__rnd).squeeze()
             for _ in range(self.__inits)
         ])
         start_psi = np.asarray([
             [
                 [scstats.dirichlet.rvs(alpha_kz, 1, self.__rnd).squeeze() for alpha_kz in alpha_k]
-                for alpha_k in self.__psi_alpha
+                for alpha_k in self.__psi_init
             ]
             for _ in range(self.__inits)
         ])
@@ -296,21 +303,22 @@ class MixtureOfCategoricals:
         # Return Self
         return self
 
-    @property
-    def Evolution(self):
-        return np.asarray(self.__fit_params[self.__best][2])
+    def predict_proba(self, X):
+        """
+        Predicts probability over latent-state Z
 
-    @property
-    def Converged(self):
-        return self.__fit_params[self.__best][3]
+        :param X: X-values (N x K x X)
+        :return: probabilities over Z (N x Z)
+        """
+        return self.__responsibility(X, self.Pi, self.Psi)[0]
 
-    @property
-    def Pi(self):
-        return self.__pi.copy()
-
-    @property
-    def Psi(self):
-        return self.__psi.copy()
+    def predict(self, X):
+        """
+        Argmax of predict proba
+        :param X:
+        :return:
+        """
+        return np.argmax(self.predict_proba(X), axis=1)
 
     def partial_fit(self, X, p_init=None):
         """
@@ -333,8 +341,8 @@ class MixtureOfCategoricals:
             pi, psi = self.Pi, self.Psi
         else:
             pi, psi = p_init
-        dir_pi = scstats.dirichlet(self.__pi_alpha)
-        dir_psi = [[scstats.dirichlet(a_kz) for a_kz in a_k] for a_k in self.__psi_alpha]
+        dir_pi = scstats.dirichlet(self.__pi_prior)
+        dir_psi = [[scstats.dirichlet(a_kz) for a_kz in a_k] for a_k in self.__psi_prior]
 
         # Prepare to Run
         iters = 0
@@ -358,9 +366,9 @@ class MixtureOfCategoricals:
 
             # ---- M-Step ---- #
             # 1) Update Pi
-            pi = npext.sum_to_one(gamma.sum(axis=0) + self.__pi_alpha - 1)
+            pi = npext.sum_to_one(gamma.sum(axis=0) + self.__pi_prior - 1)
             # 2) Update Psi (per dimension)
-            psi = np.asarray([[a_kz - 1 for a_kz in a_k] for a_k in self.__psi_alpha])
+            psi = np.asarray([[a_kz - 1 for a_kz in a_k] for a_k in self.__psi_prior])
             self.__update_psi(X, gamma, psi)
             psi = npext.sum_to_one(psi, axis=-1)
 
@@ -378,6 +386,31 @@ class MixtureOfCategoricals:
         :return: Log-Likelihood: note that this does not include the prior likelihood
         """
         return self.__responsibility(X, self.Pi, self.Psi)[1]
+
+    def BIC(self, X):
+        return self.__free_params() * np.log(X.shape[0]) - 2 * self.logpdf(X)
+
+    def AIC(self, X):
+        return 2 * self.__free_params() - 2 * self.logpdf(X)
+
+    @property
+    def Evolution(self):
+        return np.asarray(self.__fit_params[self.__best][2])
+
+    @property
+    def Converged(self):
+        return self.__fit_params[self.__best][3]
+
+    @property
+    def Pi(self):
+        return self.__pi.copy()
+
+    @property
+    def Psi(self):
+        return self.__psi.copy()
+
+    def __free_params(self):
+        return self.sZ - 1 + self.sK * self.sZ * (self.sX - 1)
 
     def __converged(self, lls):
         """
@@ -425,7 +458,7 @@ class MixtureOfCategoricals:
         return gamma, -np.log(ll).sum()
 
     @staticmethod
-    @njit(signature_or_function=(float64[:,:,::1], float64[:,:,::1], float64[:,::1]))
+    @njit(signature_or_function=(float64[:,:,:], float64[:,:,:], float64[:,:]))
     def __gamma(X, psi, gamma):
         """
         JIT Wrapper for computing Gamma for Symbol k      :param X: Observations (2D Array)
@@ -442,7 +475,7 @@ class MixtureOfCategoricals:
                     gamma[n, z] *= np.power(psi[k, z, :], X[n, k, :]).prod()
 
     @staticmethod
-    @njit(signature_or_function=(float64[:, :, ::1], float64[:, ::1], float64[:, :, ::1]))
+    @njit(signature_or_function=(float64[:, :, :], float64[:, :], float64[:, :, :]))
     def __update_psi(X, gamma, psi):
         """
         Convenience wrapper for updating PSI_k using JIT
@@ -831,22 +864,30 @@ class LogitCalibrator(tnn.Module):
 #     import time as tm
 #
 #     # Base Params
-#     pi = np.asarray([0.7, 0.3])
-#     psi = np.asarray([
-#         [[0.2, 0.2, 0.1, 0.5], [0.7, 0.1, 0.1, 0.1]],
-#         [[0.1, 0.7, 0.1, 0.1], [0.3, 0.2, 0.3, 0.2]],
-#         [[0.6, 0.1, 0.1, 0.2], [0.1, 0.1, 0.1, 0.7]],
-#     ])
+#     rng = np.random.default_rng(5)
+#     sZ = 7
+#     prior_beh = np.asarray([0.51369704, 0.09231234, 0.00780774, 0.05348966, 0.01216916, 0.02374176, 0.29678229])
+#     nmdl = np.asarray(
+#         [[6.9915, 0.2927, 0.2693, 0.3327, 0.3154, 0.306, 0.6544],
+#          [0.2653, 2.3654, 0.3171, 0.3109, 0.3093, 0.2894, 0.6172],
+#          [0.2386, 0.3238, 4.6861, 0.2981, 0.2966, 0.2897, 0.4505],
+#          [0.5156, 0.282, 0.2516, 1.3101, 0.3511, 0.299, 0.6347],
+#          [0.6059, 0.2882, 0.2894, 0.4569, 1.0259, 0.3024, 0.9283],
+#          [0.3673, 0.428, 0.3601, 0.3904, 0.55, 3.2823, 2.6791],
+#          [0.4415, 0.402, 0.3436, 0.4814, 0.596, 0.8654, 3.2864]]
+#     )
 #
 #     # Generate Samples
 #     print('Sampling ...')
-#     gen = MixtureOfCategoricals(sZ=pi, sKX=psi, random_state=1)
-#     Z, X = gen.sample(200000, True, None)
+#     pi = scstats.dirichlet.rvs(np.ones(sZ), 1, rng).squeeze()  # Sample Pi
+#     psi = scstats.dirichlet.rvs(prior_beh + 1, [3, sZ], rng)  # Sample Psi
+#     _, X = MixtureOfCategoricals(pi, psi, random_state=rng).sample(50000, as_probs=True, noisy=nmdl)
 #
 #     # Now try to fit the model, starting from correct point
 #     print('Fitting Model')
 #     s = tm.time()
-#     model = MixtureOfCategoricals(2, (3, 4), inits=20, n_jobs=0)
+#     model = MixtureOfCategoricals(sZ, [3, 7], inits=1, max_iter=100, n_jobs=0, random_state=rng)
+#     res = model.partial_fit(X, p_init=(pi, psi))
 #     model.fit(X)
 #     print('Duration = ', tm.time() - s)
 #
