@@ -18,9 +18,9 @@ from sklearn import preprocessing as skpreproc
 from scipy.spatial.distance import squareform
 from mpctools.extensions import npext, utils
 from sklearn import metrics as skmetrics
+from numba import njit, float64, types
 from scipy import stats as scstats
 from scipy.special import softmax
-from numba import njit, float64
 from sklearn.svm import SVC
 import torch.nn as tnn
 import numpy as np
@@ -322,7 +322,7 @@ class MixtureOfCategoricals:
 
     def partial_fit(self, X, p_init=None):
         """
-        Private static method for fitting a single initialisation of the parameters using EM
+        Private method for fitting a single initialisation of the parameters using EM
 
         :param X: The Observations to fit on: see fit above
         :param p_init: Initial Value for the Pi/Psi probabilities: if not specified, uses the
@@ -458,7 +458,7 @@ class MixtureOfCategoricals:
         return gamma, -np.log(ll).sum()
 
     @staticmethod
-    @njit(signature_or_function=(float64[:,:,:], float64[:,:,:], float64[:,:]))
+    @njit(signature_or_function=(types.Array(float64, 3, 'C', readonly=True), float64[:,:,:], float64[:,:]))
     def __gamma(X, psi, gamma):
         """
         JIT Wrapper for computing Gamma for Symbol k      :param X: Observations (2D Array)
@@ -475,7 +475,7 @@ class MixtureOfCategoricals:
                     gamma[n, z] *= np.power(psi[k, z, :], X[n, k, :]).prod()
 
     @staticmethod
-    @njit(signature_or_function=(float64[:, :, :], float64[:, :], float64[:, :, :]))
+    @njit(signature_or_function=(types.Array(float64, 3, 'C', readonly=True), float64[:, :], float64[:, :, :]))
     def __update_psi(X, gamma, psi):
         """
         Convenience wrapper for updating PSI_k using JIT
