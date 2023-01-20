@@ -269,7 +269,7 @@ class MixtureOfCategoricals:
         # Create Starting Points
         #   - These are sampled from the priors
         start_pi = np.asarray([
-            scstats.dirichlet.rvs(self.__pi_init, 1, self.__rnd).squeeze()
+            np.array(scstats.dirichlet.rvs(self.__pi_init, 1, self.__rnd).squeeze(), ndmin=1)
             for _ in range(self.__inits)
         ])
         start_psi = np.asarray([
@@ -396,6 +396,9 @@ class MixtureOfCategoricals:
     @property
     def Evolution(self):
         return np.asarray(self.__fit_params[self.__best][2])
+
+    def Dist(self):
+        return np.asarray(fp[2][-1] for fp in self.__fit_params)
 
     @property
     def Converged(self):
