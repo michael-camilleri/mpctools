@@ -274,6 +274,21 @@ def plot_matrix3d(
                            va="center" if abs(y_rot - 45) > 25 else "bottom", fontsize=fs)
 
 
+def plot_pca_variance(pca_mdl, ax=None, fontsize=14):
+    # Define Axis
+    ax1 = utils.default(ax, plt.gca()); ax2 = ax1.twinx()
+    # Plot Explained Variance as Bar-Plot
+    var_ratios = pca_mdl.explained_variance_ratio_
+    l1 = ax1.bar(np.arange(len(var_ratios)), var_ratios)[0]
+    ax1.set_ylabel('Individual Variance Ratio', fontsize=fontsize+2); ax1.tick_params(labelsize=fontsize)
+    # Plot Cumulative Explained Variance
+    l2 = ax2.plot(np.cumsum(var_ratios), '-o', c='r')[0]; ax2.set_ylim([0, 1.05])
+    ax2.set_ylabel('Cumulative Variance Ratio', fontsize=fontsize+2); ax2.tick_params(labelsize=fontsize)
+    # Commonalities
+    ax1.legend([l1, l2], ['Individual', 'Cumulative'], fontsize=fontsize, loc=7)
+    ax1.set_xlabel('Components', fontsize=fontsize+2)
+
+
 def autolabel_bar(bars, labels=None, fs=12, prec=3, ax=None):
     """
     Add a Text-Label to the top of each bar in a bar-chart.

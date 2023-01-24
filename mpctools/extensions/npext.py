@@ -670,13 +670,13 @@ def sum_to_one(x, axis=None, norm=False):
 
 def invert_softmax(x, enforce_unique=None):
     """
-    Return a vector which would yield x under softmax: note that uniqueness is achieved in a number
-    of ways.
+    Returns a vector which would yield x under softmax.
 
     :param x: Vector/Matrix of probabilities (last dimension must sum to 1)
-    :param enforce_unique: If None (default) then uniqueness is achieved by enforcing that the
-                            inverted space sums to 0. Otherwise, it specifies an index which is
-                            enforced to be 0.
+    :param enforce_unique: Method for ensuring identifiability:
+            * If None (default) then use CLR: uniqueness is achieved by enforcing that the inverted
+              space sums to 0.
+            * Otherwise, it must be an index which is enforced to be 0.
     :return:  Inverse Softmax
     """
     # Compute Log(X)
