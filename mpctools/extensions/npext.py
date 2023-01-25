@@ -396,27 +396,53 @@ def swap_columns(x, cols):
     return temp
 
 
-def part_convolve(a, v, width=5):
+def autocorrelate(a, extent=5, correlation=False, symmetry=False):
     """
-    A simplification of the correlation function that only evaluates for the specified width on
-    *EITHER* side of the centre. This is more efficient than np.correlate when the size of the
-    array is large relative to the width.
-    Note, that this currently works only with 1D arrays.
+    Performs auto-correlation on a time-series.
 
-    :param a: Array 1
-    :param v: Other Array (namings to mirror np.correlate)
-    :param width: Width of shifts to evaluate for either way
+    Computes the autocorrelation of a for various extents of lags/leads. This differs from
+    numpy.correlate:
+      * Can handle multiple instantiations of the sequence (list of time-chains).
+      * Can handle missing data (as per [1], these are ignored)
+      * More efficient when the size of the array is large relative to the extent.
+
+    Note, that like np.correlate, this only handles 1D arrays, but may be fed multiple
+    instantiations.
+
+    [1] https://www.ism.ac.jp/editsec/aism/pdf/023_3_0387.pdf
+
+
+    :param a: List of 1D Array like: if a single time-series, can pass in a single array
+    :param extent: Maximum Lead/Lag to compute for
+    :param correlation: If True, return the correlation which is defined such that the
+            convolutions are normalised by the convolution at lag=0.
+    :param symmetry: If True, return a symmetrical array for lags as well as leads
     :return: Correlation array for specified shifts.
     """
-    # Ensure that Padded to allow rolling with 0's
-    a = np.pad(a, [width, width], mode='constant', constant_values=0)
-    v = np.pad(v, [width, width], mode='constant', constant_values=0)
-    c = np.empty([width*2 + 1])
-    # Populate
-    for i, w in enumerate(range(-width, width+1)):
-        c[i] = (a * np.roll(v, w)).sum()
-    # return
-    return c
+    # Ensure input as list if ndarray
+    a = [a, ] if isinstance(a, np.ndarray) else a
+    # Compute Mean, Valid and Divisors
+    m, v = 0, 0
+    for aa in a:
+        m += np.nansum(aa)
+        v += np.isfinite(aa).sum()
+    m /= v
+    divs = v - np.arange(extent + 1) * len(a)
+    if (divs < 1).any():
+        raise RuntimeError('Divisor is 0 or negative for some points.')
+    # Now compute correlation
+    corr = np.zeros([extent + 1])
+    for i, aa in enumerate(a):
+        # Prepare Array: Normalise and Pad
+        aa = np.nan_to_num(aa, nan=m) - m  # First Normalise
+        aa = np.pad(aa, [extent, extent], mode='constant', constant_values=0)  # Now Pad
+        # Iterate over
+        for j, l in enumerate(range(extent + 1)):
+            corr[j] += (aa * np.roll(aa, l)).sum()
+    # Return Normalised
+    corr = corr / divs
+    corr = corr / corr[0] if correlation else corr
+    return np.concatenate((np.flip(corr)[:-1], corr)) if symmetry else corr
 
 
 ################################################################
