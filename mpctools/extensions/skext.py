@@ -145,6 +145,7 @@ class MixtureOfCategoricals:
 
     Note:
         Indexing for Psi is always K, Z, X
+        The class can handle missing data (including during learning), represented by NaN
     """
 
     def __init__(
@@ -262,7 +263,8 @@ class MixtureOfCategoricals:
 
         Fits the Pi/Psi parameters using EM.
 
-        :param X: The Observations to fit on: N x K x X
+        :param X: The Observations to fit on: N x K x X. Note that along the last dimension,
+        the vector may be all NaNs to indicate missing observation for k @ sample n.
         :param z: None: used for compatibility with sklearn framework
         :return: self, for chaining.
         """
@@ -436,7 +438,7 @@ class MixtureOfCategoricals:
         """
         Compute the responsibilities (probability over Z)
 
-        :param X: Data: K-List of arrays of size N x |X_k|
+        :param X: Data: Array-like of size N x |X|
         :param pi: Pi probability
         :param psi: Psi probability
         :return: Probability over Z's, as well as log-likelihood (normaliser).
@@ -449,14 +451,6 @@ class MixtureOfCategoricals:
         MixtureOfCategoricals.__gamma(X, psi, gamma)
         gamma, ll = npext.sum_to_one(gamma, axis=1, norm=True)
 
-        # # Compute Log-Space
-        # log_pi, log_psi = np.log(pi), np.log(psi)
-        #
-        # # Prepare Gamma and evaluate in log-space, and then convert back to exponentials
-        # gamma = np.tile(log_pi[np.newaxis, :], [sN, 1])
-        # MixtureOfCategoricals.__gamma(X, log_psi, gamma)
-        # gamma, ll = npext.sum_to_one(np.exp(gamma), axis=1, norm=True)
-
         # Return Gamma and Log-Likelihood
         return gamma, -np.log(ll).sum()
 
@@ -464,18 +458,20 @@ class MixtureOfCategoricals:
     @njit(signature_or_function=(types.Array(float64, 3, 'C', readonly=True), float64[:,:,:], float64[:,:]))
     def __gamma(X, psi, gamma):
         """
-        JIT Wrapper for computing Gamma for Symbol k      :param X: Observations (2D Array)
-        :param logpsi: Emission probabilities
-        :param gamma: Current version of Gamma (unnormalised)
+        JIT Wrapper for computing Gamma
+
+        :param X: Observations (2D Array). Can handle NaN's
+        :param psi: Emission probabilities
+        :param gamma: Current version of Gamma
         :return: None (gamma is modified in place)
         """
         sK = X.shape[1]
         sN, sZ = gamma.shape
         for n in range(sN):
-            for z in range(sZ):
-                for k in range(sK):
-                    # gamma[n, z] += np.dot(X[n, k, :], logpsi[k, z, :])
-                    gamma[n, z] *= np.power(psi[k, z, :], X[n, k, :]).prod()
+            for k in range(sK):
+                if np.isfinite(X[n, k, :]).all():  # Only Proceed if Not Missing
+                    for z in range(sZ):
+                        gamma[n, z] *= np.power(psi[k, z, :], X[n, k, :]).prod()
 
     @staticmethod
     @njit(signature_or_function=(types.Array(float64, 3, 'C', readonly=True), float64[:, :], float64[:, :, :]))
@@ -490,10 +486,11 @@ class MixtureOfCategoricals:
         """
         sK = X.shape[1]
         sN, sZ = gamma.shape
-        for k in range(sK):
-            for z in range(sZ):
-                for n in range(sN):
-                    psi[k, z, :] += gamma[n, z] * X[n, k, :]
+        for n in range(sN):
+            for k in range(sK):
+                if np.isfinite(X[n, k, :]).all():  # Only Proceed if Not Missing
+                    for z in range(sZ):
+                        psi[k, z, :] += gamma[n, z] * X[n, k, :]
 
 
 def class_accuracy(y_true, y_pred, labels=None, normalize=True):
