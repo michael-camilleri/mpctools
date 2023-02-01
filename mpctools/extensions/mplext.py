@@ -91,7 +91,7 @@ def plot_matrix(
     # Sort out the min_max:
     if mode == 'hinton':
         if min_max is None:
-            min_max = np.power(2, np.ceil(np.log2(np.abs(matrix).max())))
+            min_max = np.power(2, np.ceil(np.log2(np.nanmax(np.abs(matrix)))))
         elif np.size(min_max) == 1:
             min_max = float(min_max)
         else:
@@ -120,36 +120,37 @@ def plot_matrix(
         ax.xaxis.set_major_locator(plt.NullLocator())
         ax.yaxis.set_major_locator(plt.NullLocator())
         for (y, x), w in np.ndenumerate(matrix):
-            size = np.sqrt(np.abs(w) / min_max)
-            ax.add_patch(
-                plt.Rectangle(
-                    [x - size / 2, y - size / 2],
-                    size,
-                    size,
-                    facecolor="white" if w > 0 else "black",
-                    edgecolor="white" if w > 0 else "black",
+            if np.isfinite(w):
+                size = np.sqrt(np.abs(w) / min_max)
+                ax.add_patch(
+                    plt.Rectangle(
+                        [x - size / 2, y - size / 2],
+                        size,
+                        size,
+                        facecolor="white" if w > 0 else "black",
+                        edgecolor="white" if w > 0 else "black",
+                    )
                 )
-            )
-            if isinstance(show_val, np.ndarray):
-                ax.text(
-                    x,
-                    y,
-                    show_val[y, x],
-                    horizontalalignment="center",
-                    verticalalignment="center",
-                    color="black" if w > 0 else "white",
-                    fontsize=fs,
-                )
-            elif isinstance(show_val, bool) and show_val:
-                ax.text(
-                    x,
-                    y,
-                    "{{:{}}}".format(fmt).format(w),
-                    horizontalalignment="center",
-                    verticalalignment="center",
-                    color="black" if w > 0 else "white",
-                    fontsize=fs,
-                )
+                if isinstance(show_val, np.ndarray):
+                    ax.text(
+                        x,
+                        y,
+                        show_val[y, x],
+                        horizontalalignment="center",
+                        verticalalignment="center",
+                        color="black" if w > 0 else "white",
+                        fontsize=fs,
+                    )
+                elif isinstance(show_val, bool) and show_val:
+                    ax.text(
+                        x,
+                        y,
+                        "{{:{}}}".format(fmt).format(w),
+                        horizontalalignment="center",
+                        verticalalignment="center",
+                        color="black" if w > 0 else "white",
+                        fontsize=fs,
+                    )
 
         ax.set_ylim(-buffer, matrix.shape[0] -1 + buffer)
         ax.set_xlim(-buffer, matrix.shape[1] -1 + buffer)
