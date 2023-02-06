@@ -226,13 +226,14 @@ class MixtureOfCategoricals:
         # Check that model was fit
         if self.Pi is None or self.Psi is None:
             raise RuntimeError('Model must be fit first before sampling from it.')
+        _pi, _psi = self.Pi, self.Psi
 
         # Sample from Model
-        _Z = self.__rnd.choice(self.sZ, size=N, p=self.Pi) # Sample Z at one go
+        _Z = self.__rnd.choice(self.sZ, size=N, p=_pi) # Sample Z at one go
         _X = np.empty([N, self.sK]) # Sampling of X is conditional
         for n in range(N):
             for k in range(self.sK):
-                _X[n, k] = self.__rnd.choice(self.sX, size=1, p=self.Psi[k, _Z[n], :])
+                _X[n, k] = self.__rnd.choice(self.sX, size=1, p=_psi[k, _Z[n], :])
 
         if as_probs:
             # For Z just fill in ones in the ordinal location.
@@ -492,6 +493,486 @@ class MixtureOfCategoricals:
                 if np.isfinite(X[n, k, :]).all():  # Only Proceed if Not Missing
                     for z in range(sZ):
                         psi[k, z, :] += gamma[n, z] * X[n, k, :]
+
+
+class CategoricalHMM:
+    """
+    Implements a Categorical HMM, with support for:
+        1. Multiple emissions per Time-Point
+        2. Learning from noisy (probability) labels
+        3. Learning from missing data
+    Some Notes:
+        * Indexing for Psi is always K, Z, X
+        * Indexing for Omega is always Z^{t-1}, Z^{t}
+        * For equation reference MISC_080
+    """
+    def __init__(
+        self, sZ, sKX, omega=None, alpha_pi=None, alpha_psi=None, alpha_omega=None,
+            init_pi=None, init_psi=None, init_omega=None, tol=1e-4, inits=1, random_state=None,
+            max_iter=100, n_jobs=-1
+    ):
+        """
+        Initialises the Class
+
+        :param sZ: Size of the Latent Dimension |Z| (or) alternatively, an Array initialiser for Pi.
+        :param sKX: Number of Variables and Size (K, X) (or) alternatively, an Array initialiser
+                for Psi.
+        :param omega: If not none, initialise for Omega
+        :param alpha_pi: Array-Like of size Z dictating the alpha-prior over Pi: if None, defaults
+                to uninformative prior alpha=1
+        :param alpha_psi: Alpha parameters for prior over Psi i.e. list of list of arrays with
+                indexing [k][z][x]. If None, defaults to uninformative alpha=1 priors
+        :param alpha_omega: Alpha parameters for prior over Omega i.e. indexing is [z'][z]. If None,
+                defaults to uninformative alpha=1 priors
+        :param init_pi: Array-Like of size Z governing sampling Dirichlet for random restarts: if
+                None, uses the same as the prior
+        :param init_psi: List of lists of arrays for sampling Psi: if None, uses the prior.
+        :param init_omega: List of arrays for sampling Omega: if None, uses the prior
+        :param tol: Tolerance for convergence (stopping criterion)
+        :param inits: Number of random restarts. These are random initialisations from the provided
+                priors.
+        :param random_state: Random Generator State (used to initialise the probability parameters)
+        :param max_iter: Maximum number of iterations taken for the solvers to converge.
+        :param n_jobs: Number of cores used when parallelising over runs. If > 0 uses
+                multiprocessing, if < 0 uses threading. 0 indicates serial execution.
+        """
+        # Resolve Sizes/Parameters
+        if isinstance(sZ, np.ndarray):
+            self.__pi = np.array(sZ, dtype=float, copy=True)
+            self.sZ = len(sZ)
+        else:
+            self.__pi = None
+            self.sZ = sZ
+        if isinstance(sKX, np.ndarray):
+            self.__psi = np.array(sKX, dtype=float, copy=True)
+            self.sK = sKX.shape[0]
+            self.sX = sKX.shape[-1]
+        else:
+            self.__psi = None
+            self.sK = sKX[0]
+            self.sX = sKX[1]
+        self.__omega = np.array(omega, dtype=float, copy=True) if omega is not None else None
+        # Copy other parameters
+        self.__inits = inits
+        self.__tol = tol
+        self.__max_iter = max_iter
+        self.__n_jobs = n_jobs
+        # Resolve Priors
+        self.__pi_prior = utils.default(alpha_pi, np.ones(self.sZ))
+        self.__psi_prior = utils.default(
+            alpha_psi, [[np.ones(self.sX) for _ in range(self.sZ)] for _ in range(self.sK)]
+        )
+        self.__omega_prior = utils.default(
+            alpha_omega, [np.ones(self.sZ) for _ in range(self.sZ)]
+        )
+        self.__pi_init = utils.default(init_pi, self.__pi_prior.copy())
+        self.__psi_init = utils.default(init_psi, copy.deepcopy(self.__psi_prior))
+        self.__omega_init = utils.default(init_omega, copy.deepcopy(self.__omega_prior))
+        # Create Random Generator
+        self.__rnd = np.random.default_rng(random_state)
+        # Finally, empty set of fit parameters
+        self.__fit_params = []
+        self.__best = None
+
+    def sample(self, NT, as_probs=False, noisy=None):
+        """
+        Generate Samples from the distribution
+
+        Generates 'n' samples of lengths 't' from the distribution.
+
+        :param NT: List of sample lengths: will generate len(NT) samples each of length T_n
+        :param as_probs: If True, returns probabilities (rather than integer samples)
+        :param noisy: If as_probs is true, and this is not None, it encodes the noise for
+        sampling from:
+            * If a scalar, it is an additive constant to the dirichlet such that the X's are
+            sampled from a dirichlet with alpha = (noisy, ..., 1+noisy, ..., noisy)
+            * Otherwise an ndarray, containing the conditional alphas to sample from.
+        :return: List of two-Tuples with entries:
+            * Z : Latent variable samples T_n (x Z)
+            * X : Emission symbols, T_n x K (x X)
+        """
+        # Check that model was fit
+        if self.Pi is None or self.Psi is None or self.Omega is None:
+            raise RuntimeError('Model must be fit first before sampling from it.')
+        _pi, _psi, _omega = self.Pi, self.Psi, self.Omega
+
+        # Sample from Model
+        Z, X = [], []
+        for t_n in NT:  # Iterate over samples
+            # Sample Z
+            _Z = np.empty(t_n, dtype=int)
+            _Z[0] = self.__rnd.choice(self.sZ, size=1, p=_pi)  # First Entry from Pi
+            for t in range(1, t_n):
+                _Z[t] = self.__rnd.choice(self.sZ, size=1, p=_omega[_Z[t-1], :])
+
+            # Sample X
+            _X = np.empty([t_n, self.sK])  # Sampling of X is also conditional on Z
+            for t in range(t_n):
+                for k in range(self.sK):
+                    _X[t, k] = self.__rnd.choice(self.sX, size=1, p=_psi[k, _Z[t], :])
+
+            # Resolve as Probabilities
+            if as_probs:
+                # For Z just fill in ones in the ordinal location.
+                _ZProb = np.zeros([t_n, self.sZ])
+                for z in range(self.sZ):
+                    _ZProb[_Z == z, z] = 1
+                _Z = _ZProb
+                # For X, will need to iterate over cases
+                _XProb = np.zeros([t_n, self.sK, self.sX])
+                for x in range(self.sX):
+                    _mask = _X == x
+                    if noisy is not None:
+                        if isinstance(noisy, np.ndarray):
+                            _alpha = noisy[x, :]
+                        else:
+                            _alpha = np.ones(self.sX) * noisy; _alpha[x] += 1
+                        _XProb[_mask, :] = scstats.dirichlet.rvs(_alpha, _mask.sum(), self.__rnd)
+                    else:
+                        _XProb[_X == x, x] = 1
+                _X = _XProb
+
+            # Append
+            Z.append(_Z)
+            X.append(_X)
+
+        # Return
+        return Z, X
+
+    def fit(self, X, z=None):
+        """
+        Fits the Model
+
+        Fits the Pi/Psi parameters using EM.
+
+        :param X: The Observations to fit on: N list of T x K x X. Note that along the last
+                dimension, the vector may be all NaNs to indicate missing observation for k @
+                sample n, time t.
+        :param z: None: used for compatibility with sklearn framework
+        :return: self, for chaining.
+        """
+        # Create Starting Points
+        #   - These are sampled from the priors
+        start_pi = np.asarray([
+            np.array(scstats.dirichlet.rvs(self.__pi_init, 1, self.__rnd).squeeze(), ndmin=1)
+            for _ in range(self.__inits)
+        ])
+        start_psi = np.asarray([
+            [
+                [scstats.dirichlet.rvs(alpha_kz, 1, self.__rnd).squeeze() for alpha_kz in alpha_k]
+                for alpha_k in self.__psi_init
+            ]
+            for _ in range(self.__inits)
+        ])
+        start_omega = np.asarray([
+            [scstats.dirichlet.rvs(alpha_z, 1, self.__rnd).squeeze() for alpha_z in self.__omega_init]
+            for _ in range(self.__inits)
+        ])
+
+        # Run Multiple runs (in parallel):
+        if self.__n_jobs == 0:  # Run serially
+            self.__fit_params = [
+                self.partial_fit(X, starts) for starts in zip(start_pi, start_psi, start_omega)
+            ]
+        else:  # Run in parallel using multiprocessing or threads
+            mode = 'threads' if self.__n_jobs < 0 else 'processes'
+            self.__fit_params = joblib.Parallel(n_jobs=abs(self.__n_jobs), prefer=mode)(
+                joblib.delayed(self.partial_fit)(X, starts) for starts in zip(start_pi, start_psi, start_omega)
+            )
+
+        # Select best
+        # Check if any converged
+        if np.all([not fp['Converged'] for fp in self.__fit_params]):
+            warnings.warn('None of the runs converged.')
+        # Find run with maximum ll
+        self.__best = np.argmax([fp['LLs'][-1] for fp in self.__fit_params])
+        self.__pi = self.__fit_params[self.__best]['Pi'].copy()
+        self.__psi = self.__fit_params[self.__best]['Psi'].copy()
+        self.__omega = self.__fit_params[self.__best]['Omega'].copy()
+
+        # Return Self
+        return self
+
+    def predict_proba(self, X):
+        """
+        Predicts probability over latent-state Z
+
+        :param X: X-values (N x K x X)
+        :return: probabilities over Z (N x Z)
+        """
+        return self.__responsibility(X, self.Pi, self.Psi, self.Omega)[0]
+
+    def predict(self, X):
+        """
+        Argmax of predict proba
+        :param X:
+        :return:
+        """
+        return np.argmax(self.predict_proba(X), axis=1)
+
+    def partial_fit(self, X, p_init=None):
+        """
+        Private method for fitting a single initialisation of the parameters using EM
+
+        :param X: The Observations to fit on: see fit above
+        :param p_init: Initial Value for the Pi/Psi/Omega probabilities: if not specified, uses the
+                current member variables.
+        :return: Dictionary with:
+            * Pi: Fit Pi
+            * Psi: Fit Psi
+            * Omega: Fit Omega
+            * LLs: Log-Likelihood evolution
+            * Converged: True if converged, False otherwise
+        """
+        # Resolve Parameters
+        if p_init is None:
+            if self.Pi is None or self.Psi is None or self.Omega is None:
+                raise ValueError('Cannot initialise from self if no initial values for Pi/Psi')
+            pi, psi, omega = self.Pi, self.Psi, self.Omega
+        else:
+            pi, psi, omega = p_init
+        dir_pi = scstats.dirichlet(self.__pi_prior)
+        alpha_pi = self.__pi_prior - 1
+        dir_psi = [[scstats.dirichlet(a_kz) for a_kz in a_k] for a_k in self.__psi_prior]
+        alpha_psi = np.asarray([[a_kz - 1 for a_kz in a_k] for a_k in self.__psi_prior])
+        dir_omega = [scstats.dirichlet(a_z) for a_z in self.__omega_prior]
+        alpha_omega = np.asarray([a_z for a_z in self.__omega_prior])
+
+        # Prepare to Run
+        iters = 0
+        log_likelihood = []
+
+        # Run EM
+        while iters < self.__max_iter:
+            # ---- E-Step ---- #
+            # 1) Compute Responsibilities
+            gamma_pi, gamma_psi, eta_omega, ll = self.__responsibility(X, pi, psi, omega)
+            # 2) Update Log-Likelihood, including contribution of Pi/Psi/Omega
+            ll += dir_pi.logpdf(pi)
+            for k in range(self.sK):
+                for z in range(self.sZ):
+                    ll += dir_psi[k][z].logpdf(psi[k, z, :])
+            for z in range(self.sZ):
+                ll += dir_omega[z].logpdf(omega[z, :])
+            log_likelihood.append(ll)
+
+            # ---- Check for Convergence ---- #
+            if self.__converged(log_likelihood):
+                break
+
+            # ---- M-Step ---- #
+            pi = npext.sum_to_one(gamma_pi + alpha_pi)                  # 1) Update Pi
+            psi = npext.sum_to_one(gamma_psi + alpha_psi, axis=-1)      # 2) Update Psi
+            omega = npext.sum_to_one(eta_omega + alpha_omega, axis=-1)  # 3) Omega
+
+            # ---- Iterations ---- #
+            iters += 1
+
+        # Return result
+        return {
+            'Pi': pi,
+            'Psi': psi,
+            'Omega': omega,
+            'LLs': log_likelihood,
+            'Converged': self.__converged(log_likelihood)
+        }
+
+    def logpdf(self, X):
+        """
+        Return the (evidence) log-likelihood for the data
+
+        :param X: The observations to compute the evidence log-likelihood for: N x K x X
+        :return: Log-Likelihood: note that this does not include the prior likelihood
+        """
+        return self.__responsibility(X, self.Pi, self.Psi, self.Omega)[3]
+
+    @property
+    def Pi(self):
+        return self.__pi.copy(order='C')
+
+    @property
+    def Psi(self):
+        return self.__psi.copy(order='C')
+
+    @property
+    def Omega(self):
+        return self.__omega.copy(order='C')
+
+    def __converged(self, lls):
+        """
+        Convergence Check
+
+        :param lls: Array of Log-Likelihood
+        :param tol: Tolerance Parameter
+        :return: True only if converged, within tolerance
+        """
+        if len(lls) < 2:
+            return False
+        elif lls[-1] < lls[-2]:
+            warnings.warn("Drop in Log-Likelihood Observed! Results are probably wrong.")
+            return False
+        else:
+            return abs((lls[-1] - lls[-2]) / lls[-2]) < self.__tol
+
+    def __responsibility(self, X, pi, psi, omega):
+        """
+        Computes the responsibility summary statistics (Eqs 15 through 17)
+
+        :param X: X (for all samples): N-list of sizes [T^n, K, X]. May contain NaNs
+        :param pi: Pi Parameter (size [Z])
+        :param psi: Psi Parameter (size [K, Z, X]
+        :param omega: Omega Parameter (size [Z, Z])
+        :return: four-tuple containing:
+            * gamma_pi: sufficient statistic for Pi
+            * gamma_psi: sufficient statistic for Psi
+            * eta_omega: sufficient statistic for Omega
+            * ll: Log-likelihood
+        """
+        # Create Placeholders
+        gamma_pi = np.zeros_like(pi, order='C')
+        gamma_psi = np.zeros_like(psi, order='C')
+        eta_omega = np.zeros_like(omega, order='C')
+        ll = 0
+
+        # Iterate over samples
+        for X_n in X:
+            # Pre-compute Sizes and fill NaNs
+            sT = len(X_n)
+            X_n = np.nan_to_num(X_n, nan=0.0)
+            # Compute emission Probabilities
+            P_X = np.empty([sT, self.sZ], order='C')
+            self.__prob_emission(X_n, psi, P_X)
+            # Compute Forward Pass
+            F = np.empty([sT, self.sZ], order='C')
+            C = np.empty(sT, order='C')
+            self.__forward_single(P_X, pi, omega, F, C)
+            # Compute Backward Pass
+            B = np.empty([sT, self.sZ], order='C')
+            self.__backward_single(P_X, omega, C, B)
+            # Accumulate Sufficient Statistics
+            gamma_pi += F[0, :] * B[0, :]  # Eq. 4/15
+            self.__psi_single(X_n, F * B, gamma_psi)  # Eq 4/17
+            self.__eta_single(P_X, omega, F, B, C, eta_omega)  # Eq 5/16
+            # Accumulate LL
+            ll -= np.log(C).sum()
+
+        # Return
+        return gamma_pi, gamma_psi, eta_omega, ll
+
+    @staticmethod
+    @njit(signature_or_function=(float64[:, :, :], float64[:, :, :], float64[:, :]))
+    def __prob_emission(X_n, psi, P_X):
+        """
+        Compute P_X for a single sample (all time) (Eq 6)
+
+        :param X_n: X for sample n: array-like of size [T, K, X]: note NaN's must be filled as 0s
+        :param psi: Psi [K, Z, X]
+        :param P_X: <output [T, Z]> P_X (Eq. 6)
+        :return: None
+        """
+        # Find Sizes
+        sT, sZ = P_X.shape
+
+        # Compute over all T
+        for t in range(sT):
+            for z in range(sZ):
+                P_X[t, z] = np.power(psi[:, z, :], X_n[t, :, :]).prod()
+
+    @staticmethod
+    @njit(signature_or_function=(float64[:,::1], float64[::1], float64[:,::1], float64[:,::1],
+                                 float64[:]))
+    def __forward_single(P_X, pi, omega, F_hat, C):
+        """
+        Compute the Forward Pass for a single sample (entire time). Eqs 7 through 9
+
+        :param P_X: Emission evidence for state Z [T, Z]
+        :param pi: Pi Matrix [Z]
+        :param omega: Omega Matrix [Z, Z]
+        :param F_hat: <output [T, Z]> Forward Pass Parameters (Eq 7)
+        :param C: <output [T] > Normalisers (multiplier) (Eq 9)
+        :return: None
+        """
+        # Compute some sizes
+        sT, sZ = F_hat.shape
+
+        # Do t=0
+        F_hat[0, :] = pi @ P_X[0, :]
+        C[0] = 1.0/F_hat[0, :].sum(); F_hat[0, :] *= C[0]
+
+        # Do t > 0
+        for t in range(1, sT):
+            for z in range(sZ):
+                F_hat[t, :] = P_X[t, z] * (F_hat[t-1, :] @ omega[:, z])
+            C[t] = 1/(F_hat[t, :].sum())
+            F_hat[t, :] *= C[t]
+
+    @staticmethod
+    @njit(signature_or_function=(float64[:, :], float64[:, :], float64[:], float64[:, :]))
+    def __backward_single(P_X, omega, C, B_hat):
+        """
+        Compute the backward pass for a single sample (entire time). Eqs 10/11
+
+        :param P_X: Emission evidence for state Z [T, Z]
+        :param omega: Omega Matrix [Z, Z]
+        :param C: Normalisers (multiplier) [T, Z]
+        :param B_hat: <output [T, Z]> Backward Pass parameters (Eq. 10)
+        :return: None
+        """
+        # Complete some sizes
+        sT, sZ = B_hat.shape
+
+        # t = T
+        B_hat[sT-1, :] = 1
+
+        # t < T
+        for t in range(sT - 2, -1, -1):
+            for z in range(sZ):
+                B_hat[t, z] = C[t+1] * (omega[z, :] * P_X[t+1, :] * B_hat[t+1, :]).sum()
+
+    @staticmethod
+    @njit(signature_or_function=(
+            float64[:, :], float64[:, :], float64[:, :], float64[:, :], float64[:], float64[:, :]
+    ))
+    def __eta_single(P_X, omega, F_hat, B_hat, C, eta):
+        """
+        Computes Eta's for a single sample (all time) Eq. 5/16
+
+        :param P_X: Emission evidence for state Z: size [T, Z]
+        :param omega: Omega Matrix size [Z, Z]
+        :param F_hat: Forward Pass Parameters [T, Z]
+        :param B_hat: Backward Pass Parameters [T, Z]
+        :param C: Normalisers [T]
+        :param eta: <output [Z, Z]> Sum of Eta responsibilities: should be initialised!
+        :return: None
+        """
+        # Pre-Compute Sizes
+        sT, sZ = P_X.shape
+
+        # Compute Eta's
+        for t in range(1, sT):
+            for zp in range(sZ):
+                for z in range(sZ):
+                    eta[zp, z] += C[t] * F_hat[t-1, zp] * B_hat[t, z] * omega[zp, z] * P_X[t, z]
+
+    @staticmethod
+    @njit(signature_or_function=(float64[:, :, :], float64[:, :], float64[:, :, :]))
+    def __psi_single(X, gamma, gamma_psi):
+        """
+        Accumulates (unnormalised) Psi sufficient statistic for a single sample (all time) Eq. 17
+        :param X: Emission samples for a single n: NaNs must be filled as 0's [T, K, X]
+        :param gamma: Gamma responsibilities [T, Z]
+        :param gamma_psi: <output [K, Z, X]> Storage for Responsibilities (must be initialised)
+        :return: None
+        """
+        # Pre-Compute Sizes
+        sT, sK = X.shape[:2]
+        sZ = gamma.shape[1]
+
+        # Compute Stat
+        for t in range(sT):
+            for k in range(sK):
+                for z in range(sZ):
+                    gamma_psi[k, z, :] += gamma[t, z] * X[t, k, :]
 
 
 def class_accuracy(y_true, y_pred, labels=None, normalize=True):
@@ -895,3 +1376,38 @@ class LogitCalibrator(tnn.Module):
 #     print(model.Pi)
 #     print(model.Psi)
 
+# Test for CHMM
+if __name__ == '__main__':
+
+    import time as tm
+
+    rnd = np.random.default_rng(10)
+    NT = [10000, 8000, 12000, 5000, 1000, 4000]
+
+    pi = np.asarray([0.3, 0.5, 0.2])
+    psi = np.asarray([
+        [
+            [0.5, 0.1, 0.1, 0.1, 0.05, 0.05, 0.1],
+            [0.1, 0.1, 0.3, 0.3, 0.05, 0.1, 0.05],
+            [0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.7]
+        ],
+        [
+            [0.5, 0.1, 0.1, 0.1, 0.05, 0.05, 0.1],
+            [0.1, 0.1, 0.3, 0.3, 0.05, 0.1, 0.05],
+            [0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.7]
+        ]
+
+    ])
+    omega = np.asarray([[0.9, 0.05, 0.05], [0.05, 0.9, 0.05], [0.2, 0.2, 0.6]])
+
+    print('Sampling ... ', end=''); s = tm.time()
+    _, X = CategoricalHMM(pi, psi, omega,random_state=rnd).sample(NT, True, None)
+    print(f' Done! [{utils.show_time(tm.time() - s)}]')
+
+    print('Learning Model (from init) ... ', end=''); s = tm.time()
+    fit = CategoricalHMM(pi, psi, omega, random_state=rnd, n_jobs=0).partial_fit(X)
+    print(f' Done! [{utils.show_time(tm.time() - s)}]')
+    print(pi - fit['Pi'])
+    print(psi - fit['Psi'])
+    print(omega - fit['Omega'])
+    print(fit['LLs'])
