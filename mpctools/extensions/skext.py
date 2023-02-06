@@ -897,12 +897,13 @@ class CategoricalHMM:
 
         # Do t=0
         F_hat[0, :] = pi @ P_X[0, :]
-        C[0] = 1.0/F_hat[0, :].sum(); F_hat[0, :] *= C[0]
+        C[0] = 1.0/(F_hat[0, :].sum())
+        F_hat[0, :] *= C[0]
 
         # Do t > 0
         for t in range(1, sT):
             for z in range(sZ):
-                F_hat[t, :] = P_X[t, z] * (F_hat[t-1, :] @ omega[:, z])
+                F_hat[t, z] = P_X[t, z] * (F_hat[t-1, :] @ omega[:, z])
             C[t] = 1/(F_hat[t, :].sum())
             F_hat[t, :] *= C[t]
 
@@ -1382,7 +1383,7 @@ if __name__ == '__main__':
     import time as tm
 
     rnd = np.random.default_rng(10)
-    NT = [10000, 8000, 12000, 5000, 1000, 4000]
+    NT = [10000, 8000, 12000, 5000, 1000, 4000, 2000, 10000, 4000, 6000]
 
     pi = np.asarray([0.3, 0.5, 0.2])
     psi = np.asarray([
