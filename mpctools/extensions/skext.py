@@ -781,7 +781,7 @@ class CategoricalHMM:
         """
         Return the (evidence) log-likelihood for the data
 
-        :param X: The observations to compute the evidence log-likelihood for: N x K x X
+        :param X: The observations to compute the evidence log-likelihood for: N-list of [T, K, X]
         :return: Log-Likelihood: note that this does not include the prior likelihood
         """
         return self.__responsibility(X, self.Pi, self.Psi, self.Omega)[3]
@@ -801,6 +801,10 @@ class CategoricalHMM:
     @property
     def Evolution(self):
         return np.asarray(self.__fit_params[self.__best]['LLs'])
+
+    @property
+    def Stability(self):
+        return np.asarray([fp['LLs'][-1] for fp in self.__fit_params])
 
     def __converged(self, lls):
         """
