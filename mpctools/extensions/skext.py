@@ -798,6 +798,10 @@ class CategoricalHMM:
     def Omega(self):
         return self.__omega.copy(order='C')
 
+    @property
+    def Evolution(self):
+        return np.asarray(self.__fit_params[self.__best]['LLs'])
+
     def __converged(self, lls):
         """
         Convergence Check
