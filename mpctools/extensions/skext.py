@@ -736,7 +736,7 @@ class CategoricalHMM:
         dir_psi = [[scstats.dirichlet(a_kz) for a_kz in a_k] for a_k in self.__psi_prior]
         alpha_psi = np.asarray([[a_kz - 1 for a_kz in a_k] for a_k in self.__psi_prior])
         dir_omega = [scstats.dirichlet(a_z) for a_z in self.__omega_prior]
-        alpha_omega = np.asarray([a_z for a_z in self.__omega_prior])
+        alpha_omega = np.asarray([a_z - 1 for a_z in self.__omega_prior])
 
         # Prepare to Run
         iters = 0
@@ -747,7 +747,7 @@ class CategoricalHMM:
             # ---- E-Step ---- #
             # 1) Compute Responsibilities
             gamma_pi, gamma_psi, eta_omega, ll = self.__responsibility(X, pi, psi, omega)
-            # 2) Update Log-Likelihood, including contribution of Pi/Psi/Omega
+            # 2) Update Log-Likelihood, including contribution of (old) Pi/Psi/Omega
             ll += dir_pi.logpdf(pi)
             for k in range(self.sK):
                 for z in range(self.sZ):
@@ -896,14 +896,14 @@ class CategoricalHMM:
         sT, sZ = F_hat.shape
 
         # Do t=0
-        F_hat[0, :] = pi @ P_X[0, :]
+        F_hat[0, :] = pi * P_X[0, :]
         C[0] = 1.0/(F_hat[0, :].sum())
         F_hat[0, :] *= C[0]
 
         # Do t > 0
         for t in range(1, sT):
             for z in range(sZ):
-                F_hat[t, z] = P_X[t, z] * (F_hat[t-1, :] @ omega[:, z])
+                F_hat[t, z] = P_X[t, z] * (F_hat[t-1, :] * omega[:, z]).sum()
             C[t] = 1/(F_hat[t, :].sum())
             F_hat[t, :] *= C[t]
 
@@ -923,12 +923,13 @@ class CategoricalHMM:
         sT, sZ = B_hat.shape
 
         # t = T
-        B_hat[sT-1, :] = 1
+        B_hat[-1, :] = 1
 
         # t < T
         for t in range(sT - 2, -1, -1):
+            _pb = P_X[t+1, :] * B_hat[t+1, :]  # Last two terms do not depend on z
             for z in range(sZ):
-                B_hat[t, z] = C[t+1] * (omega[z, :] * P_X[t+1, :] * B_hat[t+1, :]).sum()
+                B_hat[t, z] = C[t+1] * (omega[z, :] * _pb).sum()
 
     @staticmethod
     @njit(signature_or_function=(
@@ -1380,35 +1381,73 @@ class LogitCalibrator(tnn.Module):
 # Test for CHMM
 if __name__ == '__main__':
 
+    from scipy.spatial import distance as scdist
     import time as tm
 
-    rnd = np.random.default_rng(10)
-    NT = [10000, 8000, 12000, 5000, 1000, 4000, 2000, 10000, 4000, 6000]
+    # rnd = np.random.default_rng(10)
+    # NT = [10000, 8000, 12000, 5000, 1000, 4000, 2000, 10000, 4000, 6000]
+    #
+    # pi = np.asarray([0.3, 0.5, 0.2])
+    # psi = np.asarray([
+    #     [
+    #         [0.5, 0.1, 0.1, 0.1, 0.05, 0.05, 0.1],
+    #         [0.1, 0.1, 0.3, 0.3, 0.05, 0.1, 0.05],
+    #         [0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.7]
+    #     ],
+    #     [
+    #         [0.5, 0.1, 0.1, 0.1, 0.05, 0.05, 0.1],
+    #         [0.1, 0.1, 0.3, 0.3, 0.05, 0.1, 0.05],
+    #         [0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.7]
+    #     ]
+    #
+    # ])
+    # omega = np.asarray([[0.9, 0.05, 0.05], [0.05, 0.9, 0.05], [0.2, 0.2, 0.6]])
+    #
+    # print('Sampling ... ', end=''); s = tm.time()
+    # _, X = CategoricalHMM(pi, psi, omega,random_state=rnd).sample(NT, True, None)
+    # print(f' Done! [{utils.show_time(tm.time() - s)}]')
+    #
+    # print('Learning Model (from init) ... ', end=''); s = tm.time()
+    # fit = CategoricalHMM(pi, psi, omega, random_state=rnd, n_jobs=0).partial_fit(X)
+    # print(f' Done! [{utils.show_time(tm.time() - s)}]')
+    # print(pi - fit['Pi'])
+    # print(psi - fit['Psi'])
+    # print(omega - fit['Omega'])
+    # print(fit['LLs'])
 
-    pi = np.asarray([0.3, 0.5, 0.2])
-    psi = np.asarray([
-        [
-            [0.5, 0.1, 0.1, 0.1, 0.05, 0.05, 0.1],
-            [0.1, 0.1, 0.3, 0.3, 0.05, 0.1, 0.05],
-            [0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.7]
-        ],
-        [
-            [0.5, 0.1, 0.1, 0.1, 0.05, 0.05, 0.1],
-            [0.1, 0.1, 0.3, 0.3, 0.05, 0.1, 0.05],
-            [0.05, 0.05, 0.05, 0.05, 0.05, 0.05, 0.7]
-        ]
+    # Create Random Generator (will be used throughout) and other common data
+    A1_SAMPLES_N = 5  # This is Fixed
+    A1_SAMPLES_T = np.asarray((0.1, 0.5, 1)) * 1000  # Number of samples (in thousands)
+    A1_PSI_SAMPLER = (0.5, 0.2, 0.2, 0.2, 0.2, 0.2, 0.35)
+    A1_OMEGA_SAMPLER = [20, 1]  # Sampler for on-state/off-state alphas
+    MAX_ITER = 200
+    LOG_BASE = 2
 
-    ])
-    omega = np.asarray([[0.9, 0.05, 0.05], [0.05, 0.9, 0.05], [0.2, 0.2, 0.6]])
+    replica = 0; sZ = 2
+    rng = np.random.default_rng(int(11 + replica + sZ * 100))
+    iters, pi_errors, psi_errors, omega_errors = (np.empty(len(A1_SAMPLES_T)) for _ in range(4))
 
-    print('Sampling ... ', end=''); s = tm.time()
-    _, X = CategoricalHMM(pi, psi, omega,random_state=rnd).sample(NT, True, None)
-    print(f' Done! [{utils.show_time(tm.time() - s)}]')
+    # Generate Model and Sample from it
+    # --- Generate Model --- #
+    pi = scstats.dirichlet.rvs(np.ones(sZ), 1, rng).squeeze()  # Sample Pi
+    psi = scstats.dirichlet.rvs(A1_PSI_SAMPLER, [3, sZ], rng)  # Sample Psi
+    omega = np.empty([sZ, sZ])  # Sample Omega
+    omega_sampler = np.ones(sZ) * A1_OMEGA_SAMPLER[1]
+    omega_sampler[0] = A1_OMEGA_SAMPLER[0]
+    for zz in range(sZ):
+        omega[zz, :] = scstats.dirichlet.rvs(np.roll(omega_sampler, zz), 1, rng)
+    # --- Generate Data --- #
+    _, X = CategoricalHMM(pi, psi, omega, random_state=rng).sample(
+        [int(A1_SAMPLES_T[-1])] * A1_SAMPLES_N, as_probs=True, noisy=None)
 
-    print('Learning Model (from init) ... ', end=''); s = tm.time()
-    fit = CategoricalHMM(pi, psi, omega, random_state=rnd, n_jobs=0).partial_fit(X)
-    print(f' Done! [{utils.show_time(tm.time() - s)}]')
-    print(pi - fit['Pi'])
-    print(psi - fit['Psi'])
-    print(omega - fit['Omega'])
-    print(fit['LLs'])
+    # Now for each size
+    for i, sT in enumerate(A1_SAMPLES_T):
+        # 1) Train Model
+        fit = CategoricalHMM(pi, psi, omega, max_iter=MAX_ITER).partial_fit([x[:int(sT), :, :] for x in X])
+        # 2) Compute Errors/Stats
+        iters[i] = len(fit['LLs'])
+        pi_errors[i] = np.square(scdist.jensenshannon(pi, fit['Pi'], base=LOG_BASE))
+        psi_errors[i] = np.square(
+            scdist.jensenshannon(psi, fit['Psi'], base=LOG_BASE, axis=-1)).mean()
+        omega_errors[i] = np.square(
+            scdist.jensenshannon(omega, fit['Omega'], base=LOG_BASE, axis=-1)).mean()
