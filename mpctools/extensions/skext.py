@@ -401,7 +401,7 @@ class MixtureOfCategoricals:
         return np.asarray(self.__fit_params[self.__best][2])
 
     @property
-    def Dist(self):
+    def Stability(self):
         return np.asarray([fp[2][-1] for fp in self.__fit_params])
 
     @property
