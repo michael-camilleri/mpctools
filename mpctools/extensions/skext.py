@@ -697,18 +697,19 @@ class CategoricalHMM:
         """
         Predicts probability over latent-state Z
 
-        :param X: X-values (N x K x X)
-        :return: probabilities over Z (N x Z)
+        :param X: X-values: N list of [T, K, X].
+        :return: probabilities over Z: N List of [T, Z]
         """
-        return self.__responsibility(X, self.Pi, self.Psi, self.Omega)[0]
+        return self.__responsibility(X, self.Pi, self.Psi, self.Omega, True)[0]
 
     def predict(self, X):
         """
-        Argmax of predict proba
-        :param X:
+        Argmax of predict proba. Note that this uses the MPM currently (Viterbi not implemented)
+
+        :param X: X-values: N list of T x K x X.
         :return:
         """
-        return np.argmax(self.predict_proba(X), axis=1)
+        return [np.argmax(z, axis=1) for z in self.predict_proba(X)]
 
     def partial_fit(self, X, p_init=None):
         """
@@ -784,7 +785,7 @@ class CategoricalHMM:
         :param X: The observations to compute the evidence log-likelihood for: N-list of [T, K, X]
         :return: Log-Likelihood: note that this does not include the prior likelihood
         """
-        return self.__responsibility(X, self.Pi, self.Psi, self.Omega)[3]
+        return self.__responsibility(X, self.Pi, self.Psi, self.Omega, True)[-1]
 
     @property
     def Pi(self):
@@ -822,7 +823,7 @@ class CategoricalHMM:
         else:
             return abs((lls[-1] - lls[-2]) / lls[-2]) < self.__tol
 
-    def __responsibility(self, X, pi, psi, omega):
+    def __responsibility(self, X, pi, psi, omega, posterior=False):
         """
         Computes the responsibility summary statistics (Eqs 15 through 17)
 
@@ -830,16 +831,24 @@ class CategoricalHMM:
         :param pi: Pi Parameter (size [Z])
         :param psi: Psi Parameter (size [K, Z, X]
         :param omega: Omega Parameter (size [Z, Z])
-        :return: four-tuple containing:
-            * gamma_pi: sufficient statistic for Pi
-            * gamma_psi: sufficient statistic for Psi
-            * eta_omega: sufficient statistic for Omega
-            * ll: Log-likelihood
+        :param posterior: If True, return also the gamma matrix (posterior over latent states)
+        :return: Behaviour depends on setting of posterior:
+            If True: two-tuple containing:
+                * p_Z: posterior over each Z
+                * ll: Log-likelihood
+            else: four-tuple containing
+                * gamma_pi: sufficient statistic for Pi
+                * gamma_psi: sufficient statistic for Psi
+                * eta_omega: sufficient statistic for Omega
+                * ll: Log-likelihood
         """
         # Create Placeholders
-        gamma_pi = np.zeros_like(pi, order='C')
-        gamma_psi = np.zeros_like(psi, order='C')
-        eta_omega = np.zeros_like(omega, order='C')
+        if posterior:
+            p_Z = []
+        else:
+            gamma_pi = np.zeros_like(pi, order='C')
+            gamma_psi = np.zeros_like(psi, order='C')
+            eta_omega = np.zeros_like(omega, order='C')
         ll = 0
 
         # Iterate over samples
@@ -858,14 +867,17 @@ class CategoricalHMM:
             B = np.empty([sT, self.sZ], order='C')
             self.__backward_single(P_X, omega, C, B)
             # Accumulate Sufficient Statistics
-            gamma_pi += F[0, :] * B[0, :]  # Eq. 4/15
-            self.__psi_single(X_n, F * B, gamma_psi)  # Eq 4/17
-            self.__eta_single(P_X, omega, F, B, C, eta_omega)  # Eq 5/16
+            if posterior:
+                p_Z.append(F * B)
+            else:
+                gamma_pi += F[0, :] * B[0, :]  # Eq. 4/15
+                self.__psi_single(X_n, F * B, gamma_psi)  # Eq 4/17
+                self.__eta_single(P_X, omega, F, B, C, eta_omega)  # Eq 5/16
             # Accumulate LL
             ll -= np.log(C).sum()
 
         # Return
-        return gamma_pi, gamma_psi, eta_omega, ll
+        return (p_Z, ll) if posterior else (gamma_pi, gamma_psi, eta_omega, ll)
 
     @staticmethod
     @njit(signature_or_function=(float64[:, :, :], float64[:, :, :], float64[:, :]))
