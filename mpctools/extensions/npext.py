@@ -854,6 +854,18 @@ def markov_stationary(transition):
     return sum_to_one(np.real_if_close(evect[:, _i]))
 
 
+def markov_dwell(transition):
+    """
+    Returns the Expected Dwell-Time for each of the states in a Markov-Chain Transition Matrix
+
+    Note, that here I assume that the support of the dwell time starts from 1 (unlike Murphy)
+
+    :param transition: Transition Matrix
+    :return: Dwell time for each state
+    """
+    return 1/(1 - np.diagonal(transition))
+
+
 def switch_rate(a, axis=-1, ratio=False):
     """
     Compute the number/frequency of switching at various levels in a time-series.
