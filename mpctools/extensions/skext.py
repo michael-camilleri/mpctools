@@ -778,14 +778,16 @@ class CategoricalHMM:
             'Converged': self.__converged(log_likelihood)
         }
 
-    def logpdf(self, X):
+    def logpdf(self, X, per_run=False, norm=False):
         """
         Return the (evidence) log-likelihood for the data
 
         :param X: The observations to compute the evidence log-likelihood for: N-list of [T, K, X]
+        :param per_run: If True, return the log-likelihood per each run individually
+        :param norm: If True, normalise the log-likelihood by the number of emissions
         :return: Log-Likelihood: note that this does not include the prior likelihood
         """
-        return self.__responsibility(X, self.Pi, self.Psi, self.Omega, True)[-1]
+        return self.__responsibility(X, self.Pi, self.Psi, self.Omega, True, per_run, norm)[-1]
 
     @property
     def Pi(self):
@@ -823,7 +825,7 @@ class CategoricalHMM:
         else:
             return abs((lls[-1] - lls[-2]) / lls[-2]) < self.__tol
 
-    def __responsibility(self, X, pi, psi, omega, posterior=False):
+    def __responsibility(self, X, pi, psi, omega, posterior=False, ll_per_run=False, ll_norm=False):
         """
         Computes the responsibility summary statistics (Eqs 15 through 17)
 
@@ -831,7 +833,9 @@ class CategoricalHMM:
         :param pi: Pi Parameter (size [Z])
         :param psi: Psi Parameter (size [K, Z, X]
         :param omega: Omega Parameter (size [Z, Z])
-        :param posterior: If True, return also the gamma matrix (posterior over latent states)
+        :param posterior: If True, return only the gamma matrix (posterior over latent states)
+        :param ll_per_run: If True, return the log-likelihood per-run (instead of total)
+        :param ll_norm: If True, normalise the log-likelihood by the Number of Emissions
         :return: Behaviour depends on setting of posterior:
             If True: two-tuple containing:
                 * p_Z: posterior over each Z
@@ -849,12 +853,14 @@ class CategoricalHMM:
             gamma_pi = np.zeros_like(pi, order='C')
             gamma_psi = np.zeros_like(psi, order='C')
             eta_omega = np.zeros_like(omega, order='C')
-        ll = 0
+        ll, n_obs = [], [] if ll_norm else None
 
         # Iterate over samples
         for X_n in X:
             # Pre-compute Sizes and fill NaNs
             sT = len(X_n)
+            if ll_norm:
+                n_obs.append(np.isfinite(X_n).all(axis=-1).sum())
             X_n = np.nan_to_num(X_n, nan=0.0)
             # Compute emission Probabilities
             P_X = np.empty([sT, self.sZ], order='C')
@@ -874,9 +880,16 @@ class CategoricalHMM:
                 self.__psi_single(X_n, F * B, gamma_psi)  # Eq 4/17
                 self.__eta_single(P_X, omega, F, B, C, eta_omega)  # Eq 5/16
             # Accumulate LL
-            ll -= np.log(C).sum()
+            ll.append(-np.log(C).sum())
 
-        # Return
+        # Return, but need to resolve LL
+        if ll_per_run:
+            if ll_norm:
+                ll = np.divide(ll, n_obs)
+        else:
+            ll = np.sum(ll)
+            if ll_norm:
+                ll /= np.sum(n_obs)
         return (p_Z, ll) if posterior else (gamma_pi, gamma_psi, eta_omega, ll)
 
     @staticmethod

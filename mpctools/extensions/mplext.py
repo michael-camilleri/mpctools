@@ -172,7 +172,7 @@ def plot_matrix(
         sns.heatmap(
             np.zeros_like(matrix),
             annot=matrix,
-            cmap=[utils.default(colour, (0.9, 0.9, 0.9)),],
+            cmap=[utils.default(colour, (0.9, 0.9, 0.9)), ],
             fmt=fmt,
             ax=ax,
             cbar=False,

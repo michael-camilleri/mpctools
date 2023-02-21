@@ -434,7 +434,7 @@ def autocorrelate(a, extent=5, correlation=False, symmetry=False):
     corr = np.zeros([extent + 1])
     for i, aa in enumerate(a):
         # Prepare Array: Normalise and Pad
-        aa = np.nan_to_num(aa, nan=m) - m  # First Normalise
+        aa = np.nan_to_num(aa, nan=m) - m  # First Normalise (subtract mean)
         aa = np.pad(aa, [extent, extent], mode='constant', constant_values=0)  # Now Pad
         # Iterate over
         for j, l in enumerate(range(extent + 1)):
