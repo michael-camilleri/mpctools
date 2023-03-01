@@ -643,7 +643,7 @@ class CategoricalHMM:
         """
         Fits the Model
 
-        Fits the Pi/Psi parameters using EM.
+        Fits the Pi/Psi/Omega parameters using EM.
 
         :param X: The Observations to fit on: N list of T x K x X. Note that along the last
                 dimension, the vector may be all NaNs to indicate missing observation for k @
@@ -672,12 +672,12 @@ class CategoricalHMM:
         # Run Multiple runs (in parallel):
         if self.__n_jobs == 0:  # Run serially
             self.__fit_params = [
-                self.partial_fit(X, starts) for starts in zip(start_pi, start_psi, start_omega)
+                self.__fit_single(X, starts) for starts in zip(start_pi, start_psi, start_omega)
             ]
         else:  # Run in parallel using multiprocessing or threads
             mode = 'threads' if self.__n_jobs < 0 else 'processes'
             self.__fit_params = joblib.Parallel(n_jobs=abs(self.__n_jobs), prefer=mode)(
-                joblib.delayed(self.partial_fit)(X, starts) for starts in zip(start_pi, start_psi, start_omega)
+                joblib.delayed(self.__fit_single)(X, starts) for starts in zip(start_pi, start_psi, start_omega)
             )
 
         # Select best
@@ -686,6 +686,42 @@ class CategoricalHMM:
             warnings.warn('None of the runs converged.')
         # Find run with maximum ll
         self.__best = np.argmax([fp['LLs'][-1] for fp in self.__fit_params])
+        self.__pi = self.__fit_params[self.__best]['Pi'].copy()
+        self.__psi = self.__fit_params[self.__best]['Psi'].copy()
+        self.__omega = self.__fit_params[self.__best]['Omega'].copy()
+
+        # Return Self
+        return self
+
+    def fit_partial(self, X, p_init=None):
+        """
+        Fits the Model from a warm-start
+
+        Convenience method for fitting the data with a warm-start from the current parameters
+        (or as supplied)
+
+        :param X: The Observations to fit on: (see fit)
+        :param p_init: The initialisation point for the parameters. Can be None, in which case,
+                        the current values will be used.
+        :return: self, for chaining
+        """
+        # Resolve initialisation
+        if p_init is None:
+            if None in (self.__pi, self.__psi, self.__omega):
+                raise RuntimeError('One or more of the Parameters is not yet fit: you must supply initialiser')
+            p_init = (self.Pi, self.Psi, self.Omega)
+        else:
+            p_init = (theta.copy(order='C') for theta in p_init)  # Ensure a copy
+
+        # Fit the Data (run serially)
+        self.__fit_params = [self.__fit_single(X, p_init)]
+
+        # Check for Converge
+        if not self.__fit_params[0]['Converged']:
+            warnings.warn('None of the runs converged.')
+
+        # Resolve Parameters and Store
+        self.__best = 0 # There is only 1
         self.__pi = self.__fit_params[self.__best]['Pi'].copy()
         self.__psi = self.__fit_params[self.__best]['Psi'].copy()
         self.__omega = self.__fit_params[self.__best]['Omega'].copy()
@@ -711,13 +747,43 @@ class CategoricalHMM:
         """
         return [np.argmax(z, axis=1) for z in self.predict_proba(X)]
 
-    def partial_fit(self, X, p_init=None):
+    def logpdf(self, X, per_run=False, norm=False):
         """
-        Private method for fitting a single initialisation of the parameters using EM
+        Return the (evidence) log-likelihood for the data
+
+        :param X: The observations to compute the evidence log-likelihood for: N-list of [T, K, X]
+        :param per_run: If True, return the log-likelihood per each run individually
+        :param norm: If True, normalise the log-likelihood by the number of emissions
+        :return: Log-Likelihood: note that this does not include the prior likelihood
+        """
+        return self.__responsibility(X, self.Pi, self.Psi, self.Omega, True, per_run, norm)[-1]
+
+    @property
+    def Pi(self):
+        return self.__pi.copy(order='C')
+
+    @property
+    def Psi(self):
+        return self.__psi.copy(order='C')
+
+    @property
+    def Omega(self):
+        return self.__omega.copy(order='C')
+
+    @property
+    def Evolution(self):
+        return np.asarray(self.__fit_params[self.__best]['LLs'])
+
+    @property
+    def Stability(self):
+        return np.asarray([fp['LLs'][-1] for fp in self.__fit_params])
+
+    def __fit_single(self, X, p_init):
+        """
+        Private Method for fitting a single initialisation of the parameters using EM
 
         :param X: The Observations to fit on: see fit above
-        :param p_init: Initial Value for the Pi/Psi/Omega probabilities: if not specified, uses the
-                current member variables.
+        :param p_init: Initial Value for the Pi/Psi/Omega probabilities
         :return: Dictionary with:
             * Pi: Fit Pi
             * Psi: Fit Psi
@@ -726,12 +792,7 @@ class CategoricalHMM:
             * Converged: True if converged, False otherwise
         """
         # Resolve Parameters
-        if p_init is None:
-            if self.Pi is None or self.Psi is None or self.Omega is None:
-                raise ValueError('Cannot initialise from self if no initial values for Pi/Psi')
-            pi, psi, omega = self.Pi, self.Psi, self.Omega
-        else:
-            pi, psi, omega = p_init
+        pi, psi, omega = p_init
         dir_pi = scstats.dirichlet(self.__pi_prior)
         alpha_pi = self.__pi_prior - 1
         dir_psi = [[scstats.dirichlet(a_kz) for a_kz in a_k] for a_k in self.__psi_prior]
@@ -777,37 +838,6 @@ class CategoricalHMM:
             'LLs': log_likelihood,
             'Converged': self.__converged(log_likelihood)
         }
-
-    def logpdf(self, X, per_run=False, norm=False):
-        """
-        Return the (evidence) log-likelihood for the data
-
-        :param X: The observations to compute the evidence log-likelihood for: N-list of [T, K, X]
-        :param per_run: If True, return the log-likelihood per each run individually
-        :param norm: If True, normalise the log-likelihood by the number of emissions
-        :return: Log-Likelihood: note that this does not include the prior likelihood
-        """
-        return self.__responsibility(X, self.Pi, self.Psi, self.Omega, True, per_run, norm)[-1]
-
-    @property
-    def Pi(self):
-        return self.__pi.copy(order='C')
-
-    @property
-    def Psi(self):
-        return self.__psi.copy(order='C')
-
-    @property
-    def Omega(self):
-        return self.__omega.copy(order='C')
-
-    @property
-    def Evolution(self):
-        return np.asarray(self.__fit_params[self.__best]['LLs'])
-
-    @property
-    def Stability(self):
-        return np.asarray([fp['LLs'][-1] for fp in self.__fit_params])
 
     def __converged(self, lls):
         """
@@ -1404,7 +1434,7 @@ class LogitCalibrator(tnn.Module):
 #     print('Fitting Model')
 #     s = tm.time()
 #     model = MixtureOfCategoricals(sZ, [3, 7], inits=1, max_iter=100, n_jobs=0, random_state=rng)
-#     res = model.partial_fit(X, p_init=(pi, psi))
+#     res = model.__fit_single(X, p_init=(pi, psi))
 #     model.fit(X)
 #     print('Duration = ', tm.time() - s)
 #
@@ -1441,7 +1471,7 @@ if __name__ == '__main__':
     # print(f' Done! [{utils.show_time(tm.time() - s)}]')
     #
     # print('Learning Model (from init) ... ', end=''); s = tm.time()
-    # fit = CategoricalHMM(pi, psi, omega, random_state=rnd, n_jobs=0).partial_fit(X)
+    # fit = CategoricalHMM(pi, psi, omega, random_state=rnd, n_jobs=0).__fit_single(X)
     # print(f' Done! [{utils.show_time(tm.time() - s)}]')
     # print(pi - fit['Pi'])
     # print(psi - fit['Psi'])
@@ -1476,7 +1506,7 @@ if __name__ == '__main__':
     # Now for each size
     for i, sT in enumerate(A1_SAMPLES_T):
         # 1) Train Model
-        fit = CategoricalHMM(pi, psi, omega, max_iter=MAX_ITER).partial_fit([x[:int(sT), :, :] for x in X])
+        fit = CategoricalHMM(pi, psi, omega, max_iter=MAX_ITER).__fit_single([x[:int(sT), :, :] for x in X])
         # 2) Compute Errors/Stats
         iters[i] = len(fit['LLs'])
         pi_errors[i] = np.square(scdist.jensenshannon(pi, fit['Pi'], base=LOG_BASE))
