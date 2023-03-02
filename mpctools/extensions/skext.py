@@ -707,7 +707,7 @@ class CategoricalHMM:
         """
         # Resolve initialisation
         if p_init is None:
-            if None in (self.__pi, self.__psi, self.__omega):
+            if (self.__pi is None) or (self.__psi is None) or (self.__omega is None):
                 raise RuntimeError('One or more of the Parameters is not yet fit: you must supply initialiser')
             p_init = (self.Pi, self.Psi, self.Omega)
         else:
@@ -716,8 +716,8 @@ class CategoricalHMM:
         # Fit the Data (run serially)
         self.__fit_params = [self.__fit_single(X, p_init)]
 
-        # Check for Converge
-        if not self.__fit_params[0]['Converged']:
+        # Check for Convergence (do not warn if doing one step)
+        if not self.__fit_params[0]['Converged'] and self.__max_iter > 1:
             warnings.warn('None of the runs converged.')
 
         # Resolve Parameters and Store
@@ -844,7 +844,6 @@ class CategoricalHMM:
         Convergence Check
 
         :param lls: Array of Log-Likelihood
-        :param tol: Tolerance Parameter
         :return: True only if converged, within tolerance
         """
         if len(lls) < 2:
