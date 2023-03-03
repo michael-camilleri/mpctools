@@ -51,8 +51,6 @@ def plot_matrix(
     Rows (first-dimension) of the matrix are printed along the y-axis, with columns (2nd dimension)
     along the X-axis. Note that by default, the y-axes is inverted.
 
-    TODO: Support NaN plotting
-
     Inspired by [Hinton Demo](https://matplotlib.org/examples/specialty_plots/hinton_demo.html). The
     heatmap makes use of seaborn functionality, with some pre/post processing.
 
@@ -101,7 +99,7 @@ def plot_matrix(
             min_max = np.power(2, np.ceil(np.log2(np.abs(matrix).max())))
     elif mode == 'heatmap':
         if min_max is None:
-            min_max = [matrix.min(), matrix.max()]
+            min_max = [np.nanmin(matrix), np.nanmax(matrix)]
         elif np.size(min_max) == 2:
             min_max = np.array(min_max, dtype=float)
         else:
@@ -156,6 +154,7 @@ def plot_matrix(
         ax.set_xlim(-buffer, matrix.shape[1] -1 + buffer)
         ax.invert_yaxis()
     elif mode == 'heatmap':
+
         sns.heatmap(
             matrix,
             vmin=min_max[0],
