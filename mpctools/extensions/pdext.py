@@ -59,6 +59,21 @@ def build_dataframe(_d, _idx_names, _idx_values):
     return _df
 
 
+def idx_where(df, cond, axis=0):
+    """
+    Return indices where condition is true
+
+    :param df: DataFrame or series
+    :param cond: Function to determine truth
+    :param axis: For DataFrame: determines axis along which to operate
+    :return:
+    """
+    if axis == 0:
+        return [i for i in range(len(df)) if cond(df.iloc[i])]
+    else:
+        return [i for i in range(len(df.columns)) if cond(df.iloc[:, i])]
+
+
 def recategorise(_df, _cat_type, _cols, _map=None):
     """
     A Convenience function to re-categorise the columns in the dataframe: the operation is performed in place. Note that

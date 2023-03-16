@@ -13,7 +13,10 @@ see http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
-from sklearn.calibration import CalibrationDisplay
+try:
+    from sklearn.calibration import CalibrationDisplay
+except ImportError as ie:
+    print(ie)
 from sklearn import preprocessing as skpreproc
 from scipy.spatial.distance import squareform
 from mpctools.extensions import npext, utils
