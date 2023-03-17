@@ -68,7 +68,7 @@ def idx_where(df, cond, axis=0):
     :param axis: For DataFrame: determines axis along which to operate
     :return:
     """
-    if axis == 0:
+    if isinstance(df, pd.Series) or axis == 0:
         return [i for i in range(len(df)) if cond(df.iloc[i])]
     else:
         return [i for i in range(len(df.columns)) if cond(df.iloc[:, i])]
@@ -176,3 +176,25 @@ def segment_periods(df, fill_holes=False):
         for c in df.columns:
             df.loc[df[c].first_valid_index():df[c].last_valid_index(), c] = 1.0
     return df.notnull().diff(axis=0).any(axis=1).cumsum()
+
+
+def diff(df, periods=1, fillna=False, axis=0):
+    """
+    Difference function which works with any datatype (not just integers)
+
+    :param df: Pandas DataFrame or Series
+    :param periods: How many shifts to compute for
+    :param fillna: If True, then the NaNs from shifting are converted to 0
+    :param axis: Axis along which to operate (for DataFrame only)
+    :return: Difference along axis.
+    """
+    def __diff(s, p, n):
+        d = s.ne(s.shift(periods=p).bfill()).astype(float)
+        if not n:
+            d.iloc[:p] = np.NaN
+        return d
+
+    if isinstance(df, pd.Series):
+         return __diff(df, periods, fillna)
+    else:
+        return df.apply(axis=axis, func=__diff, p=periods, n=fillna)
