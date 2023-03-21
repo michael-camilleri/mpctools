@@ -581,6 +581,32 @@ class delta:
         return 0 if self.pdf(x) == 1 else np.NINF
 
 
+def welch_dof(*x):
+    """
+    Computes the Welch-Satterthwaite Degrees of Freedom
+
+    This computes the Welch-Satterthwaite Degrees of Freedom according to [1]
+
+    Parameters
+    -----------
+    x: collection of array-like
+      These are 1-dimensional arrays of samples
+
+    Returns
+    --------
+    Degrees of Freedom (float)
+
+    References
+    ----------
+    .. [1] https://en.wikipedia.org/wiki/Welch%27s_t-test
+    """
+    s = np.asarray([np.var(_x) for _x in x])  # Compute Variances
+    n = np.asarray([len(_x) for _x in x])     # Compute Lengths (N)
+    num = np.square(np.sum(s/n))
+    den = (np.square(s) / (np.square(n) * (n-1))).sum()
+    return num/den
+    
+    
 def ttest_mult(a, b, equal_var=False):
     """
     Calculates the Multivariate Hotelling T^2 Statistic for two independent multivariate samples
