@@ -71,6 +71,9 @@ class BitField:
             self.__it = -1
             raise StopIteration
 
+    def __eq__(self, other):
+        return self.__flag == other.__flag
+
 
 class Pool:
     """

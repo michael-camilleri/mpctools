@@ -864,9 +864,23 @@ def line(img, pt1, pt2, color, thickness=1, lineType=8, shift=0, linestyle="-"):
         dvect_full = np.divide(pt2 - pt1, line_length) * seg_len
 
         for i in range(np.ceil(line_length / seg_len).astype(int)):
-            st = pt1 + dvect_full * i
-            cv2.circle(img, (int(st[0]), int(st[1])), thickness, color, -1, cv2.LINE_AA)
+            st = pt1 + dvect_full * i; st = (int(st[0]), int(st[1]))
+            cv2.circle(img, st, thickness, color, -1, cv2.LINE_AA)
         cv2.circle(img, (int(pt2[0]), int(pt2[1])), thickness, color, -1, cv2.LINE_AA)
+
+    elif linestyle == '+':
+        pt1 = np.asarray(pt1)
+        pt2 = np.asarray(pt2)
+
+        # Some Calculations
+        seg_len = 2 * thickness
+        line_length = np.sqrt((np.square(pt2 - pt1)).sum())
+        dvect_full = np.divide(pt2 - pt1, line_length) * seg_len
+
+        for i in range(np.ceil(line_length / seg_len).astype(int)):
+            st = pt1 + dvect_full * i; st = (int(st[0]), int(st[1]))
+            cv2.drawMarker(img, st, color, cv2.MARKER_CROSS, thickness, int(thickness/4), cv2.LINE_AA)
+        cv2.drawMarker(img, (int(pt2[0]), int(pt2[1])), color, cv2.MARKER_CROSS, thickness, int(thickness/4), cv2.LINE_AA)
 
 
 def rectangle(img, pt1, pt2, color, thickness=1, lineType=8, shift=0, linestyle=None):
