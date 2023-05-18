@@ -14,4 +14,4 @@ Author: Michael P. J. Camilleri
 """
 
 __author__ = "Michael P. J. Camilleri"
-__version__ = "0.9.0"
+__version__ = "0.10.0"
