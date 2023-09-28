@@ -361,6 +361,7 @@ class AffineTransform:
         m, res, rnk, s = linalg.lstsq(
             F, e, overwrite_a=True, overwrite_b=True, lapack_driver="gelss"
         )
+        m = np.squeeze(m)
 
         # Build Result
         if dof == self.TRANSLATION:

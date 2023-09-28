@@ -198,3 +198,56 @@ def diff(df, periods=1, fillna=False, axis=0):
          return __diff(df, periods, fillna)
     else:
         return df.apply(axis=axis, func=__diff, p=periods, n=fillna)
+
+
+def parallel_apply(df, func, axis=0, n_jobs=8, split=200, raw=False):
+    """
+    Apply a Function to entries of a Dataframe in parallel
+
+    @param df: Dataframe to act on
+    @param func: Function to execute. This will be applied per row/column and should in general return a Series, however
+                 see also extend below.
+    @param axis: Axis along which to apply: 0 to apply along the row (i.e. per column) and 1 vice-versa. if None, then
+                 it is assumed that df is a groupby object that can be acted upon immediately. Note that for proper
+                 grouping, the result of the application function should itself be a Dataframe (if a Series, convert to
+                 Dataframe and Transpose)
+    @param n_jobs: Number of jobs to run in parallel
+    @param split:  The number of splits to do (when not grouped)
+    @param raw: If True, then it is expected that the application of the function will return something other than a
+                   dataframe, and can be handled by the user at the end. Only valid when not grouped
+    @return: New Dataframe with applied
+    """
+    # Internal Functions
+    @cl.contextmanager
+    def progress(pbar):
+        """Context manager to patch joblib to report into tqdm progress bar given as argument"""
+        def tqdm_print_progress(self):
+            pbar.update(value=self.n_completed_tasks)
+
+        pbar.reset()
+        original_print_progress = jl.parallel.Parallel.print_progress
+        jl.parallel.Parallel.print_progress = tqdm_print_progress
+        try:
+            yield pbar
+        finally:
+            jl.parallel.Parallel.print_progress = original_print_progress
+
+    def __parallel_apply(grp, _f, ax=0, _raw=False):
+        if _raw:
+            result = []
+            for _, rc in (grp.items() if ax == 0 else grp.iterrows()):
+                result.append(_f(rc))
+            return result
+        else:
+            return grp.apply(_f, axis=ax)
+
+    # Run in parallel
+    if axis is not None:
+        df = np.array_split(df, split)
+        with progress(ProgressBar(len(df), prec=2)) as pbar:
+            res = jl.Parallel(n_jobs=n_jobs, prefer='processes')(jl.delayed(__parallel_apply)(grp, func, axis, raw) for grp in df)
+        return [r for rr in res for r in rr] if raw else pd.concat(res, axis=(1 - axis))
+    else:
+        with progress(ProgressBar(len(df), prec=2)) as pbar:
+            res = jl.Parallel(n_jobs=n_jobs, prefer='processes')(jl.delayed(func)(grp) for _, grp in df)
+        return pd.concat(res)
