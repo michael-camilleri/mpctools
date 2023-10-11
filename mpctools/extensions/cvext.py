@@ -945,6 +945,7 @@ def point(img, center, color, size=1, style="."):
     :param style: Allowed styles so far are:
         * '.' Filled circle
         * 'o' Empty circle
+        * 'x' X-shape
     :return: None
     """
     if style == ".":

@@ -12,11 +12,14 @@ see http://www.gnu.org/licenses/.
 
 Author: Michael P. J. Camilleri
 """
-import pandas as pd
 
 from mpctools.extensions.utils import dict_width
+from mpctools.parallel.progress_bar import ProgressBar
+
+import contextlib as cl
+import joblib as jl
 import numpy as np
-import pandas
+import pandas as pd
 
 
 def DataFrame(data):
@@ -27,9 +30,9 @@ def DataFrame(data):
     :return:
     """
     try:
-        return pandas.DataFrame(data)
+        return pd.DataFrame(data)
     except ValueError:
-        return pandas.DataFrame(data, index=[0,])
+        return pd.DataFrame(data, index=[0,])
 
 
 def build_dataframe(_d, _idx_names, _idx_values):
@@ -44,7 +47,7 @@ def build_dataframe(_d, _idx_names, _idx_values):
     # Find the length of each array in the dictionary and get maximum
     if type(_d) is dict:
         _w = dict_width(_d)
-        _df = pandas.DataFrame(_d, index=np.arange(_w))
+        _df = pd.DataFrame(_d, index=np.arange(_w))
     else:
         _df = _d.reset_index(drop=True)
 

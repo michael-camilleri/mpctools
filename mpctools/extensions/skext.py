@@ -1125,50 +1125,50 @@ def hierarchical_log_loss(y_true, y_prob, mapping, eps=1e-15):
     return -np.sum(np.log(np.clip(_ll, eps, 1))) / _l
 
 
-def multi_way_split(y, sizes, splitter, random_state=None):
-    """
-    Convenience Function for wrapping a multi-way split. This only returns the indices of the split.
-    This is actually implemented as a recursive function.
-
-    :param y:  The target labels. If using a stratified splitter, then this must be the true
-               targets: otherwise, it is enough to be an empty array of the same length as the data.
-    :param sizes:  The relative sizes of the K sets. Note that these should sum to 1 (this will
-                   be enforced by dividing by the sum).
-    :param splitter:  The splitting object: this allows stratified/unstratified type splits
-                      (basically one of ShuffleSplit or StratifiedShuffleSplit). Note that you
-                      should NOT initialise the object: this is just passing a reference to the
-                      class (and not an object).
-    :param random_state:  Any random state to employ
-    :return:  K-tuple of indices, one each for the K sets.
-    """
-    # --- In either case, ensure that the sizes sum to 1! --- #
-    sizes = npext.sum_to_one(sizes)
-    # --- Base Case: We know how to do this --- #
-    if len(sizes) == 2:
-        return next(
-            splitter(
-                n_splits=1, train_size=sizes[0], test_size=sizes[1], random_state=random_state,
-            ).split(y, y)
-        )
-    # --- Other Cases --- #
-    #   This is a bit trickier. We have to first split assuming that all but the first set are
-    #   grouped together. We then pass the second set of targets recursively to our function,
-    #   with the remaining sizes. However, when the indices are returned, they must be remapped
-    #   to the original index set, since they are indices into that set. Also, to ensure
-    #   randomness, the seed is increased by one each time.
-    sub_sizes = sizes[1:]
-    left, right = next(
-        splitter(
-            n_splits=1, train_size=sizes[0], test_size=np.sum(sub_sizes), random_state=random_state,
-        ).split(y, y)
-    )
-    right_split = multi_way_split(
-        y[right], sub_sizes, splitter, random_state + 1 if random_state is not None else None,
-    )
-    idcs = [left]
-    for i in right_split:
-        idcs.append(right[i])
-    return idcs
+# def multi_way_split(y, sizes, splitter, random_state=None):
+#     """
+#     Convenience Function for wrapping a multi-way split. This only returns the indices of the split.
+#     This is actually implemented as a recursive function.
+#
+#     :param y:  The target labels. If using a stratified splitter, then this must be the true
+#                targets: otherwise, it is enough to be an empty array of the same length as the data.
+#     :param sizes:  The relative sizes of the K sets. Note that these should sum to 1 (this will
+#                    be enforced by dividing by the sum).
+#     :param splitter:  The splitting object: this allows stratified/unstratified type splits
+#                       (basically one of ShuffleSplit or StratifiedShuffleSplit). Note that you
+#                       should NOT initialise the object: this is just passing a reference to the
+#                       class (and not an object).
+#     :param random_state:  Any random state to employ
+#     :return:  K-tuple of indices, one each for the K sets.
+#     """
+#     # --- In either case, ensure that the sizes sum to 1! --- #
+#     sizes = npext.sum_to_one(sizes)
+#     # --- Base Case: We know how to do this --- #
+#     if len(sizes) == 2:
+#         return next(
+#             splitter(
+#                 n_splits=1, train_size=sizes[0], test_size=sizes[1], random_state=random_state,
+#             ).split(y, y)
+#         )
+#     # --- Other Cases --- #
+#     #   This is a bit trickier. We have to first split assuming that all but the first set are
+#     #   grouped together. We then pass the second set of targets recursively to our function,
+#     #   with the remaining sizes. However, when the indices are returned, they must be remapped
+#     #   to the original index set, since they are indices into that set. Also, to ensure
+#     #   randomness, the seed is increased by one each time.
+#     sub_sizes = sizes[1:]
+#     left, right = next(
+#         splitter(
+#             n_splits=1, train_size=sizes[0], test_size=np.sum(sub_sizes), random_state=random_state,
+#         ).split(y, y)
+#     )
+#     right_split = multi_way_split(
+#         y[right], sub_sizes, splitter, random_state + 1 if random_state is not None else None,
+#     )
+#     idcs = [left]
+#     for i in right_split:
+#         idcs.append(right[i])
+#     return idcs
 
 
 def net_benefit_curve(y_true, y_score, pos_label=1, epsilon=1e-3):
