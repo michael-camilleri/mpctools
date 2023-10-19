@@ -15,11 +15,13 @@ Author: Michael P. J. Camilleri
 
 from datetime import timedelta, datetime
 from itertools import tee, islice
-import numpy as np
+
 import contextlib
-import shutil
 import copy
+import json
+import numpy as np
 import os
+import shutil
 
 
 ################################################
@@ -51,6 +53,9 @@ class BitField:
 
     def any(self):
         return "1" in self.__flag
+
+    def count(self):
+        return sum((i == '1' for i in self.__flag))
 
     def __contains__(self, item):
         return self.ison(item)
@@ -507,3 +512,14 @@ def remove(_path):
     """
     with contextlib.suppress(FileNotFoundError):
         os.remove(_path)
+
+
+def load_json(_path):
+    """
+    Loads a json file directly (wrapper around file object etc)
+
+    :param _path: Path to JSON-formatted file
+    :return: JSON-parsed object
+    """
+    with open(_path, 'r') as fin:
+        return json.load(fin)

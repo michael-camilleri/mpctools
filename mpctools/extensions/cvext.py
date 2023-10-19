@@ -245,6 +245,9 @@ class AffineTransform:
         _t = [f'{t:.0f}' for t in self.translation]
         return f'AFFINE {{R({self.rotation:.2f}) M({self.shear:.2f}) S{_s} T{_t}}}'
 
+    def __eq__(self, other):
+        return np.allclose(self._forward, other._forward)
+
     def estimate(self, pts=None, lns=None, weight=0.5, dof=AFFINE):
         """
         Estimates the transform from point and/or line correspondences
