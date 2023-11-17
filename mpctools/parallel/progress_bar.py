@@ -15,8 +15,11 @@ see http://www.gnu.org/licenses/.
 Author: Michael P. J. Camilleri
 """
 from mpctools.extensions import utils
-import time as tm
+
+import contextlib as cl
+import joblib as jl
 import sys
+import time as tm
 
 
 class ProgressBar:
@@ -131,3 +134,18 @@ class ProgressBar:
             self.__sink.flush()
 
         return self
+
+
+@cl.contextmanager
+def parallel_progress(pbar):
+    """Context manager to patch joblib to report into tqdm progress bar given as argument"""
+    def tqdm_print_progress(self):
+        pbar.update(value=self.n_completed_tasks)
+
+    pbar.reset()
+    original_print_progress = jl.parallel.Parallel.print_progress
+    jl.parallel.Parallel.print_progress = tqdm_print_progress
+    try:
+        yield pbar
+    finally:
+        jl.parallel.Parallel.print_progress = original_print_progress

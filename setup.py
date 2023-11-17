@@ -19,6 +19,7 @@ setup(
         "scikit-learn",
         "matplotlib",
         "deprecated",
+        "joblib",
         "lapsolver",
         "hotelling",
         "seaborn",
