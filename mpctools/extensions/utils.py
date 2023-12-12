@@ -133,6 +133,27 @@ class Pool:
         return reverse_dict
 
 
+class Uniquefy:
+    """
+    Defines an easy way of mapping elements to unique numbers on the fly.
+    """
+    def __init__(self):
+        """
+        Initialises the mapper
+        """
+        self.__map = {}
+
+    def __getitem__(self, item):
+        """
+        Returns an existing or new index for the item.
+        :param item: Object to map
+        :return: Index
+        """
+        if item not in self.__map:
+            self.__map[item] = len(self.__map)
+        return self.__map[item]
+
+
 def window(iterable, size):
     """
     Return a sliding window iterator over elements.

@@ -1006,6 +1006,7 @@ class VideoParser:
         self.signal_started = False  # Signal from thread to main to indicate started
         self.StartAt = 0  # Where to Start
         self.Stride = 1  # Whether to stride...
+        self.OK = False
 
         # Now some other State-Control
         self.properties = {
@@ -1068,9 +1069,11 @@ class VideoParser:
         # Wait until started
         while not self.signal_started:
             tm.sleep(0.001)  # Sleep and release GIL so other thread can execute
+        if not self.OK:
+            self.thread = None
 
         # Indicate success
-        return True
+        return self.OK
 
     def read(self):
         """
@@ -1158,16 +1161,26 @@ class VideoParser:
 
         :return: None
         """
+        self.OK = True  # OK so far
+
         # Start stream
         stream = cv2.VideoCapture(self.path)
+        if (stream is None) or (not stream.isOpened()):
+            self.OK = False
+            self.signal_started = True
+            return
 
         # If seeking
         if self.StartAt > 0:
             stream.set(cv2.CAP_PROP_POS_FRAMES, self.StartAt)
-            assert stream.get(cv2.CAP_PROP_POS_FRAMES) == self.StartAt, f"Unable to set Start for {self.path}"
+            if stream.get(cv2.CAP_PROP_POS_FRAMES) != self.StartAt:
+                warnings.warn(f'Unable to Start at Frame {self.StartAt}.')
+                self.OK = False
+                self.signal_started = True
+                return
 
         # Store/Initialise CV2s properties
-        for prop in filter(lambda p: p >=0, self.properties.keys()):
+        for prop in filter(lambda p: p >= 0, self.properties.keys()):
             self.properties[prop] = stream.get(prop)
 
         # Now indicate started
