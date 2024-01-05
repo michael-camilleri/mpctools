@@ -214,7 +214,7 @@ def parallel_apply(df, func, axis=0, n_jobs=8, split=200, raw=False):
                  grouping, the result of the application function should itself be a Dataframe (if a Series, convert to
                  Dataframe and Transpose)
     @param n_jobs: Number of jobs to run in parallel
-    @param split:  The number of splits to do (when not grouped)
+    @param split: The number of splits to do (when not grouped)
     @param raw: If True, then it is expected that the application of the function will return something other than a
                    dataframe, and can be handled by the user at the end. Only valid when not grouped
     @return: New Dataframe with applied

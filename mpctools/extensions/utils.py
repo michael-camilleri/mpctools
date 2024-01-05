@@ -153,6 +153,10 @@ class Uniquefy:
             self.__map[item] = len(self.__map)
         return self.__map[item]
 
+    @property
+    def identities(self):
+        return copy.deepcopy(self.__map)
+
 
 def window(iterable, size):
     """
