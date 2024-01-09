@@ -668,8 +668,13 @@ class BoundingBox:
             return False
         return True
 
+    @property
     def area(self):
         return np.prod(self.size)
+
+    @property
+    def aspect(self):
+        return self.size[0]/self.size[1]
 
     @property
     def corners(self):
@@ -727,7 +732,7 @@ class BoundingBox:
             return 0
 
         # Compute the union
-        union = self.area() + other.area() - intersection
+        union = self.area + other.area - intersection
 
         # Return Intersection over Union
         return intersection / union
