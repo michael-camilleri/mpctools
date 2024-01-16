@@ -674,7 +674,7 @@ class BoundingBox:
 
     @property
     def aspect(self):
-        return self.size[0]/self.size[1]
+        return (self.size[0]/self.size[1]) if (self.size > 0).all() else np.NaN
 
     @property
     def corners(self):
