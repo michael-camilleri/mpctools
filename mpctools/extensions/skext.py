@@ -12,6 +12,7 @@ see http://www.gnu.org/licenses/.
 
 Author: Michael P. J. Camilleri
 """
+from sklearn import base as skbase
 from scipy.cluster.hierarchy import linkage, dendrogram, fcluster
 try:
     from sklearn.calibration import CalibrationDisplay
@@ -35,9 +36,9 @@ import copy
 
 class ThresholdedClassifier:
     """
-    Simple wrapper which applies a threshold to a classifier.
+    Simple wrapper which applies a threshold to a classifier (or a regressor)
 
-    Currently, only works for Binary Classifiers
+    Currently, only works for Binary Classifiers and Regressors
     """
     def __init__(self, clf, threshold=0.5):
         self.__clf = clf
@@ -53,13 +54,20 @@ class ThresholdedClassifier:
         """
         Returns positive class if probability is above threshold, else negative class.
         """
-        return (self.__clf.predict_proba(X)[:, 1] > self.__thr).astype(int)
+        return (self.predict_proba(X)[:, 1] > self.__thr).astype(int)
 
     def predict_proba(self, X):
         """
-        Calls the underlying predict_proba() method for the classifier.
+        Calls the underlying predict_proba() method for the classifier or predict() if a regressor. In the latter case,
+        values are clipped to [0, 1]
         """
-        return self.__clf.predict_proba(X)
+        if skbase.is_classifier(self.__clf):
+            return self.__clf.predict_proba(X)
+        else:
+            y = np.empty([len(X), 2])
+            y[:, 1] = np.clip(self.__clf.predict(X).squeeze(), 0, 1)
+            y[:, 0] = 1 - y[:, 1]
+            return y
 
     @property
     def threshold(self):

@@ -175,6 +175,10 @@ class AffineTransform:
     TRANSLATION = 2
 
     @staticmethod
+    def identity():
+        return AffineTransform()
+
+    @staticmethod
     def characterise(matrix):
         """
         Characterises the Transform, according to Stephan's Answer in:
@@ -258,7 +262,7 @@ class AffineTransform:
         (end-)points (each euclidean or homogeneous), and hence is an Nx2x(2/3) matrix.
 
         :param pts: Source/Destination Points. 2-Tuple of array-like or None
-        :param lns: Destination Points/Lines. 2-Tuple of Arraylike
+        :param lns: Source/Destination Lines. 2-Tuple of Arraylike or None
         :param weight: Weight for Point (as opposed to line) correspondences.
         :param dof: Degrees of Freedom (in decreasing flexibility)
                     AFFINE: Full affine [Default]

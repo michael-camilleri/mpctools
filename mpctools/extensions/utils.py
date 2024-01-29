@@ -173,6 +173,16 @@ def window(iterable, size):
     return zip(*shiftedStarts)
 
 
+def is_collection(value):
+    """
+    Static (Module) Method that checks if the object is a collection (list, tuple, set or ndarray),
+
+    :param value: object to check for.
+    :return: True if a collection, false otherwise
+    """
+    return type(value) in (tuple, list, set, np.ndarray)
+
+
 def to_tuple(value):
     """
     Static (Module) Method for converting a scalar into a tuple if not already (tuple/list/numpy
@@ -181,7 +191,7 @@ def to_tuple(value):
     :param value: The Value to convert
     :return: A Tuple containing value if a scalar, or value if already a list/tuple/numpy array/none
     """
-    return value if (type(value) in (tuple, list, np.ndarray) or value is None) else (value,)
+    return value if (is_collection(value) or value is None) else (value,)
 
 
 def to_list(value):
@@ -193,7 +203,7 @@ def to_list(value):
     :return: A List containing value if a scalar, or value if already a list/tuple/numpy array/none
     """
     return (
-        value if (type(value) in (tuple, list, np.ndarray) or value is None) else [value,]
+        value if (is_collection(value) or value is None) else [value,]
     )
 
 
@@ -288,7 +298,7 @@ def pad(a, length, value):
     :param a:       The original List. Must be a list and NOT a numpy array!
     :param length:  The desired length
     :param value:   The Value to fill with
-    :return:        Padded List. A copy is always returned!
+    :return:        Padded List. A (shallow) copy is always returned!
     """
     if length > len(a):
         return a + [value] * (length - len(a))
