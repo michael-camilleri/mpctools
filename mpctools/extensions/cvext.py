@@ -14,19 +14,19 @@ see http://www.gnu.org/licenses/.
 
 Author: Michael P. J. Camilleri
 """
-import glob
-
 from numba import jit, uint8, uint16, double
 from queue import Queue, Empty, Full
 from scipy import optimize as optim
-from threading import Thread
 from scipy import linalg
+from threading import Thread
+
+import cv2
+import glob
+import math
 import numpy as np
+import os
 import time as tm
 import warnings
-import math
-import cv2
-import os
 
 
 # Define Some Constants
@@ -257,9 +257,9 @@ class AffineTransform:
         Estimates the transform from point and/or line correspondences
 
         The method can estimate the affine transformation from either point or line
-        correspondences (or both). Points themselves may be specified in either euclidean or
+        correspondences (or both). Points themselves may be specified in either Euclidean or
         homogeneous co-ordinates, yielding an Nx(2/3) matrix. Lines are specified in terms of two
-        (end-)points (each euclidean or homogeneous), and hence is an Nx2x(2/3) matrix.
+        (end-)points (each in either Euclidean or Homogeneous co-ordinates), and hence is an Nx2x(2/3) matrix.
 
         :param pts: Source/Destination Points. 2-Tuple of array-like or None
         :param lns: Source/Destination Lines. 2-Tuple of Arraylike or None
@@ -965,8 +965,8 @@ def point(img, center, color, size=1, style="."):
     elif style == "o":
         cv2.circle(img, (int(center[0]), int(center[1])), size, color, int(math.ceil(size / 5)))
     elif style == 'x':
-        ctr = (int(center[0] - 5*size), int(center[1] + 4*size))
-        cv2.putText(img, 'x', ctr, cv2.FONT_HERSHEY_PLAIN, size, color, size*2)
+        ctr = (int(center[0] - 5*size/4), int(center[1] + size))
+        cv2.putText(img, 'x', ctr, cv2.FONT_HERSHEY_PLAIN, size/4, color, int(math.ceil(size / 4)))
 
 
 class TimeFrame:
@@ -1000,8 +1000,6 @@ class TimeFrame:
 class VideoParser:
     """
     The Video Parser (Wrapper) Object
-
-    **Note: May be deprecated soon in favour of decord**
     """
 
     def __init__(self, path, qsize=16):
@@ -1058,11 +1056,12 @@ class VideoParser:
         :param stride:  How much to stride: default is to just add 1 (this is in terms of frames).
                         Note that when striding, the last frame is ALWAYS read even if it is not
                         a multiple of the stride.
-        :return:        True if successful, false otherwise
+        :return:        self, for chaining
         """
         # Check that not already processing
         if self.thread is not None:
-            return False
+            warnings.warn('Parser is already open: cannot restart!')
+            return self
 
         # Open Stream, but first update signals
         self.signal_stop = False
@@ -1079,10 +1078,11 @@ class VideoParser:
         while not self.signal_started:
             tm.sleep(0.001)  # Sleep and release GIL so other thread can execute
         if not self.OK:
+            warnings.warn('Something went wrong: could not start Parser.')
             self.thread = None
 
         # Indicate success
-        return self.OK
+        return self
 
     def read(self):
         """
@@ -1136,6 +1136,17 @@ class VideoParser:
                 self.thread.join()
                 self.thread = None
                 return False, None
+
+    def iterate(self):
+        """
+        Implements an Iterator Interface
+
+        :return: Frame (through yields)
+        """
+        ret, frm = self.read()
+        while ret:
+            yield frm
+            ret, frm = self.read()
 
     def stop(self):
         """

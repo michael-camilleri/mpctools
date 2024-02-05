@@ -96,19 +96,17 @@ class ProgressBar:
             if self.__verb:
                 _elapsed = tm.time() - self.__strt
                 _rate = self.__count / _elapsed if _elapsed > 0 else -1
-                _rem = (
-                    utils.show_time(int((self.__total - self.__count) / _rate))
-                    if _rate > 0
-                    else "--:--"
-                )
+                _rem = utils.show_time(int((self.__total - self.__count) / _rate)) if _rate > 0 else "--:--"
+                _unit = 'it/s' if (_rate > 0.5) or (_rate == 0) else 's/it'
                 self.__sink.write(
-                    "\r{0} |{1}{2}| {3:.{4}f}% {5:.{4}f} it/s ({6}) {7}       ".format(
+                    "\r{0} |{1}{2}| {3:.{4}f}% {5:.{4}f} {6} ({7}) {8}       ".format(
                         self.__prefix,
                         "\u2588" * int(_progress),
                         "-" * (self.__width - int(_progress)),
                         _progress,
                         self.__prec,
-                        _rate,
+                        _rate if (_rate > 0.5) or (_rate == 0) else 1/_rate,
+                        _unit,
                         _rem,
                         suffix,
                     )
