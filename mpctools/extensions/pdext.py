@@ -206,6 +206,10 @@ def parallel_apply(df, func, axis=0, n_jobs=8, split=200, raw=False):
     """
     Apply a Function to entries of a Dataframe in parallel
 
+    Note that this works in two modes:
+     * if axis is 0/1, then this applies the function per row/column respectively: i.e. func must accept a Series
+     * if axis is None, then this applies the function per group: i.e. func must accept a DataFrame
+
     @param df: In general a DataFrame, but if axis is None, can be a groupby object.
     @param func: Function to execute. This will be applied per row/column and should in general return a Series, however
                  see also raw below.
@@ -231,9 +235,9 @@ def parallel_apply(df, func, axis=0, n_jobs=8, split=200, raw=False):
 
     # Run in parallel
     if axis is not None:
-        df = np.array_split(df, split)
+        df = np.array_split(df, min(split, len(df)))
         with parallel_progress(ProgressBar(len(df), prec=2)) as pbar:
             res = jl.Parallel(n_jobs=n_jobs, prefer='processes')(jl.delayed(__parallel_apply)(grp, func, axis, raw) for grp in df)
         return [r for rr in res for r in rr] if raw else pd.concat(res, axis=(1 - axis))
     else:
-        return pd.concat(parallelise(func, [grp for _, grp in df]))
+        return pd.concat(parallelise(func, [grp for _, grp in df]), keys=[ix for ix, _ in df])
