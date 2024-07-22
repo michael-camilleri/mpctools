@@ -28,7 +28,7 @@ class ProgressBar:
         https://gist.github.com/aubricus/f91fb55dc6ba5557fbab06119420dd6a
     """
 
-    def __init__(self, total, width=100, sink=sys.stdout, prec=1, verbose=True):
+    def __init__(self, total, width=100, sink=sys.stdout, prec=1, verbose=True, title=None):
         """
         Initialiser
 
@@ -47,13 +47,13 @@ class ProgressBar:
 
         # State Control
         self.__count = int(0)
-        self.__prefix = None
+        self.__prefix = title
 
     @property
     def Sink(self):
         return self.__sink
 
-    def reset(self, prefix="", suffix=""):
+    def reset(self, prefix=None, suffix=""):
         """
         Convenience Function for starting the Progress bar:
 
