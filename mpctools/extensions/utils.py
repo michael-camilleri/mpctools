@@ -22,6 +22,7 @@ import json
 import numpy as np
 import os
 import shutil
+import time as tm
 
 
 ################################################
@@ -499,14 +500,27 @@ def short_int(_int):
     :param _int: Integer (or float) value
     :return:     String representation
     """
-    if _int < 1000:
+    if _int < 100:
         return str(_int)
-    elif _int < 1000000:
-        return "{0:.4g}K".format(_int / 1000)
-    elif _int < 1000000000:
-        return "{0:.4g}M".format(_int / 1000000)
+    elif _int < 100000:
+        return "{0:.2g}K".format(_int / 1000)
+    elif _int < 100000000:
+        return "{0:.2g}M".format(_int / 1000000)
     else:
-        return "{0:.4g}G".format(_int / 1000000000)
+        return "{0:.2g}G".format(_int / 1000000000)
+
+def progress_print(txt):
+    """
+    Wrapper around print to avoid newline and also returns current time
+    :param txt: Text to write
+    :return: Current time in seconds
+    """
+    print(txt, end='', flush=True)
+    return tm.time()
+
+
+def complete_print(s):
+    print(f'Done! [{show_time(tm.time()-s)}]')
 
 
 ################################################
