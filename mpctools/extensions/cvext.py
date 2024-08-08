@@ -20,7 +20,10 @@ from scipy import optimize as optim
 from scipy import linalg
 from threading import Thread
 
-import cv2
+try:
+    import cv2
+except ImportError as ie:
+    print('OpenCV is not found: some features are not available. To enable, install mpctools[cv].')
 import glob
 import math
 import numpy as np

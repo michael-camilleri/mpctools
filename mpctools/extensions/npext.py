@@ -17,7 +17,6 @@ from scipy.spatial.distance import pdist
 from hotelling import stats as hstats
 from scipy.stats import entropy, f
 from lapsolver import solve_dense
-# from deprecated import deprecated
 from scipy.special import gamma
 from functools import reduce
 import pandas as pd

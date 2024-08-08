@@ -12,8 +12,6 @@ see http://www.gnu.org/licenses/.
 
 Author: Michael P. J. Camilleri
 """
-
-from mpctools.parallel.worker_handler import WorkerHandler, IWorker
 from mpctools.parallel.progress_bar import ProgressBar, parallel_progress
 from mpctools.parallel.paralleliser import parallelise
 

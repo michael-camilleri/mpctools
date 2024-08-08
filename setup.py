@@ -15,10 +15,8 @@ setup(
     packages=["mpctools", "mpctools.extensions", "mpctools.parallel"],
     # Requirements
     install_requires=[
-        "opencv-python",
         "scikit-learn",
         "matplotlib",
-        "deprecated",
         "joblib",
         "lapsolver",
         "hotelling",
@@ -26,10 +24,14 @@ setup(
         "pandas",
         "pathos",
         "scipy",
-        "torch",
         "numpy",
         "numba",
     ],
+    extras_require = {
+        'torch': ["torch"],
+        'cv':["opencv-python"],
+        'all': ["torch", "opencv-python"]
+    },
     # Meta-Data
     author="Michael P. J. Camilleri",
     author_email="michael.p.camilleri@ed.ac.uk",

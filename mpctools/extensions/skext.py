@@ -26,7 +26,10 @@ from numba import njit, float64, types
 from scipy import stats as scstats
 from scipy.special import softmax
 from sklearn.svm import SVC
-import torch.nn as tnn
+try:
+    import torch.nn as tnn
+except ImportError as ie:
+    print('Torch not available: Some features will not be available. Install mpctools[torch] to enable.')
 import numpy as np
 import warnings
 import joblib
