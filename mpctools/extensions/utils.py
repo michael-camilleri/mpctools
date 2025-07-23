@@ -18,6 +18,7 @@ from itertools import tee, islice
 
 import contextlib
 import copy
+import hashlib
 import json
 import numpy as np
 import os
@@ -444,6 +445,16 @@ def show_time(_time, minimal=True, ms=False):
                 if ms
                 else _time_str.strftime("%jD+%H:%M:%S")
             )
+            
+
+def hash_string(string: str):
+    """
+    Converts a string to an integer hash in deterministic fashion
+    
+    :param string: String to hash
+    :return: Integer hash
+    """
+    return int(hashlib.md5(string.encode("utf-8"), usedforsecurity=False).hexdigest(), 16) % 4294967295
 
 
 def int_list(_list, _sort=True):

@@ -517,7 +517,9 @@ class AffineTransform:
 
 def pairwise_iou(a, b, cutoff=0, distance=False):
     """
-    Computes the Pair-wise IoU (or distance) between two lists of BBs
+    Computes the Pair-wise IoU (or distance) between two lists of BBs.
+
+    This can now handle None-type BBounding Boxes in any of the lists (output is inadmissable)
 
     :param a: First List
     :param b: Second List
@@ -529,9 +531,16 @@ def pairwise_iou(a, b, cutoff=0, distance=False):
     dists = np.empty([len(a), len(b)], dtype=float)
     inadm = np.PINF if distance else np.NINF
     for a_i, a_bb in enumerate(a):
-        for b_i, b_bb in enumerate(b):
-            iou = a_bb.iou(b_bb)
-            dists[a_i, b_i] = inadm if (iou < cutoff) else (1 - iou if distance else iou)
+        if a_bb is None:
+            for b_i, b_bb in enumerate(b):
+                dists[a_i, b_i] = inadm
+        else:
+            for b_i, b_bb in enumerate(b):
+                if b_bb is None:
+                    dists[a_i, b_i] = inadm
+                else:
+                    iou = a_bb.iou(b_bb)
+                    dists[a_i, b_i] = inadm if (iou < cutoff) else (1 - iou if distance else iou)
     return dists
 
 
