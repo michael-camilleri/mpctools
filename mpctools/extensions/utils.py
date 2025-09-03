@@ -457,7 +457,7 @@ def hash_string(string: str):
     return int(hashlib.md5(string.encode("utf-8"), usedforsecurity=False).hexdigest(), 16) % 4294967295
 
 
-def int_list(_list, _sort=True):
+def show_int_list(_list, _sort=True):
     """
     Formats a list of unique integers, summarising ranges
     :param _list: List to display
@@ -583,3 +583,21 @@ def load_json(_path):
     """
     with open(_path, 'r') as fin:
         return json.load(fin)
+
+
+################################################
+#                      Other                   #
+################################################
+
+def try2int(o):
+    """
+    Attempts to convert an object to integer and if unsuccessful, returns as is
+
+    :param o: Object (usually string) to convert to integer
+    :return: Integer representation of o if possible, or o otherwise.
+    """
+    try:
+        r = int(o)
+    except ValueError as ve:
+        r = copy.copy(o)
+    return r

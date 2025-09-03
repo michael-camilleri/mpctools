@@ -240,4 +240,4 @@ def parallel_apply(df, func, axis=0, n_jobs=8, split=200, raw=False, title=None)
             res = jl.Parallel(n_jobs=n_jobs, prefer='processes')(jl.delayed(__parallel_apply)(grp, func, axis, raw) for grp in df)
         return [r for rr in res for r in rr] if raw else pd.concat(res, axis=(1 - axis))
     else:
-        return pd.concat(parallelise(func, [grp for _, grp in df], title=title), keys=[ix for ix, _ in df])
+        return pd.concat(parallelise(func, [grp for _, grp in df], n_jobs=n_jobs, title=title), keys=[ix for ix, _ in df])
