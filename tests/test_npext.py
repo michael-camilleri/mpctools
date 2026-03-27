@@ -83,13 +83,13 @@ class TestInvertSoftmax(unittest.TestCase):
 
 class TestRunLengths(unittest.TestCase):
     def test_standard(self):
-        a = np.array([0, 0, 0, 1, 1, np.NaN, 1, 1, 1, 1, 1, -1, 1, 1, 1, 1, 2, 3, 0.56, 0.56, 0.56])
+        a = np.array([0, 0, 0, 1, 1, np.nan, 1, 1, 1, 1, 1, -1, 1, 1, 1, 1, 2, 3, 0.56, 0.56, 0.56])
         self.assertTrue(np.array_equal(npext.run_lengths(a, how="i"), [3, 2, 5, 1, 4, 1, 1, 3]))
         self.assertTrue((npext.run_lengths(a, how="a") == [3, 2, 1, 5, 1, 4, 1, 1, 3]).all())
 
     def test_NaN_handling(self):
         # Test 1
-        a = np.array([0, 5, np.NaN, 1.0, np.NaN, np.NaN, 4.3, -5, -np.Inf, np.NaN, 5.2])
+        a = np.array([0, 5, np.nan, 1.0, np.nan, np.nan, 4.3, -5, -np.inf, np.nan, 5.2])
         self.assertTrue((npext.run_lengths(a, how="o") == [1, 2, 1]).all())
         self.assertTrue((npext.run_lengths(a, how="a") == [1, 1, 1, 1, 2, 1, 1, 1, 1, 1]).all())
         self.assertTrue((npext.run_lengths(a, how="i") == [1, 1, 1, 1, 1, 1, 1]).all())
@@ -99,9 +99,9 @@ class TestRunLengths(unittest.TestCase):
 
     def test_NaN_handles_edges(self):
         # Define Array
-        a = np.array([0, 5, np.NaN, 1.0, np.NaN, np.NaN, 4.3, -5, -np.Inf, np.NaN, 5.2, np.NaN])
+        a = np.array([0, 5, np.nan, 1.0, np.nan, np.nan, 4.3, -5, -np.inf, np.nan, 5.2, np.nan])
         b = np.array(
-            [np.NaN, np.NaN, 0, 5, np.NaN, 1.0, np.NaN, np.NaN, 4.3, -5, -np.Inf, np.NaN, 5.2]
+            [np.nan, np.nan, 0, 5, np.nan, 1.0, np.nan, np.nan, 4.3, -5, -np.inf, np.nan, 5.2]
         )
         # Test
         c = npext.run_lengths(a, how="o")
@@ -110,14 +110,14 @@ class TestRunLengths(unittest.TestCase):
 
     def test_handle_reshaping(self):
         # Define array
-        a = np.array([np.NaN, np.NaN, 1, 1, np.NaN, 2, np.NaN, np.NaN, 3, 3, 3, -np.Inf]).reshape(
+        a = np.array([np.nan, np.nan, 1, 1, np.nan, 2, np.nan, np.nan, 3, 3, 3, -np.inf]).reshape(
             [4, 3]
         )
         self.assertTrue((npext.run_lengths(a, how="o") == [2, 1, 2]).all())
         self.assertTrue((npext.run_lengths(a, how="a") == [2, 2, 1, 1, 2, 3, 1]).all())
 
     def test_position_return(self):
-        a = np.array([0, 0, 0, 1, 1, np.NaN, 1, 1, 1, 1, 1, -1, 1, 1, 1, 1, 2, 3, 0.56, 0.56, 0.56])
+        a = np.array([0, 0, 0, 1, 1, np.nan, 1, 1, 1, 1, 1, -1, 1, 1, 1, 1, 2, 3, 0.56, 0.56, 0.56])
         self.assertTrue(
             (
                 npext.run_lengths(a, how="a", return_positions=True)[1]
@@ -133,11 +133,11 @@ class TestRunLengths(unittest.TestCase):
         self.assertTrue((npext.run_lengths(a, how="o", return_positions=True)[1] == [5]).all())
 
     def test_value_return(self):
-        a = np.array([0, 0, 0, 1, 1, np.NaN, 1, 1, 1, 1, 1, -1, 1, 1, 1, 1, 2, 3, 0.56, 0.56, 0.56])
+        a = np.array([0, 0, 0, 1, 1, np.nan, 1, 1, 1, 1, 1, -1, 1, 1, 1, 1, 2, 3, 0.56, 0.56, 0.56])
         self.assertTrue(
             npext.array_nan_equal(
                 npext.run_lengths(a, how="a", return_values=True)[1],
-                [0, 1, np.NaN, 1, -1, 1, 2, 3, 0.56],
+                [0, 1, np.nan, 1, -1, 1, 2, 3, 0.56],
             )
         )
         self.assertTrue(
@@ -146,7 +146,7 @@ class TestRunLengths(unittest.TestCase):
             )
         )
         self.assertTrue(
-            npext.array_nan_equal(npext.run_lengths(a, how="o", return_values=True)[1], [np.NaN])
+            npext.array_nan_equal(npext.run_lengths(a, how="o", return_values=True)[1], [np.nan])
         )
 
 
@@ -187,7 +187,7 @@ class TestHungarian(unittest.TestCase):
 
     def test_inadmissables(self):
         _cost = 1 - np.eye(7)
-        _cost[5, :] = np.NaN
+        _cost[5, :] = np.nan
         r, c = npext.hungarian(_cost)
         self.assertTrue(np.array_equal(r, [0, 1, 2, 3, 4, 6]))
         self.assertTrue(np.array_equal(c, [0, 1, 2, 3, 4, 6]))
@@ -199,7 +199,7 @@ class TestHungarian(unittest.TestCase):
         self.assertTrue(np.array_equal(c, ["A", "B", "C", "D", "E", "G"]))
 
         _cost = np.eye(7)
-        _cost[5, :] = np.NaN
+        _cost[5, :] = np.nan
         r, c = npext.hungarian(_cost, maximise=True)
         self.assertTrue(np.array_equal(r, [0, 1, 2, 3, 4, 6]))
         self.assertTrue(np.array_equal(c, [0, 1, 2, 3, 4, 6]))
@@ -222,13 +222,21 @@ class TestHungarian(unittest.TestCase):
     def test_degenerates(self):
         for _ in range(10):
             _sz = np.random.randint(3, 10, size=2)
-            self.assertEqual(npext.hungarian(np.full(_sz, np.NaN)), ([], []))
-            self.assertEqual(npext.hungarian(np.full(_sz, np.NaN), False), ([], []))
-            self.assertEqual(npext.hungarian(np.ones(_sz), cutoff=0.5), ([], []))
-            self.assertEqual(npext.hungarian(np.ones(_sz), True, cutoff=2), ([], []))
+            r, c = npext.hungarian(np.full(_sz, np.nan))
+            self.assertEqual(len(r), 0)
+            self.assertEqual(len(c), 0)
+            r, c = npext.hungarian(np.full(_sz, np.nan), False)
+            self.assertEqual(len(r), 0)
+            self.assertEqual(len(c), 0)
+            r, c = npext.hungarian(np.ones(_sz), cutoff=0.5)
+            self.assertEqual(len(r), 0)
+            self.assertEqual(len(c), 0)
+            r, c = npext.hungarian(np.ones(_sz), True, cutoff=2)
+            self.assertEqual(len(r), 0)
+            self.assertEqual(len(c), 0)
 
     def test_hard_cases(self):
-        _cost = np.asarray([[np.NaN, 1.0, np.NaN], [np.NaN, 2.0, np.NaN], [1.0, 3.1, 2.1]])
+        _cost = np.asarray([[np.nan, 1.0, np.nan], [np.nan, 2.0, np.nan], [1.0, 3.1, 2.1]])
         # Minimise
         r, c = npext.hungarian(_cost, False)
         self.assertTrue(np.array_equal(r, [0, 2]))

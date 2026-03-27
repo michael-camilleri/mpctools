@@ -1,0 +1,40 @@
+# Setup for PyPI
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mpctools"
+version = "0.16.0"
+description = "A set of tools and utilities for extending common libraries and providing parallel computation"
+readme = "README.md"
+authors = [{ name = "Michael P. J. Camilleri", email = "michael.p.camilleri@ed.ac.uk" }]
+license = { file = "LICENSE" }
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries",
+    "License :: OSI Approved :: GNU General Public License (GPL)",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3 :: Only",
+]
+keywords = ["tools", "utilities", "extensions", "parallel"]
+dependencies = [
+    "scikit-learn",
+    "matplotlib",
+    "joblib",
+    "hotelling",
+    "seaborn",
+    "pandas",
+    "pathos",
+    "scipy",
+    "numpy",
+    "numba",
+]
+#requires-python = ">=3.10"
+
+[project.optional-dependencies]
+torch = ["torch"]
+cv = ["opencv-python"]
+all = ["torch", "opencv-python"]

@@ -21,7 +21,6 @@ This Library has the following dependencies:
   * scikit-learn
   * matplotlib
   * deprecated
-  * lapsolver
   * hotelling
   * seaborn
   * pandas

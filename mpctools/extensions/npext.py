@@ -15,8 +15,8 @@ Author: Michael P. J. Camilleri
 
 from scipy.spatial.distance import pdist
 from hotelling import stats as hstats
+import scipy.optimize as scoptim
 from scipy.stats import entropy, f
-from lapsolver import solve_dense
 from scipy.special import gamma
 from functools import reduce
 import pandas as pd
@@ -219,7 +219,7 @@ def run_lengths(a, how="I", return_values=False, return_positions=False):
     #  position information. We also need to convert arrays of NaN to lists so that NaN works.
     #  This will slow down but cannot be helped.
     if type(a) == np.ndarray:
-        a = [i if pd.notnull(i) else np.NaN for i in a.flatten()]
+        a = [i if pd.notnull(i) else np.nan for i in a.flatten()]
     rls = np.asarray(
         [(sum(1 for _ in l), n) for n, l in itertools.groupby(a)], dtype="object",
     )  # Now, compute run-lengths and types.
@@ -347,14 +347,15 @@ def hungarian(costs: np.ndarray, maximise=False, cutoff=None, row_labels=None, c
     """
     # Prepare
     _cost = costs.astype(float)
+    _invalid = -1e10 if maximise else 1e10
+    cutoff = cutoff if cutoff is not None else _invalid
 
     # Handle Edge Cases
-    _cost[~np.isfinite(_cost)] = np.NaN
-    if cutoff is not None:
-        if maximise:
-            _cost[_cost < cutoff] = np.NaN
-        else:
-            _cost[_cost > cutoff] = np.NaN
+    _cost[~np.isfinite(_cost)] = _invalid
+    if maximise:
+        _cost[_cost <= cutoff] = _invalid
+    else:
+        _cost[_cost >= cutoff] = _invalid
 
     # Extract only valid rows/columns (i.e. where the is at least one element which is valid)
     valid = np.isfinite(_cost)
@@ -364,14 +365,15 @@ def hungarian(costs: np.ndarray, maximise=False, cutoff=None, row_labels=None, c
     _cost = _cost[val_r, :]
     _cost = _cost[:, val_c]
 
-    # Perform Hungarian (but handle Maximisation)
-    if maximise:
-        finite = np.isfinite(_cost)
-        _cost[finite] = np.max(_cost[finite]) - _cost[finite]
-    r, c = solve_dense(_cost)
+    # Perform Hungarian & remove infeasible
+    r_all, c_all = scoptim.linear_sum_assignment(_cost, maximize=maximise)
+    r = [ri for (ri, ci) in zip(r_all, c_all) if ((_cost[ri, ci] > cutoff) if maximise else (_cost[ri, ci] < cutoff))]
+    c = [ci for (ri, ci) in zip(r_all, c_all) if ((_cost[ri, ci] > cutoff) if maximise else (_cost[ri, ci] < cutoff))]
 
-    # Map to original Indices
+    # Map to original Indices (and filter invalid assignments)
     r_ids, c_ids = np.where(val_r)[0][r], np.where(val_c)[0][c]
+
+    # Optionally map to label names
     if row_labels is not None:
         r_ids = np.asarray(row_labels)[r_ids]
     if col_labels is not None:
