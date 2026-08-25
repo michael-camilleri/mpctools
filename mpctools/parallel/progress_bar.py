@@ -137,8 +137,14 @@ class ProgressBar:
 @cl.contextmanager
 def parallel_progress(pbar):
     """Context manager to patch joblib to report into tqdm progress bar given as argument"""
+    last_completed = 0
+
     def tqdm_print_progress(self):
-        pbar.update(value=self.n_completed_tasks)
+        nonlocal last_completed
+        completed = self.n_completed_tasks
+        if completed > last_completed:
+            pbar.update(value=completed)
+            last_completed = completed
 
     pbar.reset()
     original_print_progress = jl.parallel.Parallel.print_progress

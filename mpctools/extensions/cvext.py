@@ -68,7 +68,7 @@ class Homography:
     def __convert(points, homog):
         points = np.array(points, copy=False, ndmin=2)
         valid = np.isfinite(points).all(axis=1)
-        new_coords = np.full_like(points, fill_value=np.NaN)
+        new_coords = np.full_like(points, fill_value=np.nan)
         new_coords[valid, :] = np.squeeze(
             cv2.perspectiveTransform(np.expand_dims(points[valid, :], axis=0), homog)
         )
@@ -529,7 +529,7 @@ def pairwise_iou(a, b, cutoff=0, distance=False):
     :return: A Matrix of size N_a by N_b
     """
     dists = np.empty([len(a), len(b)], dtype=float)
-    inadm = np.PINF if distance else np.NINF
+    inadm = np.inf if distance else -np.inf
     for a_i, a_bb in enumerate(a):
         if a_bb is None:
             for b_i, b_bb in enumerate(b):
@@ -690,7 +690,7 @@ class BoundingBox:
 
     @property
     def aspect(self):
-        return (self.size[0]/self.size[1]) if (self.size > 0).all() else np.NaN
+        return (self.size[0]/self.size[1]) if (self.size > 0).all() else np.nan
 
     @property
     def corners(self):
@@ -808,7 +808,7 @@ def average_bbox(bboxes):
         avg = np.mean(np.asarray([bb.extrema for bb in bboxes]), axis=0)
         return BoundingBox(tl=avg[:2], br=avg[2:])
     else:
-        return np.NaN
+        return np.nan
 
 
 def build_line(pts, normalised=True):

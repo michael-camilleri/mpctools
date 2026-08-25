@@ -174,7 +174,7 @@ def segment_periods(df, fill_holes=False):
     """
     if fill_holes:
         df = df.notnull()
-        df[~df] = np.NaN
+        df[~df] = np.nan
         for c in df.columns:
             df.loc[df[c].first_valid_index():df[c].last_valid_index(), c] = 1.0
     return df.notnull().diff(axis=0).any(axis=1).cumsum()
@@ -193,7 +193,7 @@ def diff(df, periods=1, fillna=False, axis=0):
     def __diff(s, p, n):
         d = s.ne(s.shift(periods=p).bfill()).astype(float)
         if not n:
-            d.iloc[:p] = np.NaN
+            d.iloc[:p] = np.nan
         return d
 
     if isinstance(df, pd.Series):
@@ -240,4 +240,6 @@ def parallel_apply(df, func, axis=0, n_jobs=8, split=200, raw=False, title=None)
             res = jl.Parallel(n_jobs=n_jobs, prefer='processes')(jl.delayed(__parallel_apply)(grp, func, axis, raw) for grp in df)
         return [r for rr in res for r in rr] if raw else pd.concat(res, axis=(1 - axis))
     else:
-        return pd.concat(parallelise(func, [grp for _, grp in df], n_jobs=n_jobs, title=title), keys=[ix for ix, _ in df])
+        return pd.concat(
+            parallelise(func, [grp for _, grp in df], n_jobs=n_jobs, title=title), keys=[ix for ix, _ in df]
+        )

@@ -414,7 +414,7 @@ def plot_categorical(
     _data = np.vstack(_data)
 
     # Generate Discrete Colour Map
-    base = plt.cm.get_cmap(cmap)
+    base = plt.get_cmap(cmap)
     color_list = base(np.linspace(0, 1, N))
     cmap_name = base.name + str(N)
 
@@ -470,7 +470,7 @@ def plot_lifespans(
     if type(colors) in (list, tuple):
         color_list = colors
     elif type(colors) is str:
-        clrmap = plt.cm.get_cmap(colors)
+        clrmap = plt.get_cmap(colors)
         color_list = clrmap(np.linspace(0, 1, min(n_series, clrmap.N)))
     elif colors is False:
         color_list = [(0.75, 0.75, 0.75, 1.0)] # Gray Colour
@@ -480,7 +480,7 @@ def plot_lifespans(
     # To simplify computation load
     if color_list is not None:
         ts = pd.notnull(ts).astype(float)
-        ts[ts == 0] = np.NaN
+        ts[ts == 0] = np.nan
 
     # Iterate over time-series (columns):
     for i in range(n_series):

@@ -201,7 +201,7 @@ def run_lengths(a, how="I", return_values=False, return_positions=False):
     Compute the length of continuous runs of the same values in an array.
 
     :param a: Array If not one-d, the input is flattened.
-    :param how: How to treat values including np.NaN
+    :param how: How to treat values including np.nan
                     A: use All values (including treating NaN as its own de-facto value)
                     I: Ignore NaN values but treat all others as before. Note that if an NaN
                        interrupts a stream of same values, then these will be treated as SEPARATE
@@ -332,7 +332,7 @@ def hungarian(costs: np.ndarray, maximise=False, cutoff=None, row_labels=None, c
 
     This method is a wrapper lapsolver's solve_dense that:
      1. Can Threshold certain costs,
-     2. Can Handle np.NaN (as np.Inf)
+     2. Can Handle np.nan (as np.inf)
      3. Can deal with rows/columns of NaN
      4. Can keep track of labels, rather than just indices
 
@@ -579,7 +579,7 @@ class delta:
         return int(np.array_equal(self.loc, np.array(x, ndmin=1)))
 
     def logpdf(self, x):
-        return 0 if self.pdf(x) == 1 else np.NINF
+        return 0 if self.pdf(x) == 1 else -np.inf
 
 
 def welch_dof(*x):
